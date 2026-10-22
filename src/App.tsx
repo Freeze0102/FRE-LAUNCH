@@ -182,7 +182,7 @@ export default function App() {
         <div className="toolbar version-footer"><b>Обрано: {selected || "нічого"}</b><button className="primary" disabled={!selected || busy} onClick={() => void installVersion(selected)}><HardDriveDownload size={17}/> Встановити / перевірити</button></div>
         <p className="muted">Сумісність історичних версій може відрізнятися. Підтримка окремих модлоадерів ще не готова.</p>
       </section>}
-      {page === "Instances" && <InstancesPanel version={selected} active={activeInstanceId} setActive={setActiveInstanceId} setVersion={setSelected} navigateHome={() => setPage("Home")}/>}
+      {page === "Instances" && <InstancesPanel version={selected} active={activeInstanceId} setActive={setActiveInstanceId} setVersion={setSelected} setMemory={setMemoryMb} navigateHome={() => setPage("Home")}/>}
       {page === "Mods" && <ModsPanel version={selected} instanceId={activeInstanceId}/>}
       {page === "Skins" && <SkinStudio/>}
       {page === "Backups" && <BackupsPanel instanceId={activeInstanceId} instanceName={activeInstanceId ? "Вибрана збірка" : ""}/>}

@@ -24,10 +24,11 @@ type InstancesProps = {
   active: string;
   setActive: (id: string) => void;
   setVersion: (version: string) => void;
+  setMemory: (memoryMb: number) => void;
   navigateHome: () => void;
 };
 
-export function InstancesPanel({version, active, setActive, setVersion, navigateHome}: InstancesProps) {
+export function InstancesPanel({version, active, setActive, setVersion, setMemory, navigateHome}: InstancesProps) {
   const [instances, setInstances] = useState<Instance[]>([]);
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
@@ -52,6 +53,7 @@ export function InstancesPanel({version, active, setActive, setVersion, navigate
       const created = await invoke<Instance>("create_instance", {name, version});
       setName("");
       setActive(created.id);
+      setMemory(created.memoryMb);
       await refresh();
     } catch (err) { setError(String(err)); }
     finally { setBusy(false); }
@@ -87,6 +89,7 @@ export function InstancesPanel({version, active, setActive, setVersion, navigate
     try {
       await invoke("update_instance", {id: instance.id, name: editName, favorite: instance.favorite, memoryMb: editMemory, javaPath: editJava.trim() || null});
       setEditing(null);
+      if (active === instance.id) setMemory(editMemory);
       await refresh();
     } catch (err) {setError(String(err));}
     finally {setBusy(false);}
@@ -109,7 +112,7 @@ export function InstancesPanel({version, active, setActive, setVersion, navigate
         <div className="instance-info"><b>{instance.name}</b><span>{instance.version} · {instance.memoryMb} MB RAM</span></div>
         <button className={"icon-button" + (instance.favorite ? " starred" : "")} title="Обране" onClick={() => void favorite(instance)}><Star size={17} fill={instance.favorite ? "currentColor" : "none"}/></button>
         <button className="icon-button" title="Редагувати" onClick={() => editing === instance.id ? setEditing(null) : beginEdit(instance)}><Pencil size={17}/></button>
-        <button className="secondary" onClick={() => {setActive(instance.id); setVersion(instance.version); navigateHome();}}>Обрати</button>
+        <button className="secondary" onClick={() => {setActive(instance.id); setVersion(instance.version); setMemory(instance.memoryMb); navigateHome();}}>Обрати</button>
         <button className="icon-button danger" title="Прибрати (без видалення світів)" onClick={() => void remove(instance)}><Trash2 size={17}/></button>
         {editing === instance.id && <div className="instance-editor">
           <label className="field-label">Назва</label>
