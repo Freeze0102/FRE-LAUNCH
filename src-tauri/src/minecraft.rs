@@ -19,7 +19,7 @@ fn progress(app: &AppHandle, stage: &str, current: usize, total: usize, message:
     let _ = app.emit("install-progress", Progress { stage: stage.into(), current, total, message: message.into() });
 }
 
-fn validate_version(id: &str) -> Result<(), String> {
+pub(super) fn validate_version(id: &str) -> Result<(), String> {
     if id.is_empty() || id.len() > 100 || !id.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-')) || id == "." || id == ".." {
         return Err("Invalid Minecraft version identifier".into());
     }
@@ -272,8 +272,7 @@ fn jvm_arg_replace(s: &str, base: &Path, version: &str, classpath: &str) -> Stri
      .replace("${classpath_separator}", if cfg!(windows) { ";" } else { ":" })
 }
 
-fn game_arg_replace(s: &str, base: &Path, version: &str, name: &str, uuid: &str, meta: &Value) -> String {
-    let dir = base.join("instances").join(version);
+fn game_arg_replace(s: &str, base: &Path, version: &str, dir: &Path, name: &str, uuid: &str, meta: &Value) -> String {
     let assets = base.join("assets");
     s.replace("${auth_player_name}", name)
      .replace("${version_name}", version)
@@ -318,19 +317,19 @@ fn stable_uuid(name: &str) -> String {
 }
 
 #[tauri::command]
-pub async fn launch_game(app: AppHandle, version: String, nickname: String, memory_mb: u32) -> Result<String, String> {
+pub async fn launch_game(app: AppHandle, version: String, nickname: String, memory_mb: u32, instance_id: Option<String>) -> Result<String, String> {
     validate_version(&version)?;
     if nickname.is_empty() || nickname.len()>16 || !nickname.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_') {
         return Err("Нікнейм: 1–16 латинських літер, цифр або _".into());
     }
     if !(512..=32768).contains(&memory_mb) { return Err("RAM must be between 512 and 32768 MB".into()); }
     if RUNNING.swap(true, Ordering::SeqCst) { return Err("Minecraft уже запускається або працює".into()); }
-    let result = launch_inner(app.clone(), version, nickname, memory_mb).await;
+    let result = launch_inner(app.clone(), version, nickname, memory_mb, instance_id).await;
     if result.is_err() { RUNNING.store(false, Ordering::SeqCst); }
     result
 }
 
-async fn launch_inner(app: AppHandle, version: String, nickname: String, memory_mb: u32) -> Result<String, String> {
+async fn launch_inner(app: AppHandle, version: String, nickname: String, memory_mb: u32, instance_id: Option<String>) -> Result<String, String> {
     let base = root(&app)?;
     let cached_metadata = base.join("versions").join(&version).join(format!("{version}.json"));
     // Installed games must remain launchable without contacting Mojang.
@@ -342,14 +341,24 @@ async fn launch_inner(app: AppHandle, version: String, nickname: String, memory_
     } else {
         install(&app, &version).await?
     };
-    let java = java_info()?;
+    let profile = if let Some(id) = instance_id.as_deref() { Some(super::instances::read(&app, id)?) } else { None };
+    if let Some(profile) = &profile {
+        if profile.version != version { return Err("Instance version mismatch".into()); }
+    }
+    let java_bin = profile.as_ref().and_then(|p| p.java_path.as_deref()).unwrap_or("java");
+    let java_output = std::process::Command::new(java_bin).arg("-version").output()
+        .map_err(|e| format!("Java executable not found: {e}"))?;
+    if !java_output.status.success() { return Err("Java version check failed".into()); }
+    let java = String::from_utf8_lossy(&java_output.stderr).lines().next().unwrap_or("").to_owned();
     if let Some(required) = meta["javaVersion"]["majorVersion"].as_u64() {
         let actual = java_major(&java).ok_or("Не вдалося визначити версію Java")?;
         if actual != required as u32 {
             return Err(format!("Minecraft {version} потребує Java {required}, але знайдено Java {actual}. Встанови відповідну Java та вибери її через PATH."));
         }
     }
-    let dir = base.join("instances").join(&version);
+    let dir = if let Some(id) = instance_id.as_deref() {
+        super::instances::game_directory(&app, id, &version)?
+    } else { base.join("instances").join(&version) };
     fs::create_dir_all(&dir).await.map_err(|e| e.to_string())?;
     let mut cp = Vec::new();
     for (_, path, _, native) in libraries(&meta, &base)? {
@@ -369,9 +378,9 @@ async fn launch_inner(app: AppHandle, version: String, nickname: String, memory_
     let game_args = if let Some(legacy) = meta["minecraftArguments"].as_str() {
         legacy.split_whitespace().map(str::to_string).collect::<Vec<String>>()
     } else { parse_arguments(&meta["arguments"]["game"]) };
-    args.extend(game_args.iter().map(|s| game_arg_replace(s, &base, &version, &nickname, &uuid, &meta)));
+    args.extend(game_args.iter().map(|s| game_arg_replace(s, &base, &version, &dir, &nickname, &uuid, &meta)));
 
-    let mut command = Command::new("java");
+    let mut command = Command::new(java_bin);
     command.args(&args).current_dir(&dir).stdout(Stdio::piped()).stderr(Stdio::piped()).kill_on_drop(true);
     let mut child = command.spawn().map_err(|e| format!("Не вдалося запустити Java: {e}"))?;
     let pid = child.id().unwrap_or(0);
