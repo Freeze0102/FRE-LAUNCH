@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { SkinViewer, WalkingAnimation, RunningAnimation } from "skinview3d";
 import { ImagePlus, RotateCcw, Footprints, Pause, Play, Upload } from "lucide-react";
+import SkinPixelEditor from "./SkinPixelEditor";
 
 type Animate = "idle" | "walk" | "run";
 const STORAGE_SKIN = "fre-launch:skin-preview";
@@ -80,7 +81,11 @@ export default function SkinStudio() {
     image.src = local;
   }
 
-  return <div className="studio-grid">
+  function applySkin(dataUrl:string){
+    try {localStorage.setItem(STORAGE_SKIN,dataUrl);setSkin(dataUrl);}
+    catch {setError("Не вдалося зберегти відредагований скін.");}
+  }
+  return <><div className="studio-grid">
     <section className="panel skin-stage">
       <div className="panel-heading"><h3>FRE SKIN STUDIO</h3><ImagePlus size={19}/></div>
       <div className="skin-canvas"><canvas ref={canvas} aria-label="3D-попередній перегляд скіна Minecraft"/></div>
@@ -101,5 +106,5 @@ export default function SkinStudio() {
       {error && <p className="error">{error}</p>}
       <p className="muted">Це локальний 3D-перегляд. Застосування скінів до Microsoft-акаунта поки не підтримується.</p>
     </section>
-  </div>;
+  </div>{skin && <SkinPixelEditor source={skin} onEdit={applySkin}/>}</>;
 }
