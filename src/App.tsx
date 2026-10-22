@@ -7,6 +7,7 @@ import { create } from "zustand";
 import { InstancesPanel, ModsPanel } from "./Features";
 import SkinStudio from "./SkinStudio";
 import BackupsPanel from "./BackupsPanel";
+import AccountsPanel from "./AccountsPanel";
 import { persist } from "zustand/middleware";
 
 type Version = { id: string; type: string; url: string; time: string; releaseTime: string };
@@ -65,7 +66,6 @@ export default function App() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
   const [java, setJava] = useState("Перевірка Java...");
-  const [editNick, setEditNick] = useState("");
   const [task, setTask] = useState<Task>("idle");
   const [installed, setInstalled] = useState(false);
   const [progress, setProgress] = useState<Progress | null>(null);
@@ -185,7 +185,7 @@ export default function App() {
       {page === "Mods" && <ModsPanel version={selected} instanceId={activeInstanceId}/>}
       {page === "Skins" && <SkinStudio/>}
       {page === "Backups" && <BackupsPanel instanceId={activeInstanceId} instanceName={activeInstanceId ? "Вибрана збірка" : ""}/>}
-      {page === "Accounts" && <section className="panel narrow"><div className="panel-heading"><h3>Локальний офлайн-профіль</h3><UserRound size={19}/></div><p>Офлайн-профіль для локального запуску та сумісної одиночної гри. Не замінює офіційну ліцензію.</p><label className="field-label">Нікнейм (1–16 символів)</label><div className="toolbar"><input className="input" value={editNick} placeholder={nickname} maxLength={16} onChange={(e) => setEditNick(e.target.value.replace(/[^a-zA-Z0-9_]/g, ""))}/><button className="primary" disabled={!editNick} onClick={() => {if (editNick) setNickname(editNick); setEditNick("");}}>Зберегти</button></div><p className="muted">Microsoft OAuth та перевірка ліцензійних акаунтів ще не реалізовані.</p></section>}
+      {page === "Accounts" && <AccountsPanel nickname={nickname} onSelect={setNickname}/>}
       {page === "Settings" && <section className="panel narrow">
         <div className="panel-heading"><h3>FRE THEMES</h3><Settings2 size={19}/></div>
         <p>Зміна теми застосовується миттєво і зберігається після перезапуску лаунчера.</p>
