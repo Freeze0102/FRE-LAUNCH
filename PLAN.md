@@ -1,15 +1,22 @@
-# FRE LAUNCH implementation plan
+# FRE LAUNCH development roadmap
 
-1. [x] Tauri 2 / React / TypeScript / Rust foundation.
-2. [x] Official Minecraft version discovery.
-3. [x] Initial vanilla Minecraft installer and launch engine code (not runtime verified).
-4. [x] Initial progress/log streaming and local offline profiles.
-5. [ ] Resolve all CI build issues and verify installer.
-6. [ ] Verify at least one modern vanilla release launches on Windows.
-7. [ ] Implement managed Java installation, automatic runtime selection and independent instances.
-8. [ ] Secure Microsoft OAuth with entitlement verification.
-9. [ ] Add Fabric / Forge / NeoForge / Quilt and Modrinth integration.
-10. [ ] Build skin studio, server browser, backups, themes, localization and updater.
-11. [ ] Automated integration tests, security review and stable release.
+- [x] Base Tauri/React/Rust UI and GitHub Windows installer.
+- [x] Official Minecraft version discovery.
+- [x] Vanilla client/library/resource installer and preliminary offline launch engine.
+- [x] Live logs, real progress and SHA-1 verification.
+- [x] SQLite database for separated instances, preferences and per-instance Java/RAM.
+- [x] Verified resource pack installation and Modrinth discovery.
+- [x] Interactive skin preview and imported PNG capes.
+- [x] Persistent UI color themes.
+- [x] SQLite offline account manager with multiple local nicknames.
+- [x] ZIP world backups with non-overwriting restoration.
+- [x] Discover installed Java runtimes and configure each instance.
+- [ ] Verify Windows 0.3.0 CI with tests; fix all failures.
+- [ ] Verify actual game launch on a Windows PC and cover older versions.
+- [ ] Java runtime download and automatic path selection.
+- [ ] Microsoft OAuth and Minecraft ownership checks.
+- [ ] Fabric/Forge/NeoForge/Quilt and compatible mod installation.
+- [ ] Server manager, updater, complete translations, logging/privacy hardening.
+- [ ] Release verified stable installer.
 
-**Priority:** a verified launch path and reliable builds over speculative features.
+Current policy: never claim runtime verification solely because GitHub Actions builds the executable.
