@@ -8,6 +8,7 @@ import { InstancesPanel, ModsPanel } from "./Features";
 import SkinStudio from "./SkinStudio";
 import BackupsPanel from "./BackupsPanel";
 import AccountsPanel from "./AccountsPanel";
+import JavaPanel from "./JavaPanel";
 import { persist } from "zustand/middleware";
 
 type Version = { id: string; type: string; url: string; time: string; releaseTime: string };
@@ -203,6 +204,7 @@ export default function App() {
         <p>RAM зберігається локально. Окремі збірки можуть мати власні налаштування у FRE INSTANCES.</p>
         <hr/><div className="panel-heading"><h3>Java</h3><Coffee size={19}/></div>
         <p>{java}</p><p className="muted">Для власного шляху до Java відкрий налаштування конкретної збірки.</p>
+        <JavaPanel instanceId={activeInstanceId}/>
       </section>}
       {page === "Downloads" && <section className="panel narrow"><div className="panel-heading"><h3>Стан встановлення</h3><Download size={19}/></div>{progress ? <><p>{progress.message}</p><p>{progress.stage}: {progress.current}/{progress.total}</p></> : <p>Наразі немає активних завантажень.</p>}</section>}
       {page === "Logs" && <section className="panel"><div className="panel-heading"><h3>Журнал Minecraft</h3><Terminal size={19}/></div><div className="toolbar"><button className="secondary" disabled={!logs.length} onClick={() => void navigator.clipboard.writeText(logs.join("\n"))}><Copy size={15}/> Копіювати логи</button><button className="secondary" onClick={() => setLogs([])}>Очистити</button></div><pre className="log-view">{logs.length ? logs.join("\n") : "Логи з’являться тут після запуску Minecraft."}</pre></section>}
