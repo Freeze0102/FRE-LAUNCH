@@ -33,9 +33,10 @@ fn table(app: &AppHandle) -> Result<rusqlite::Connection, String> {
 pub fn list_offline_accounts(app: AppHandle) -> Result<Vec<OfflineAccount>, String> {
     let conn = table(&app)?;
     let mut stmt = conn.prepare("SELECT id,nickname,offline_uuid FROM offline_accounts ORDER BY nickname COLLATE NOCASE").map_err(|e|e.to_string())?;
-    stmt.query_map([], |r| Ok(OfflineAccount { id:r.get(0)?,nickname:r.get(1)?,offline_uuid:r.get(2)? }))
+    let accounts: Result<Vec<OfflineAccount>, String> = stmt.query_map([], |r| Ok(OfflineAccount { id:r.get(0)?,nickname:r.get(1)?,offline_uuid:r.get(2)? }))
         .map_err(|e|e.to_string())?
-        .map(|x|x.map_err(|e|e.to_string())).collect()
+        .map(|x|x.map_err(|e|e.to_string())).collect();
+    accounts
 }
 
 #[tauri::command]
