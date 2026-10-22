@@ -21,7 +21,7 @@ fn db_file(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(folder.join("fre-launch.sqlite3"))
 }
 
-fn db(app: &AppHandle) -> Result<Connection, String> {
+pub(super) fn db(app: &AppHandle) -> Result<Connection, String> {
     let connection = Connection::open(db_file(app)?).map_err(|e| e.to_string())?;
     connection.execute_batch(
         "PRAGMA busy_timeout=5000;
