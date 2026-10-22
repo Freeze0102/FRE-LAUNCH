@@ -96,3 +96,14 @@
 .backup-row button{display:flex;align-items:center;gap:6px}
 .backup-icon{width:40px;height:40px;border-radius:11px;display:grid;place-items:center;background:#373054;color:#c5abff}
 [data-theme="light"] .backup-row{background:#f5f5fd;border-color:#d7dbea}
+
+
+.account-grid{display:flex;flex-direction:column;gap:11px;margin-top:19px}
+.account-card{display:flex;align-items:center;gap:12px;background:#1e2031;border:1px solid #343651;border-radius:14px;padding:14px}
+.account-card.chosen{border-color:#9372fa}
+.account-avatar{width:42px;height:42px;display:grid;place-items:center;background:linear-gradient(135deg,#9b71e9,#6761ad);border-radius:12px;font-weight:900;font-size:20px}
+.account-details{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1}
+.account-details b{font-size:13px}
+.account-details span{font-size:10px;color:#8b8ea5;overflow-wrap:anywhere}
+.account-card .secondary{display:flex;gap:7px;align-items:center}
+[data-theme="light"] .account-card{background:#f8f7ff;color:#282943;border-color:#d4d7e8}
