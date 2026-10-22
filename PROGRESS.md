@@ -1,35 +1,33 @@
-# FRE LAUNCH — progress
+# FRE LAUNCH — PROGRESS
 
-## Current milestone: 0.2.0 Alpha
+## 0.3.0 Alpha (candidate, CI verification pending)
 
-### Implemented in this branch (UNVERIFIED until CI finishes)
-- Repair workflow setup: eliminate npm caching without lockfile; generate application icons from SVG before Tauri compilation.
-- Rust Minecraft vanilla installer: official version metadata, client JAR, library downloads, asset index and hashed resources, safe native JAR extraction.
-- SHA-1 validation for Mojang artifacts and safe temporary downloads.
-- Modern and legacy JVM/game argument preparation (vanilla only, Windows targeted).
-- Java PATH detection and basic compatibility check.
-- Local offline UUID generation, nickname validation and process spawning.
-- Real-time Minecraft logs and installation progress emitted to frontend.
-- Version selection, real Install/Play actions, progress/logs panels.
-- Persisted local nickname, selected version, and RAM using Zustand local storage.
-- Windows GitHub Actions build with NSIS artifact and portable EXE artifact if available.
+### Implemented in repository
+- Tauri 2 / Rust / React / TypeScript desktop project.
+- Windows GitHub Actions with TypeScript, Rust unit tests, icon generation, NSIS installer and portable EXE artifacts.
+- Mojang version manifest discovery for release, snapshots, old alpha and beta.
+- Vanilla installer: client libraries, resources, SHA-1 download integrity, native extraction.
+- Offline-compatible launcher process with Java path and per-instance directories; live log stream and launch status.
+- **SQLite instance manager:** create, rename, favorite, independent game folders, per-instance RAM and Java executable.
+- **Modrinth catalog:** real searches filtered by version/category. Verified resource-pack ZIP installer into selected instance with SHA-512 validation.
+- **FRE SKIN STUDIO:** interactive 3D viewer, rotation, walking/running animation, skin PNG and cape preview; skin PNG saved locally.
+- **FRE THEMES:** five live presets persisted across restarts.
+- Ukrainian interface, local nickname, recent selected version and RAM settings.
+- Safety: UUID-based paths, version sanitization, file hashes, no shell execution, HTTPS-only approved download hosts.
 
-### Not implemented / limitations
-- Microsoft OAuth, entitlement validation, secure token vault.
-- Fabric, Forge, NeoForge, Quilt, Modrinth.
-- Custom skins and capes.
-- Separate configurable instances, backups, servers, updater.
-- Java runtime downloader / per-instance Java selection.
-- Full language switching and theme system.
-- Legacy versions with inherited metadata or missing download fields; old legacy asset behavior remains incomplete.
-- No confirmed runtime test on Windows or confirmed successful GitHub Actions build yet.
+### Unsupported / next work
+- Mojang/Microsoft OAuth and premium entitlement validation; no Minecraft purchase bypass.
+- Forge, Fabric, NeoForge, Quilt, dependency-resolving mod install, import/export modpacks.
+- Auto-installation of managed Java, signed updates, complete multilingual translations.
+- Server ping, backups, skin upload to licensed account, screenshot gallery.
+- Full legacy version launch compatibility (old alpha/beta may need metadata/assets not currently handled).
 
-### Testing status
-The execution environment used to author these commits does not have Cargo/Rust or network access to install npm packages; TypeScript and Rust compilation remain UNVERIFIED until GitHub Actions completes. Do NOT advertise a working installer or verified game launch.
+### Verification status
+Windows build in main for 0.2.0 passed; Minecraft gameplay not independently verified.
+**0.3.0 feature branch must pass CI and get a successful Windows installer before merge.**
 
-### Next tasks
-1. Inspect GitHub Actions build and fix any errors until it is green.
-2. Install and launch a recent vanilla release on Windows, check logs.
-3. Replace hardcoded Java PATH with managed runtimes.
-4. Add robust persistent SQLite installation metadata and independent instances.
-5. Continue with authenticated profiles, modloaders, skins, and full i18n.
+## Next actions
+1. Run 0.3.0 CI on PR and fix Rust/TS build failures.
+2. Verify installing and launching a recent Java release with compatible Java runtime on Windows.
+3. Add managed Java runtime automatic selection and native dependency edge cases.
+4. Build full Microsoft account sign-in and integrity-tested modloader support.
