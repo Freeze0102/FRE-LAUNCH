@@ -331,8 +331,17 @@ pub async fn launch_game(app: AppHandle, version: String, nickname: String, memo
 }
 
 async fn launch_inner(app: AppHandle, version: String, nickname: String, memory_mb: u32) -> Result<String, String> {
-    let meta = install(&app, &version).await?;
     let base = root(&app)?;
+    let cached_metadata = base.join("versions").join(&version).join(format!("{version}.json"));
+    // Installed games must remain launchable without contacting Mojang.
+    // A manual reinstall explicitly rechecks the downloaded files.
+    let meta = if fs::try_exists(base.join("versions").join(&version).join(".installed"))
+        .await.map_err(|e| e.to_string())? && fs::try_exists(&cached_metadata).await.map_err(|e| e.to_string())? {
+        let bytes = fs::read(&cached_metadata).await.map_err(|e| e.to_string())?;
+        serde_json::from_slice::<Value>(&bytes).map_err(|e| e.to_string())?
+    } else {
+        install(&app, &version).await?
+    };
     let java = java_info()?;
     if let Some(required) = meta["javaVersion"]["majorVersion"].as_u64() {
         let actual = java_major(&java).ok_or("Не вдалося визначити версію Java")?;
@@ -407,6 +416,11 @@ mod tests {
     fn offline_uuid_is_stable() {
         assert_eq!(stable_uuid("Player"), stable_uuid("Player"));
         assert_ne!(stable_uuid("Player"), stable_uuid("Other"));
+    }
+    #[test]
+    fn sha1_check_detects_tampering() {
+        assert!(matches_sha(b"hello", "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"));
+        assert!(!matches_sha(b"world", "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"));
     }
     #[test]
     fn java_version_detection() {
