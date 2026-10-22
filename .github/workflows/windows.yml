@@ -5,24 +5,49 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: windows-latest
+    timeout-minutes: 65
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          node-version: "22"
-          cache: npm
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Install dependencies
-        run: npm install
-      - name: Frontend check
+          node-version: '22'
+          # No npm lockfile is committed yet; cache: npm would fail before installation.
+      - name: Set up Rust stable
+        uses: dtolnay/rust-toolchain@stable
+      - name: Cache Rust build output
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+      - name: Install frontend dependencies
+        run: npm install --no-audit --no-fund
+      - name: Verify TypeScript
         run: npm run check
+      - name: Build frontend
+        run: npm run build
+      - name: Generate application icons
+        run: npm run tauri icon src-tauri/icons/app.svg
+      - name: Run Rust unit tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml
       - name: Build Windows installer
         run: npm run tauri build
-      - uses: actions/upload-artifact@v4
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
         with:
           name: FRE-LAUNCH-Windows-Installer
           path: src-tauri/target/release/bundle/nsis/*
           if-no-files-found: error
+      - name: Upload portable Windows executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: FRE-LAUNCH-Windows-Portable
+          path: src-tauri/target/release/fre-launch.exe
+          if-no-files-found: warn

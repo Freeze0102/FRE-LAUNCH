@@ -1,3 +1,4 @@
+mod minecraft;
 use serde::{Deserialize, Serialize};
 use std::process::Command;
 
@@ -37,7 +38,7 @@ fn detect_java() -> Result<String, String> {
 
 pub fn run() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![get_versions, detect_java])
+        .invoke_handler(tauri::generate_handler![get_versions, detect_java, minecraft::java_info, minecraft::install_version, minecraft::is_installed, minecraft::launch_game])
         .run(tauri::generate_context!())
         .expect("error while running FRE LAUNCH");
 }

@@ -1,0 +1,430 @@
+use futures::stream::{self, StreamExt};
+use reqwest::Client;
+use serde::Serialize;
+use serde_json::Value;
+use sha1::{Digest, Sha1};
+use std::{collections::HashSet, path::{Path, PathBuf}, process::Stdio, sync::atomic::{AtomicBool, Ordering}, time::Duration};
+use tauri::{AppHandle, Emitter, Manager};
+use tokio::{fs, io::{AsyncBufReadExt, BufReader}, process::Command};
+use uuid::Uuid;
+
+static RUNNING: AtomicBool = AtomicBool::new(false);
+const MANIFEST: &str = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct Progress { stage: String, current: usize, total: usize, message: String }
+
+fn progress(app: &AppHandle, stage: &str, current: usize, total: usize, message: impl Into<String>) {
+    let _ = app.emit("install-progress", Progress { stage: stage.into(), current, total, message: message.into() });
+}
+
+fn validate_version(id: &str) -> Result<(), String> {
+    if id.is_empty() || id.len() > 100 || !id.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-')) || id == "." || id == ".." {
+        return Err("Invalid Minecraft version identifier".into());
+    }
+    Ok(())
+}
+
+fn root(app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(app.path().app_data_dir().map_err(|e| e.to_string())?.join("minecraft"))
+}
+
+fn client() -> Result<Client, String> {
+    Client::builder().timeout(Duration::from_secs(120)).user_agent("FRE-LAUNCH/0.2 (Minecraft launcher)").build().map_err(|e| e.to_string())
+}
+
+fn value_str<'a>(v: &'a Value, key: &str) -> Result<&'a str, String> {
+    v.get(key).and_then(Value::as_str).ok_or_else(|| format!("Missing required metadata property: {key}"))
+}
+
+fn allowed_url(url: &str) -> Result<(), String> {
+    let parsed = reqwest::Url::parse(url).map_err(|e| e.to_string())?;
+    if parsed.scheme() != "https" { return Err(format!("Insecure download URL: {url}")); }
+    let host = parsed.host_str().unwrap_or("").to_ascii_lowercase();
+    if !matches!(host.as_str(),
+        "piston-meta.mojang.com" | "piston-data.mojang.com" |
+        "resources.download.minecraft.net" | "libraries.minecraft.net" |
+        "launcher.mojang.com" | "launchermeta.mojang.com" |
+        "meta.mojang.com" | "s3.amazonaws.com") {
+        return Err(format!("Untrusted download domain: {host}"));
+    }
+    Ok(())
+}
+
+async fn fetch_json(client: &Client, url: &str) -> Result<Value, String> {
+    allowed_url(url)?;
+    client.get(url).send().await.map_err(|e| e.to_string())?
+        .error_for_status().map_err(|e| e.to_string())?
+        .json::<Value>().await.map_err(|e| e.to_string())
+}
+
+fn matches_sha(bytes: &[u8], expected: &str) -> bool {
+    format!("{:x}", Sha1::digest(bytes)).eq_ignore_ascii_case(expected)
+}
+
+async fn download_one(client: &Client, url: &str, path: &Path, sha1: Option<&str>) -> Result<(), String> {
+    allowed_url(url)?;
+    if fs::try_exists(path).await.map_err(|e| e.to_string())? {
+        if let Some(expected) = sha1 {
+            let old = fs::read(path).await.map_err(|e| e.to_string())?;
+            if matches_sha(&old, expected) { return Ok(()); }
+        } else { return Ok(()); }
+    }
+    let res = client.get(url).send().await.map_err(|e| format!("Download request failed: {e}"))?
+        .error_for_status().map_err(|e| format!("Download rejected: {e}"))?;
+    let bytes = res.bytes().await.map_err(|e| e.to_string())?;
+    if let Some(expected) = sha1 {
+        if !matches_sha(&bytes, expected) { return Err(format!("SHA1 mismatch downloading {}", path.display())); }
+    }
+    if let Some(parent) = path.parent() { fs::create_dir_all(parent).await.map_err(|e| e.to_string())?; }
+    let temporary = path.with_extension("fre-download");
+    fs::write(&temporary, &bytes).await.map_err(|e| e.to_string())?;
+    if fs::try_exists(path).await.unwrap_or(false) { fs::remove_file(path).await.map_err(|e| e.to_string())?; }
+    fs::rename(&temporary, path).await.map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+fn os_rules(item: &Value) -> bool {
+    let Some(rules) = item.get("rules").and_then(Value::as_array) else { return true; };
+    let mut accepted = false;
+    for rule in rules {
+        if rule.get("features").is_some() { continue; }
+        let os = rule.get("os");
+        let name_match = os.and_then(|v| v.get("name")).and_then(Value::as_str)
+            .map(|name| name == "windows").unwrap_or(true);
+        let arch_match = os.and_then(|v| v.get("arch")).and_then(Value::as_str)
+            .map(|arch| match arch { "x86" => cfg!(target_arch = "x86"), "x86_64" => cfg!(target_arch = "x86_64"), _ => false })
+            .unwrap_or(true);
+        if name_match && arch_match {
+            accepted = rule.get("action").and_then(Value::as_str) == Some("allow");
+        }
+    }
+    accepted
+}
+
+fn sha_from(item: &Value) -> Option<&str> { item.get("sha1").and_then(Value::as_str) }
+
+fn safe_relative(s: &str) -> Result<PathBuf, String> {
+    let path = Path::new(s);
+    if path.components().any(|c| !matches!(c, std::path::Component::Normal(_))) {
+        return Err("Invalid relative download path".into());
+    }
+    Ok(path.to_path_buf())
+}
+
+async fn version_meta(client: &Client, version: &str) -> Result<Value, String> {
+    validate_version(version)?;
+    let manifest = fetch_json(client, MANIFEST).await?;
+    let entry = manifest["versions"].as_array().ok_or("Missing versions array")?
+        .iter().find(|v| v["id"].as_str() == Some(version)).ok_or("Minecraft version not found")?;
+    let url = value_str(entry, "url")?;
+    let details = fetch_json(client, url).await?;
+    if details.get("inheritsFrom").is_some() {
+        return Err("Inherited versions are not supported by the vanilla installer yet".into());
+    }
+    Ok(details)
+}
+
+fn libraries(metadata: &Value, base: &Path) -> Result<Vec<(String, PathBuf, Option<String>, bool)>, String> {
+    let mut result = Vec::new();
+    for lib in metadata["libraries"].as_array().ok_or("Missing libraries array")? {
+        if !os_rules(lib) { continue; }
+        let Some(downloads) = lib.get("downloads") else { continue; };
+        if let Some(artifact) = downloads.get("artifact") {
+            let path = safe_relative(value_str(artifact, "path")?)?;
+            result.push((value_str(artifact, "url")?.to_string(), base.join("libraries").join(path), sha_from(artifact).map(str::to_string), false));
+        }
+        if let Some(classifiers) = downloads.get("classifiers") {
+            let key = lib["natives"]["windows"].as_str().unwrap_or("");
+            let key = key.replace("${arch}", if cfg!(target_arch = "x86_64") { "64" } else { "32" });
+            if let Some(archive) = classifiers.get(&key) {
+                let path = safe_relative(value_str(archive, "path")?)?;
+                result.push((value_str(archive, "url")?.to_string(), base.join("libraries").join(path), sha_from(archive).map(str::to_string), true));
+            }
+        }
+    }
+    Ok(result)
+}
+
+fn extract_natives(archives: &[PathBuf], dest: &Path) -> Result<(), String> {
+    std::fs::create_dir_all(dest).map_err(|e| e.to_string())?;
+    for archive in archives {
+        let file = std::fs::File::open(archive).map_err(|e| e.to_string())?;
+        let mut zip = zip::ZipArchive::new(file).map_err(|e| e.to_string())?;
+        for i in 0..zip.len() {
+            let mut entry = zip.by_index(i).map_err(|e| e.to_string())?;
+            let Some(relative) = entry.enclosed_name() else { continue; };
+            if relative.components().any(|c| c.as_os_str().to_string_lossy().eq_ignore_ascii_case("META-INF")) { continue; }
+            let target = dest.join(relative);
+            if entry.is_dir() { std::fs::create_dir_all(&target).map_err(|e| e.to_string())?; continue; }
+            if let Some(parent) = target.parent() { std::fs::create_dir_all(parent).map_err(|e| e.to_string())?; }
+            let mut output = std::fs::File::create(target).map_err(|e| e.to_string())?;
+            std::io::copy(&mut entry, &mut output).map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(())
+}
+
+async fn install(app: &AppHandle, version: &str) -> Result<Value, String> {
+    let http = client()?;
+    let base = root(app)?;
+    progress(app, "metadata", 0, 1, "Отримання метаданих Mojang");
+    let meta = version_meta(&http, version).await?;
+    let versions = base.join("versions").join(version);
+    fs::create_dir_all(&versions).await.map_err(|e| e.to_string())?;
+    let json_path = versions.join(format!("{version}.json"));
+    fs::write(&json_path, serde_json::to_vec_pretty(&meta).map_err(|e| e.to_string())?)
+        .await.map_err(|e| e.to_string())?;
+
+    progress(app, "client", 0, 1, "Завантаження Minecraft client");
+    let jar = meta["downloads"]["client"].as_object().ok_or("Client download not found")?;
+    let client_url = jar.get("url").and_then(Value::as_str).ok_or("Missing client download URL")?;
+    let client_hash = jar.get("sha1").and_then(Value::as_str);
+    download_one(&http, client_url, &versions.join(format!("{version}.jar")), client_hash).await?;
+
+    let libs = libraries(&meta, &base)?;
+    let native_archives: Vec<PathBuf> = libs.iter().filter(|(_, _, _, native)| *native).map(|(_,path,_,_)|path.clone()).collect();
+    let total_libs = libs.len();
+    for (index, (url, path, sha, _)) in libs.iter().enumerate() {
+        download_one(&http, url, path, sha.as_deref()).await?;
+        progress(app, "libraries", index + 1, total_libs, format!("Бібліотеки: {}/{}", index+1,total_libs));
+    }
+
+    let asset_index = &meta["assetIndex"];
+    if let (Some(id), Some(url)) = (asset_index["id"].as_str(),asset_index["url"].as_str()) {
+        validate_version(id)?;
+        let path = base.join("assets").join("indexes").join(format!("{id}.json"));
+        download_one(&http, url, &path, sha_from(asset_index)).await?;
+        let index_data: Value = serde_json::from_slice(&fs::read(&path).await.map_err(|e| e.to_string())?)
+            .map_err(|e| e.to_string())?;
+        let objects = index_data["objects"].as_object().ok_or("Invalid assets index")?;
+        let mut seen = HashSet::new();
+        let mut files = Vec::new();
+        for asset in objects.values() {
+            let Some(hash) = asset["hash"].as_str() else { continue; };
+            if hash.len() != 40 || !hash.bytes().all(|b| b.is_ascii_hexdigit()) { return Err("Invalid asset hash".into()); }
+            if !seen.insert(hash.to_string()) { continue; }
+            let dest = base.join("assets").join("objects").join(&hash[..2]).join(hash);
+            let url = format!("https://resources.download.minecraft.net/{}/{}", &hash[..2], hash);
+            files.push((url, dest, hash.to_string()));
+        }
+        let count = files.len();
+        let mut downloads = stream::iter(files.into_iter().map(|(url,dest,hash)| {
+            let http = http.clone();
+            async move { download_one(&http, &url, &dest, Some(&hash)).await }
+        })).buffer_unordered(12);
+        let mut finished = 0usize;
+        while let Some(result) = downloads.next().await {
+            result?;
+            finished += 1;
+            if finished % 25 == 0 || finished == count {
+                progress(app,"assets",finished,count,format!("Ресурси: {finished}/{count}"));
+            }
+        }
+    }
+
+    let natives_dest = base.join("instances").join(version).join("natives");
+    tokio::task::spawn_blocking(move || extract_natives(&native_archives, &natives_dest))
+        .await.map_err(|e| e.to_string())??;
+    fs::create_dir_all(base.join("instances").join(version)).await.map_err(|e| e.to_string())?;
+    fs::write(versions.join(".installed"), b"ok").await.map_err(|e| e.to_string())?;
+    progress(app, "complete", 1, 1, "Minecraft встановлено");
+    Ok(meta)
+}
+
+#[tauri::command]
+pub async fn install_version(app: AppHandle, version: String) -> Result<String, String> {
+    validate_version(&version)?;
+    install(&app, &version).await?;
+    Ok(format!("Minecraft {version} installed successfully"))
+}
+
+#[tauri::command]
+pub async fn is_installed(app: AppHandle, version: String) -> Result<bool, String> {
+    validate_version(&version)?;
+    Ok(fs::try_exists(root(&app)?.join("versions").join(&version).join(".installed"))
+        .await.map_err(|e| e.to_string())?)
+}
+
+#[tauri::command]
+pub fn java_info() -> Result<String, String> {
+    let output = std::process::Command::new("java").arg("-version").output()
+        .map_err(|e| format!("Java не знайдено в PATH: {e}"))?;
+    if !output.status.success() { return Err("Java завершила перевірку з помилкою".into()); }
+    let text = String::from_utf8_lossy(&output.stderr);
+    Ok(text.lines().next().unwrap_or("Java знайдено").to_string())
+}
+
+fn java_major(raw: &str) -> Option<u32> {
+    let quoted = raw.split('"').nth(1)?;
+    let nums: Vec<&str> = quoted.split('.').collect();
+    if nums.first() == Some(&"1") { nums.get(1)?.parse().ok() }
+    else { nums.first()?.parse().ok() }
+}
+
+fn jvm_arg_replace(s: &str, base: &Path, version: &str, classpath: &str) -> String {
+    s.replace("${natives_directory}", &base.join("instances").join(version).join("natives").to_string_lossy())
+     .replace("${launcher_name}", "FRE_LAUNCH")
+     .replace("${launcher_version}", env!("CARGO_PKG_VERSION"))
+     .replace("${classpath}", classpath)
+     .replace("${library_directory}", &base.join("libraries").to_string_lossy())
+     .replace("${classpath_separator}", if cfg!(windows) { ";" } else { ":" })
+}
+
+fn game_arg_replace(s: &str, base: &Path, version: &str, name: &str, uuid: &str, meta: &Value) -> String {
+    let dir = base.join("instances").join(version);
+    let assets = base.join("assets");
+    s.replace("${auth_player_name}", name)
+     .replace("${version_name}", version)
+     .replace("${game_directory}", &dir.to_string_lossy())
+     .replace("${assets_root}", &assets.to_string_lossy())
+     .replace("${game_assets}", &assets.to_string_lossy())
+     .replace("${assets_index_name}", meta["assets"].as_str().unwrap_or("legacy"))
+     .replace("${auth_uuid}", uuid)
+     .replace("${auth_access_token}", "0")
+     .replace("${auth_session}", "0")
+     .replace("${user_type}", "legacy")
+     .replace("${version_type}", meta["type"].as_str().unwrap_or("release"))
+     .replace("${user_properties}", "{}")
+     .replace("${auth_xuid}", "0")
+     .replace("${clientid}", "")
+     .replace("${resolution_width}", "1280")
+     .replace("${resolution_height}", "720")
+}
+
+fn parse_arguments(arr: &Value) -> Vec<String> {
+    let mut result = Vec::new();
+    if let Some(items) = arr.as_array() {
+        for item in items {
+            if let Some(s) = item.as_str() { result.push(s.into()); }
+            else if os_rules(item) {
+                if let Some(s) = item["value"].as_str() { result.push(s.into()); }
+                else if let Some(vals) = item["value"].as_array() {
+                    result.extend(vals.iter().filter_map(Value::as_str).map(str::to_string));
+                }
+            }
+        }
+    }
+    result
+}
+
+fn stable_uuid(name: &str) -> String {
+    let hash = md5::compute(format!("OfflinePlayer:{name}"));
+    let mut bytes = hash.0;
+    bytes[6] = (bytes[6] & 0x0f) | 0x30;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    Uuid::from_bytes(bytes).to_string()
+}
+
+#[tauri::command]
+pub async fn launch_game(app: AppHandle, version: String, nickname: String, memory_mb: u32) -> Result<String, String> {
+    validate_version(&version)?;
+    if nickname.is_empty() || nickname.len()>16 || !nickname.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_') {
+        return Err("Нікнейм: 1–16 латинських літер, цифр або _".into());
+    }
+    if !(512..=32768).contains(&memory_mb) { return Err("RAM must be between 512 and 32768 MB".into()); }
+    if RUNNING.swap(true, Ordering::SeqCst) { return Err("Minecraft уже запускається або працює".into()); }
+    let result = launch_inner(app.clone(), version, nickname, memory_mb).await;
+    if result.is_err() { RUNNING.store(false, Ordering::SeqCst); }
+    result
+}
+
+async fn launch_inner(app: AppHandle, version: String, nickname: String, memory_mb: u32) -> Result<String, String> {
+    let base = root(&app)?;
+    let cached_metadata = base.join("versions").join(&version).join(format!("{version}.json"));
+    // Installed games must remain launchable without contacting Mojang.
+    // A manual reinstall explicitly rechecks the downloaded files.
+    let meta = if fs::try_exists(base.join("versions").join(&version).join(".installed"))
+        .await.map_err(|e| e.to_string())? && fs::try_exists(&cached_metadata).await.map_err(|e| e.to_string())? {
+        let bytes = fs::read(&cached_metadata).await.map_err(|e| e.to_string())?;
+        serde_json::from_slice::<Value>(&bytes).map_err(|e| e.to_string())?
+    } else {
+        install(&app, &version).await?
+    };
+    let java = java_info()?;
+    if let Some(required) = meta["javaVersion"]["majorVersion"].as_u64() {
+        let actual = java_major(&java).ok_or("Не вдалося визначити версію Java")?;
+        if actual != required as u32 {
+            return Err(format!("Minecraft {version} потребує Java {required}, але знайдено Java {actual}. Встанови відповідну Java та вибери її через PATH."));
+        }
+    }
+    let dir = base.join("instances").join(&version);
+    fs::create_dir_all(&dir).await.map_err(|e| e.to_string())?;
+    let mut cp = Vec::new();
+    for (_, path, _, native) in libraries(&meta, &base)? {
+        if !native { cp.push(path.to_string_lossy().to_string()); }
+    }
+    cp.push(base.join("versions").join(&version).join(format!("{version}.jar")).to_string_lossy().to_string());
+    let classpath = cp.join(if cfg!(windows) { ";" } else { ":" });
+    let uuid = stable_uuid(&nickname);
+    let mut jvm = parse_arguments(&meta["arguments"]["jvm"]);
+    if jvm.is_empty() {
+        jvm = vec!["-Djava.library.path=${natives_directory}".into(), "-cp".into(), "${classpath}".into()];
+    }
+    let mut args = vec![format!("-Xmx{memory_mb}M"), "-Xms512M".into()];
+    args.extend(jvm.iter().map(|s| jvm_arg_replace(s, &base, &version, &classpath)));
+    args.push(value_str(&meta,"mainClass")?.into());
+
+    let game_args = if let Some(legacy) = meta["minecraftArguments"].as_str() {
+        legacy.split_whitespace().map(str::to_string).collect::<Vec<String>>()
+    } else { parse_arguments(&meta["arguments"]["game"]) };
+    args.extend(game_args.iter().map(|s| game_arg_replace(s, &base, &version, &nickname, &uuid, &meta)));
+
+    let mut command = Command::new("java");
+    command.args(&args).current_dir(&dir).stdout(Stdio::piped()).stderr(Stdio::piped()).kill_on_drop(true);
+    let mut child = command.spawn().map_err(|e| format!("Не вдалося запустити Java: {e}"))?;
+    let pid = child.id().unwrap_or(0);
+    let _ = app.emit("game-status", "running");
+    if let Some(stdout) = child.stdout.take() {
+        let output_app = app.clone();
+        tokio::spawn(async move {
+            let mut lines = BufReader::new(stdout).lines();
+            while let Ok(Some(line)) = lines.next_line().await { let _ = output_app.emit("game-log", line); }
+        });
+    }
+    if let Some(stderr) = child.stderr.take() {
+        let output_app = app.clone();
+        tokio::spawn(async move {
+            let mut lines = BufReader::new(stderr).lines();
+            while let Ok(Some(line)) = lines.next_line().await { let _ = output_app.emit("game-log", line); }
+        });
+    }
+    tokio::spawn(async move {
+        let result = child.wait().await;
+        let message = match result {
+            Ok(exit) => format!("Minecraft exited with code {:?}", exit.code()),
+            Err(e) => format!("Minecraft process error: {e}"),
+        };
+        let _ = app.emit("game-log", message.clone());
+        let _ = app.emit("game-status", message);
+        RUNNING.store(false, Ordering::SeqCst);
+    });
+    Ok(format!("Minecraft {version} launched (PID {pid})"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn version_path_is_safe() {
+        assert!(validate_version("1.21.4").is_ok());
+        assert!(validate_version("../evil").is_err());
+        assert!(validate_version("..").is_err());
+    }
+    #[test]
+    fn offline_uuid_is_stable() {
+        assert_eq!(stable_uuid("Player"), stable_uuid("Player"));
+        assert_ne!(stable_uuid("Player"), stable_uuid("Other"));
+    }
+    #[test]
+    fn sha1_check_detects_tampering() {
+        assert!(matches_sha(b"hello", "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"));
+        assert!(!matches_sha(b"world", "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"));
+    }
+    #[test]
+    fn java_version_detection() {
+        assert_eq!(java_major("openjdk version \"21.0.2\""), Some(21));
+        assert_eq!(java_major("java version \"1.8.0_421\""), Some(8));
+    }
+}
