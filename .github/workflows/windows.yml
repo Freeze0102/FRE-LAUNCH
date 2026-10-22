@@ -35,6 +35,8 @@ jobs:
         run: npm run build
       - name: Generate application icons
         run: npm run tauri icon src-tauri/icons/app.svg
+      - name: Run Rust unit tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml
       - name: Build Windows installer
         run: npm run tauri build
       - name: Upload Windows installer
