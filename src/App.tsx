@@ -6,6 +6,7 @@ import { House, Layers3, Puzzle, UserRound, Shirt, Server, Download, ScrollText,
 import { create } from "zustand";
 import { InstancesPanel, ModsPanel } from "./Features";
 import SkinStudio from "./SkinStudio";
+import BackupsPanel from "./BackupsPanel";
 import { persist } from "zustand/middleware";
 
 type Version = { id: string; type: string; url: string; time: string; releaseTime: string };
@@ -183,6 +184,7 @@ export default function App() {
       {page === "Instances" && <InstancesPanel version={selected} active={activeInstanceId} setActive={setActiveInstanceId} setVersion={setSelected} navigateHome={() => setPage("Home")}/>}
       {page === "Mods" && <ModsPanel version={selected} instanceId={activeInstanceId}/>}
       {page === "Skins" && <SkinStudio/>}
+      {page === "Backups" && <BackupsPanel instanceId={activeInstanceId} instanceName={activeInstanceId ? "Вибрана збірка" : ""}/>}
       {page === "Accounts" && <section className="panel narrow"><div className="panel-heading"><h3>Локальний офлайн-профіль</h3><UserRound size={19}/></div><p>Офлайн-профіль для локального запуску та сумісної одиночної гри. Не замінює офіційну ліцензію.</p><label className="field-label">Нікнейм (1–16 символів)</label><div className="toolbar"><input className="input" value={editNick} placeholder={nickname} maxLength={16} onChange={(e) => setEditNick(e.target.value.replace(/[^a-zA-Z0-9_]/g, ""))}/><button className="primary" disabled={!editNick} onClick={() => {if (editNick) setNickname(editNick); setEditNick("");}}>Зберегти</button></div><p className="muted">Microsoft OAuth та перевірка ліцензійних акаунтів ще не реалізовані.</p></section>}
       {page === "Settings" && <section className="panel narrow">
         <div className="panel-heading"><h3>FRE THEMES</h3><Settings2 size={19}/></div>
@@ -204,7 +206,7 @@ export default function App() {
       </section>}
       {page === "Downloads" && <section className="panel narrow"><div className="panel-heading"><h3>Стан встановлення</h3><Download size={19}/></div>{progress ? <><p>{progress.message}</p><p>{progress.stage}: {progress.current}/{progress.total}</p></> : <p>Наразі немає активних завантажень.</p>}</section>}
       {page === "Logs" && <section className="panel"><div className="panel-heading"><h3>Журнал Minecraft</h3><Terminal size={19}/></div><div className="toolbar"><button className="secondary" disabled={!logs.length} onClick={() => void navigator.clipboard.writeText(logs.join("\n"))}><Copy size={15}/> Копіювати логи</button><button className="secondary" onClick={() => setLogs([])}>Очистити</button></div><pre className="log-view">{logs.length ? logs.join("\n") : "Логи з’являться тут після запуску Minecraft."}</pre></section>}
-      {page in future && !["Instances","Mods","Skins"].includes(page) && <section className="panel empty"><ShieldCheck size={38}/><h3>Модуль у розробці</h3><p>{future[page]}</p><button className="secondary" onClick={() => setPage("Home")}>На головну</button></section>}
+      {page in future && !["Instances","Mods","Skins","Backups"].includes(page) && <section className="panel empty"><ShieldCheck size={38}/><h3>Модуль у розробці</h3><p>{future[page]}</p><button className="secondary" onClick={() => setPage("Home")}>На головну</button></section>}
       <footer>FRE LAUNCH <span>•</span> Your Minecraft. Your Rules. <span>•</span> Alpha build</footer>
     </main>
   </div>;
