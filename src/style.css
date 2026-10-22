@@ -107,3 +107,14 @@
 .account-details span{font-size:10px;color:#8b8ea5;overflow-wrap:anywhere}
 .account-card .secondary{display:flex;gap:7px;align-items:center}
 [data-theme="light"] .account-card{background:#f8f7ff;color:#282943;border-color:#d4d7e8}
+
+
+.java-panel{display:flex;flex-direction:column;gap:12px}
+.java-panel .secondary{align-self:flex-start;display:flex;align-items:center;gap:7px}
+.java-list{display:flex;flex-direction:column;gap:8px}
+.java-row{display:flex;align-items:center;gap:13px;background:#1d2030;border:1px solid #363850;border-radius:12px;padding:12px}
+.java-major{background:#40345e;border-radius:10px;min-width:38px;height:38px;display:grid;place-items:center;font-weight:800;font-size:16px;color:#ddcfff}
+.java-row>div{display:flex;flex-direction:column;gap:5px;flex:1;min-width:0}
+.java-row b{font-size:12px}.java-row small{font-size:10px;color:#959bb6;overflow-wrap:anywhere}
+.java-row .secondary{margin-left:auto}
+[data-theme="light"] .java-row{background:#f5f6ff;border-color:#d7dbea;color:#30314b}
