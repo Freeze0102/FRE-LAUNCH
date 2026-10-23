@@ -231,8 +231,8 @@ fn java_major(raw: &str) -> Option<u32> {
     else { nums.first()?.parse().ok() }
 }
 
-fn jvm_arg_replace(s: &str, base: &Path, version: &str, classpath: &str) -> String {
-    s.replace("${natives_directory}", &base.join("instances").join(version).join("natives").to_string_lossy())
+fn jvm_arg_replace(s: &str, base: &Path, natives: &Path, classpath: &str) -> String {
+    s.replace("${natives_directory}", &natives.to_string_lossy())
      .replace("${launcher_name}", "FRE_LAUNCH")
      .replace("${launcher_version}", env!("CARGO_PKG_VERSION"))
      .replace("${classpath}", classpath)
@@ -313,7 +313,18 @@ async fn launch_inner(app: AppHandle, version: String, nickname: String, memory_
     if let Some(profile) = &profile {
         if profile.version != version { return Err("Instance version mismatch".into()); }
     }
-    let java_bin = profile.as_ref().and_then(|p| p.java_path.as_deref()).unwrap_or("java");
+    // Prefer an explicit instance override. Otherwise select a compatible
+    // Java runtime from already installed JDKs and Minecraft-managed runtimes.
+    let chosen_runtime = if profile.as_ref().and_then(|p| p.java_path.as_ref()).is_some() {
+        None
+    } else {
+        let required = meta["javaVersion"]["majorVersion"].as_u64().unwrap_or(8) as u32;
+        super::java::list_java_runtimes().into_iter()
+            .find(|runtime| runtime.major == required)
+            .map(|runtime| runtime.path)
+    };
+    let java_bin = profile.as_ref().and_then(|p| p.java_path.as_deref())
+        .or(chosen_runtime.as_deref()).unwrap_or("java");
     let java_output = std::process::Command::new(java_bin).arg("-version").output()
         .map_err(|e| format!("Java executable not found: {e}"))?;
     if !java_output.status.success() { return Err("Java version check failed".into()); }
@@ -321,7 +332,7 @@ async fn launch_inner(app: AppHandle, version: String, nickname: String, memory_
     if let Some(required) = meta["javaVersion"]["majorVersion"].as_u64() {
         let actual = java_major(&java).ok_or("Не вдалося визначити версію Java")?;
         if actual != required as u32 {
-            return Err(format!("Minecraft {version} потребує Java {required}, але знайдено Java {actual}. Встанови відповідну Java та вибери її через PATH."));
+            return Err(format!("Minecraft {version} потребує Java {required}, але {java_bin} має Java {actual}. Обери правильний шлях у FRE JAVA MANAGER."));
         }
     }
     let dir = if let Some(id) = instance_id.as_deref() {
@@ -334,13 +345,21 @@ async fn launch_inner(app: AppHandle, version: String, nickname: String, memory_
     }
     cp.push(base.join("versions").join(&version).join(format!("{version}.jar")).to_string_lossy().to_string());
     let classpath = cp.join(if cfg!(windows) { ";" } else { ":" });
-    let uuid = stable_uuid(&nickname);
+    // The launcher passes a compact 32-digit Mojang-style UUID argument.
+    let uuid = stable_uuid(&nickname).replace('-', "");
+    let natives = dir.join("natives");
+    let native_libraries: Vec<PathBuf> = libraries(&meta, &base)?
+        .into_iter().filter(|(_, _, _, native)| *native)
+        .map(|(_, path, _, _)| path).collect();
+    let natives_for_extract = natives.clone();
+    tokio::task::spawn_blocking(move || extract_natives(&native_libraries, &natives_for_extract))
+        .await.map_err(|e| format!("Native extraction failed: {e}"))??;
     let mut jvm = parse_arguments(&meta["arguments"]["jvm"]);
     if jvm.is_empty() {
         jvm = vec!["-Djava.library.path=${natives_directory}".into(), "-cp".into(), "${classpath}".into()];
     }
     let mut args = vec![format!("-Xmx{memory_mb}M"), "-Xms512M".into()];
-    args.extend(jvm.iter().map(|s| jvm_arg_replace(s, &base, &version, &classpath)));
+    args.extend(jvm.iter().map(|s| jvm_arg_replace(s, &base, &natives, &classpath)));
     args.push(value_str(&meta,"mainClass")?.into());
 
     let game_args = if let Some(legacy) = meta["minecraftArguments"].as_str() {
