@@ -22,7 +22,14 @@ const MANIFEST: &str = "https://piston-meta.mojang.com/mc/game/version_manifest_
 struct Progress { stage: String, current: usize, total: usize, message: String }
 
 fn progress(app: &AppHandle, stage: &str, current: usize, total: usize, message: impl Into<String>) {
-    let _ = app.emit("install-progress", Progress { stage: stage.into(), current, total, message: message.into() });
+    let message=message.into();
+    // Keep a durable breadcrumb trail if Windows terminates the process in the next stage.
+    // Asset downloads are frequent, so record only milestones rather than every single file.
+    if stage != "assets" || current == 0 || current == total || current % 250 == 0 {
+        super::diagnostics::write(app, "INSTALL_STAGE",
+            &format!("{stage} {current}/{total}: {message}"));
+    }
+    let _ = app.emit("install-progress", Progress { stage: stage.into(), current, total, message });
 }
 
 pub(super) fn validate_version(id: &str) -> Result<(), String> {
@@ -276,6 +283,17 @@ pub async fn install_version(app: AppHandle, version: String) -> Result<String, 
     }
     let _guard=InstallGuard;
     super::diagnostics::write(&app,"INSTALL_START",&format!("Minecraft {version}"));
+    // Detect permission, disk and redirected profile folders *before* network downloads.
+    if let Err(error) = super::preflight::install_preflight(app.clone()).await {
+        super::diagnostics::write(&app,"INSTALL_PREFLIGHT_ERROR",&error);
+        return Err(error);
+    }
+    let preflight=super::preflight::install_preflight(app.clone()).await?;
+    super::diagnostics::write(&app,"INSTALL_TARGET",&preflight.path);
+    if !preflight.ready {
+        super::diagnostics::write(&app,"INSTALL_PREFLIGHT_ERROR",&preflight.detail);
+        return Err(format!("Немає доступу до папки Minecraft: {} ({})", preflight.path, preflight.detail));
+    }
     // Convert Rust panics within the install future into an ordinary Tauri error.
     // This does not catch native OS crashes or out-of-memory termination.
     let outcome=std::panic::AssertUnwindSafe(install(&app, &version)).catch_unwind().await;
