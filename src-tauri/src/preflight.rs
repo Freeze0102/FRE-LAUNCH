@@ -5,6 +5,16 @@ use std::{fs::{self, OpenOptions}, io::Write, path::PathBuf};
 use tauri::{AppHandle, Manager};
 use uuid::Uuid;
 
+// Prevent starting a large Minecraft download on an almost-full system disk.
+// This checks the game-data volume, which is often C: even when the launcher is on D:.
+const MIN_GAME_DISK_SPACE: u64 = 900 * 1024 * 1024;
+fn validate_free_space(free: u64) -> Result<(), String> {
+    if free < MIN_GAME_DISK_SPACE {
+        return Err(format!("Недостатньо місця на диску Minecraft: доступно {} МБ, рекомендовано щонайменше 900 МБ. Звільни місце на диску з даними гри.", free / (1024*1024)));
+    }
+    Ok(())
+}
+
 #[derive(Clone, Serialize)]
 #[serde(rename_all="camelCase")]
 pub struct InstallPreflight {
@@ -20,6 +30,8 @@ fn target(app: &AppHandle) -> Result<PathBuf, String> {
 
 fn test_write(path: &PathBuf) -> Result<(), String> {
     fs::create_dir_all(path).map_err(|e| format!("Не вдалося створити папку Minecraft: {e}"))?;
+    let free=fs2::available_space(path).map_err(|e| format!("Не вдалося перевірити вільне місце: {e}"))?;
+    validate_free_space(free)?;
     let name = format!(".fre-write-test-{}", Uuid::new_v4());
     let probe = path.join(name);
     let result = (|| {
@@ -58,6 +70,11 @@ pub async fn install_preflight(app: AppHandle) -> Result<InstallPreflight, Strin
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn rejects_disk_with_insufficient_free_space() {
+        assert!(validate_free_space(100 * 1024 * 1024).is_err());
+        assert!(validate_free_space(MIN_GAME_DISK_SPACE).is_ok());
+    }
     #[test]
     fn write_probe_works_for_a_regular_directory() {
         let path=std::env::temp_dir().join(format!("fre-install-preflight-{}",Uuid::new_v4()));

@@ -158,11 +158,24 @@ fn libraries(metadata: &Value, base: &Path) -> Result<Vec<(String, PathBuf, Opti
 
 fn extract_natives(archives: &[PathBuf], dest: &Path) -> Result<(), String> {
     std::fs::create_dir_all(dest).map_err(|e| e.to_string())?;
+    let mut total_unpacked = 0u64;
+    let mut total_entries = 0usize;
     for archive in archives {
         let file = std::fs::File::open(archive).map_err(|e| e.to_string())?;
         let mut zip = zip::ZipArchive::new(file).map_err(|e| e.to_string())?;
+        if zip.len() > 20_000 {return Err("Minecraft native archive contains too many entries".into());}
         for i in 0..zip.len() {
+            total_entries += 1;
+            if total_entries > 40_000 {return Err("Too many native files".into());}
             let mut entry = zip.by_index(i).map_err(|e| e.to_string())?;
+            if entry.unix_mode().is_some_and(|mode| mode & 0o170000 == 0o120000) {
+                return Err("Refusing a native archive symlink".into());
+            }
+            if entry.size() > 128 * 1024 * 1024 {
+                return Err("Minecraft native archive entry is too large".into());
+            }
+            total_unpacked = total_unpacked.checked_add(entry.size()).ok_or("Native archive size overflow")?;
+            if total_unpacked > 768 * 1024 * 1024 {return Err("Minecraft natives exceed extraction limit".into());}
             let Some(relative) = entry.enclosed_name() else { continue; };
             if relative.components().any(|c| c.as_os_str().to_string_lossy().eq_ignore_ascii_case("META-INF")) { continue; }
             let target = dest.join(relative);
@@ -227,9 +240,12 @@ async fn install(app: &AppHandle, version: &str) -> Result<Value, String> {
     let libs = libraries(&meta, &base)?;
     let native_archives: Vec<PathBuf> = libs.iter().filter(|(_, _, _, native)| *native).map(|(_,path,_,_)|path.clone()).collect();
     let total_libs = libs.len();
+    progress(app, "libraries", 0, total_libs, format!("Перевірка {total_libs} бібліотек"));
     for (index, (url, path, sha, _)) in libs.iter().enumerate() {
         download_one(&http, url, path, sha.as_deref()).await?;
-        progress(app, "libraries", index + 1, total_libs, format!("Бібліотеки: {}/{}", index+1,total_libs));
+        if index % 10 == 0 || index + 1 == total_libs {
+            progress(app, "libraries", index + 1, total_libs, format!("Бібліотеки: {}/{}", index+1,total_libs));
+        }
     }
 
     let asset_index = &meta["assetIndex"];
@@ -240,6 +256,7 @@ async fn install(app: &AppHandle, version: &str) -> Result<Value, String> {
         let index_data: Value = serde_json::from_slice(&fs::read(&path).await.map_err(|e| e.to_string())?)
             .map_err(|e| e.to_string())?;
         let objects = index_data["objects"].as_object().ok_or("Invalid assets index")?;
+        if objects.len() > 180_000 {return Err("Mojang assets index is unexpectedly large".into());}
         let mut seen = HashSet::new();
         let mut files = Vec::new();
         for asset in objects.values() {
@@ -251,24 +268,27 @@ async fn install(app: &AppHandle, version: &str) -> Result<Value, String> {
             files.push((url, dest, hash.to_string()));
         }
         let count = files.len();
+        progress(app, "assets", 0, count, format!("Підготовка {count} ресурсів"));
         let mut downloads = stream::iter(files.into_iter().map(|(url,dest,hash)| {
             let http = http.clone();
             async move { download_one(&http, &url, &dest, Some(&hash)).await }
-        })).buffer_unordered(12);
+        })).buffer_unordered(4);
         let mut finished = 0usize;
         while let Some(result) = downloads.next().await {
             result?;
             finished += 1;
-            if finished % 25 == 0 || finished == count {
+            if finished % 100 == 0 || finished == count {
                 progress(app,"assets",finished,count,format!("Ресурси: {finished}/{count}"));
             }
         }
         materialize_legacy_assets(&base, id, &index_data, None).await?;
     }
 
+    progress(app, "natives", 0, 1, "Розпакування ігрових бібліотек");
     let natives_dest = base.join("instances").join(version).join("natives");
     tokio::task::spawn_blocking(move || extract_natives(&native_archives, &natives_dest))
         .await.map_err(|e| e.to_string())??;
+    progress(app, "natives", 1, 1, "Бібліотеки розпаковано");
     fs::create_dir_all(base.join("instances").join(version)).await.map_err(|e| e.to_string())?;
     fs::write(versions.join(".installed"), b"ok").await.map_err(|e| e.to_string())?;
     progress(app, "complete", 1, 1, "Minecraft встановлено");
@@ -391,7 +411,7 @@ pub async fn launch_game(app: AppHandle, version: String, nickname: String, memo
         return Err("Нікнейм: 1–16 латинських літер, цифр або _".into());
     }
     if !(512..=32768).contains(&memory_mb) { return Err("RAM must be between 512 and 32768 MB".into()); }
-    if RUNNING.swap(true, Ordering::SeqCst) { return Err("Minecraft уже запускається або працює".into()); }
+    if RUNNING.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst).is_err() { return Err("Minecraft уже запускається або працює".into()); }
     let result = launch_inner(app.clone(), version, nickname, memory_mb, instance_id).await;
     if result.is_err() { RUNNING.store(false, Ordering::SeqCst); }
     result

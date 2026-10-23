@@ -7,6 +7,18 @@ use tokio::{fs, io::{AsyncReadExt, AsyncWriteExt}};
 use uuid::Uuid;
 
 pub const MAX_FILE_BYTES: u64 = 512 * 1024 * 1024;
+const MAX_ATTEMPTS: u32 = 3;
+
+fn retryable_download_error(error: &str) -> bool {
+    error.starts_with("Download failed:") ||
+    error.starts_with("Download stream interrupted:") ||
+    error.starts_with("Downloaded file hash mismatch") ||
+    error.starts_with("HTTP error: 429") ||
+    error.starts_with("HTTP error: 500") ||
+    error.starts_with("HTTP error: 502") ||
+    error.starts_with("HTTP error: 503") ||
+    error.starts_with("HTTP error: 504")
+}
 
 pub fn trusted_url(url: &str) -> Result<(), String> {
     let parsed = reqwest::Url::parse(url).map_err(|e| e.to_string())?;
@@ -55,6 +67,25 @@ pub async fn verify_file(path: &Path, expected_sha1: &str) -> Result<bool, Strin
 }
 
 pub async fn download_one(
+    client: &reqwest::Client, url: &str, destination: &Path, sha1: Option<&str>,
+) -> Result<(), String> {
+    // Interrupted Mojang/CDN connections are common on slower links. Retry only
+    // network errors and transient HTTP responses; never retry disk failures.
+    let mut last_error = String::new();
+    for attempt in 1..=MAX_ATTEMPTS {
+        match download_once(client, url, destination, sha1).await {
+            Ok(()) => return Ok(()),
+            Err(error) if attempt < MAX_ATTEMPTS && retryable_download_error(&error) => {
+                last_error = error;
+                tokio::time::sleep(Duration::from_millis(400u64 * 2u64.pow(attempt - 1))).await;
+            }
+            Err(error) => return Err(format!("Download failed after {attempt} attempt(s): {error}")),
+        }
+    }
+    Err(format!("Download stopped: {last_error}"))
+}
+
+async fn download_once(
     client: &reqwest::Client, url: &str, destination: &Path, sha1: Option<&str>,
 ) -> Result<(), String> {
     trusted_url(url)?;
@@ -120,6 +151,15 @@ pub async fn download_one(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn retry_only_transient_download_errors() {
+        assert!(retryable_download_error("HTTP error: 503 Service Unavailable"));
+        assert!(retryable_download_error("Download stream interrupted: timeout"));
+        assert!(retryable_download_error("Downloaded file hash mismatch"));
+        assert!(!retryable_download_error("HTTP error: 404 Not Found"));
+        assert!(!retryable_download_error("Permission denied: cannot write"));
+        assert!(!retryable_download_error("Invalid expected SHA-1 digest"));
+    }
     #[test]
     fn trusted_host_is_exact() {
         assert!(trusted_url("https://piston-data.mojang.com/v1/objects/foo").is_ok());
