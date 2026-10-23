@@ -23,3 +23,9 @@
 - [ ] Resume/pause downloads, updater signing, UI accessibility, complete i18n, user-facing release notes.
 
 **No "fully ready" claim without actual gameplay verification.**
+
+- [x] Automatic in-app GitHub Releases update check and explicit SHA-256 verified installer updates, starting with 0.5.3.
+- [x] Startup crash recovery with WebView2 software compositing fallback; lazy 3D studio and clean Home boot.
+- [ ] Independently signed Tauri updater (requires secure publisher private key storage and release signing).
+- [ ] Hardware test: run, update and launch Minecraft on the affected Windows computer.
+

@@ -55,3 +55,14 @@
 - Checksum-free Maven artifacts must have a valid JAR header before reuse or installation; cached HTTP error pages are rejected.
 - 0.5.2: Full official Mojang client JAR and Maven library download/hash smoke tests, cached-client integrity in version status, dark WebView startup background and upgraded GitHub Actions runtime.
 - Modrinth Fabric mods and ZIP resource-pack downloads now enforce streaming byte limits, even if the remote server omits Content-Length, avoiding uncontrolled in-memory buffering.
+
+## 0.5.3 / STARTUP RECOVERY + IN-APP UPDATER
+
+- WebView2: a persistent bootstrap marker detects early process shutdown and uses software compositing on the next launch; marker clears after 20 seconds of responsive UI.
+- Zustand persistence keeps player profiles, selected release, RAM and theme but always starts at Home rather than reopening the last crash-prone page.
+- Skin Studio / Three.js are lazy-loaded, Java detection runs on a blocking worker.
+- Native Rust update backend checks GitHub Releases, validates explicit version and trusted installer origin, downloads with a strict size limit, verifies release SHA-256, and opens an installer **only after user consent**.
+- A small update center checks for releases after initial render, shows progress and allows user/admin installation modes.
+- Successful main Windows Builds publish GitHub Releases with installer SHA-256 files. Releases must use new SemVer; old releases are immutable.
+- Limits: SHA-256 from GitHub Releases is not a separate publisher signature, and actual startup crash resolution on the user's Windows machine is not yet verified.
+
