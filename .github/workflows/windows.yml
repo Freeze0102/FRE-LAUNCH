@@ -11,7 +11,8 @@ permissions:
 
 concurrency:
   group: windows-build-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  # Keep CI feedback focused on the newest commit; old installer runs are obsolete.
+  cancel-in-progress: true
 
 
 jobs:
