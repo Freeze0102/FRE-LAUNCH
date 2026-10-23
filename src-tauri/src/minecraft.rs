@@ -284,11 +284,13 @@ pub async fn install_version(app: AppHandle, version: String) -> Result<String, 
     let _guard=InstallGuard;
     super::diagnostics::write(&app,"INSTALL_START",&format!("Minecraft {version}"));
     // Detect permission, disk and redirected profile folders *before* network downloads.
-    if let Err(error) = super::preflight::install_preflight(app.clone()).await {
-        super::diagnostics::write(&app,"INSTALL_PREFLIGHT_ERROR",&error);
-        return Err(error);
-    }
-    let preflight=super::preflight::install_preflight(app.clone()).await?;
+    let preflight = match super::preflight::install_preflight(app.clone()).await {
+        Ok(check) => check,
+        Err(error) => {
+            super::diagnostics::write(&app,"INSTALL_PREFLIGHT_ERROR",&error);
+            return Err(error);
+        }
+    };
     super::diagnostics::write(&app,"INSTALL_TARGET",&preflight.path);
     if !preflight.ready {
         super::diagnostics::write(&app,"INSTALL_PREFLIGHT_ERROR",&preflight.detail);
