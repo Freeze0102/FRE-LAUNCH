@@ -548,6 +548,11 @@ async fn launch_inner(app: AppHandle, version: String, nickname: String, memory_
         super::instances::game_directory(&app, id, &version)?
     } else { base.join("instances").join(&version) };
     fs::create_dir_all(&dir).await.map_err(|e| e.to_string())?;
+    // External JARs copied through Explorer must be checked as well.
+    // Never start the JVM with an enabled mod that failed the scan.
+    if let Some(id) = instance_id.as_deref() {
+        super::mods::scan_instance_mods(&app, id).await?;
+    }
     if let (Some(index_name), Some(_)) = (meta["assetIndex"]["id"].as_str(),meta["assetIndex"]["url"].as_str()) {
         validate_version(index_name)?;
         let asset_index = base.join("assets").join("indexes").join(format!("{index_name}.json"));
