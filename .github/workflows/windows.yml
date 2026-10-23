@@ -26,6 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: write
     steps:
       - name: Keep flagged v0.5.5 installer unavailable pending malware investigation
         shell: bash
@@ -41,6 +42,23 @@ jobs:
           else
             echo "No v0.5.5 release to quarantine in this repository."
           fi
+      - name: Retire v0.5.5 build archives from earlier Windows Actions run
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # Preserve the original binary in the private draft release for analysis;
+          # remove old automatically downloadable CI ZIPs of the flagged version.
+          for id in 12506165770 12505821468 12504834056; do
+            if gh api "repos/$GH_REPO/actions/artifacts/$id" >/dev/null 2>&1; then
+              gh api --method DELETE "repos/$GH_REPO/actions/artifacts/$id"
+              echo "Retired artifact $id"
+            else
+              echo "Artifact $id was already absent"
+            fi
+          done
 
   build:
     runs-on: windows-latest
