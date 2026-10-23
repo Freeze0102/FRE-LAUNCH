@@ -73,6 +73,17 @@ jobs:
             throw "Installer exited but fre-launch.exe was not installed at the requested path"
           }
           Write-Host "NSIS installed to custom path: $folder"
+      - name: Enable local Windows crash minidumps
+        shell: pwsh
+        run: |
+          $folder = Join-Path $env:RUNNER_TEMP "FRELaunchCrashDumps"
+          New-Item -ItemType Directory -Force -Path $folder | Out-Null
+          $key = "HKCU:\Software\Microsoft\Windows\Windows Error Reporting\LocalDumps\fre-launch.exe"
+          New-Item -Path $key -Force | Out-Null
+          New-ItemProperty -Path $key -Name DumpFolder -Value $folder -PropertyType ExpandString -Force | Out-Null
+          New-ItemProperty -Path $key -Name DumpType -Value 1 -PropertyType DWord -Force | Out-Null
+          New-ItemProperty -Path $key -Name DumpCount -Value 4 -PropertyType DWord -Force | Out-Null
+          Write-Host "Minidump directory: $folder"
       - name: Smoke-test launcher normal and WebView2 recovery startup
         shell: pwsh
         timeout-minutes: 3
@@ -117,6 +128,32 @@ jobs:
           if ($attempts[1] -ne "recovery alive") {
             throw "WebView2 recovery startup failed too. Release intentionally blocked."
           }
+      - name: Inspect native Windows crash dump
+        if: failure()
+        shell: pwsh
+        run: |
+          $folder = Join-Path $env:RUNNER_TEMP "FRELaunchCrashDumps"
+          $dumps = @(Get-ChildItem $folder -File -Filter "*.dmp" -ErrorAction SilentlyContinue)
+          Write-Host "Crash minidump count: $($dumps.Count)"
+          $cdb = "C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\cdb.exe"
+          if (!$dumps.Count) {
+            Write-Warning "No Windows crash dumps were created"
+          } elseif (!(Test-Path $cdb)) {
+            Write-Warning "Windows Debugger not installed; upload saved minidumps for symbols"
+          } else {
+            foreach ($dump in $dumps | Select-Object -First 2) {
+              Write-Host "===== Crash stack for $($dump.Name) ====="
+              & $cdb -z $dump.FullName -c ".symfix; .reload; !analyze -v; kv 45; q" 2>&1 | Select-Object -Last 180 | Write-Host
+            }
+          }
+      - name: Upload startup crash minidumps
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: FRE-LAUNCH-Windows-Startup-Crashes
+          path: ${{ runner.temp }}/FRELaunchCrashDumps/*.dmp
+          if-no-files-found: warn
+          retention-days: 1
       - name: Remove first NSIS installer before admin build
         shell: pwsh
         run: |
