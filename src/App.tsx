@@ -7,6 +7,7 @@ import {
   ArrowRight, AlertTriangle, Boxes, Check, ChevronRight, CircleHelp, Coffee, Copy, Download, FolderOpen, HardDriveDownload, House, Images, Layers3, ListFilter, Orbit, Play, Puzzle, RefreshCw, Search, Server, Settings2, ShieldCheck, Shirt, SlidersHorizontal, Terminal, UserRound, Wrench, X, Archive, ScrollText
 } from "lucide-react";
 import InstallDeck from "./InstallDeck";
+import GameFolders from "./GameFolders";
 import UpdateCenter from "./UpdateCenter";
 import HomeDashboard from "./HomeDashboard";
 import { LAST_UI_CRASH } from "./ErrorBoundary";
@@ -350,6 +351,7 @@ export default function App() {
           onPage={setPage}
           onLaunch={()=>void launch()}
           onVersion={id=>{setSelected(id);setActiveInstanceId("");}}
+          onSelectInstance={(id,version,memory)=>{setActiveInstanceId(id);setSelected(version);setMemoryMb(memory);}}
           onRefresh={()=>void refreshVersions()}
         />}
 
@@ -395,15 +397,27 @@ export default function App() {
           <section className="fre-control-paper"><div className="fre-module-label"><span>03 / JAVA</span><Coffee size={18}/></div><JavaPanel instanceId={activeInstanceId}/></section>
         </div>}
 
-        {page==="Downloads"&&<InstallDeck
-          version={selected}
-          progress={progress}
-          preflight={preflight}
-          isInstalling={task==="installing"}
-          onCheck={()=>{void invoke<InstallPreflight>("install_preflight")
-            .then(setPreflight).catch(e=>setPreflight({path:"",ready:false,detail:humanError(e)}));}}
-          onLogs={()=>{void loadDiagnostics();setPage("Logs");}}
-        />}
+        {page==="Downloads"&&<>
+          <InstallDeck
+            version={selected}
+            progress={progress}
+            preflight={preflight}
+            isInstalling={task==="installing"}
+            onCheck={async ()=>{
+              try {
+                const result=await invoke<InstallPreflight>("install_preflight");
+                setPreflight(result);
+                return result;
+              } catch(e){
+                const problem={path:preflight?.path??"",ready:false,detail:humanError(e)};
+                setPreflight(problem);
+                return problem;
+              }
+            }}
+            onLogs={()=>{void loadDiagnostics();setPage("Logs");}}
+          />
+          {selected&&<GameFolders instanceId={activeInstanceId} version={selected}/>}
+        </>}
 
 
         {page==="Logs"&&<section className="fre-diag-sheet fre-diagnostics">
@@ -458,7 +472,7 @@ export default function App() {
           <div className="fre-log-mini-empty">Гра ще не надсилала повідомлень у цьому сеансі.</div>}
         </section>}
 
-        <footer className="fre-footer"><span>FRE LAUNCH © ALPHA 0.5.3</span><span>YOUR MINECRAFT / YOUR RULES</span><button onClick={()=>{setShowMore(v=>!v);}}>ПРО ПРОЄКТ <CircleHelp size={14}/></button></footer>
+        <footer className="fre-footer"><span>FRE LAUNCH · ALPHA 0.5.7</span><span>MINECRAFT JAVA EDITION</span><button onClick={()=>{setShowMore(v=>!v);}}>ПРО ПРОЄКТ <CircleHelp size={14}/></button></footer>
         {showMore&&<div className="fre-disclaimer"><button onClick={()=>setShowMore(false)}><X size={16}/></button>FRE LAUNCH — неофіційний Minecraft Java лаунчер. Не пов'язаний з Mojang чи Microsoft. Перевірка реального запуску на всіх Windows-конфігураціях ще триває.</div>}
       </main>
     </div>
