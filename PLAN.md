@@ -10,6 +10,7 @@
 - [x] Official Fabric Meta loader selection and Maven dependency installation.
 - [x] Modrinth Fabric mod installation, required dependencies, SHA-512 and enable/disable/remove.
 - [x] Server list with live Minecraft protocol status checks.
+- [x] Safe per-instance screenshot previews and gallery.
 - [x] Local offline accounts, skin preview/editor, themes, world backups.
 - [x] Legacy virtual asset directories for selected historical versions.
 

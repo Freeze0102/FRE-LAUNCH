@@ -9,6 +9,7 @@ Version: **0.4.0 Alpha** — feature branch `feat/launcher-reliability-fabric`.
 - Fabric Loader integration through documented Fabric Meta profile endpoint.
 - Modrinth Fabric mod installation (required dependencies, verified SHA-512), local mod toggles/removal.
 - Live Minecraft Java server status protocol and persistent server addresses.
+- Per-instance screenshot gallery with safe PNG validation, thumbnails and deletion.
 - Portable Temurin JRE installation with SHA-256 checksum validation; versions 8, 11, 17, 21, 25.
 - React interface for modloaders, mods, Java installs and server management.
 
