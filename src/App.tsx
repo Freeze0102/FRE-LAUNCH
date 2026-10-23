@@ -401,6 +401,7 @@ export default function App() {
         {page==="Settings"&&<div className="fre-settings-stack">
           <section className="fre-control-paper"><div className="fre-module-label"><span>01 / ВИГЛЯД</span><Wrench size={18}/></div>
             <h2>ТВОЯ АТМОСФЕРА.</h2><p>П'ять настроїв FRE LAUNCH. Вибери свій — усе зберігається автоматично.</p>
+            {recoveryMode&&<div className="fre-log-mini-empty">RECOVERY: захисний режим WebView2 активований після аварії. Світи Minecraft збережені. <button onClick={()=>{void invoke("disable_software_recovery").then(()=>setMessage("Повернення до GPU-прискорення заплановано. Перезапусти FRE LAUNCH; якщо знову вилетить, RECOVERY автоматично повернеться.")).catch(e=>setError(humanError(e)));}}>СПРОБУВАТИ ЗВИЧАЙНУ ГРАФІКУ НА НАСТУПНОМУ ЗАПУСКУ</button></div>}
             <div className="fre-theme-grid">{themes.map(item=><button key={item.id} className={"fre-theme-choice"+(theme===item.id?" is-selected":"")} onClick={()=>setTheme(item.id)}>
               <span style={{background:item.color}}/><b>{item.label}</b>{theme===item.id?<Check size={18}/>:<ArrowRight size={17}/>}</button>)}</div>
           </section>

@@ -207,6 +207,7 @@ async fn perform_update(app: &AppHandle, wanted_version: &str, mode: &str) -> Re
     let to_exit=app.clone();
     tauri::async_runtime::spawn(async move {
         tokio::time::sleep(std::time::Duration::from_millis(600)).await;
+        super::startup::clear_boot_marker_for_expected_exit();
         to_exit.exit(0);
     });
     Ok("Installer verified and started; FRE LAUNCH will close for the update".into())
