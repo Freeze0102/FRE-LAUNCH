@@ -334,6 +334,37 @@ pub async fn install_version(app: AppHandle, version: String) -> Result<String, 
     }
 }
 
+/// Avoid trying to launch a previously cached version whose important files
+/// have disappeared or become corrupted. Full asset validation remains on reinstall.
+async fn critical_cache_ready(base:&Path, version:&str, meta:&Value) -> Result<bool,String> {
+    let jar=base.join("versions").join(version).join(format!("{version}.jar"));
+    if let Some(hash)=meta["downloads"]["client"]["sha1"].as_str(){
+        if !super::downloads::verify_file(&jar,hash).await? {return Ok(false);}
+    }else if fs::metadata(&jar).await.is_err(){return Ok(false);}
+    for (_,path,hash,_) in libraries(meta,base)?{
+        if let Some(expected)=hash{
+            if !super::downloads::verify_file(&path,&expected).await?{return Ok(false);}
+        }else{
+            match fs::metadata(&path).await{
+                Ok(meta) if meta.len()>0 => {},
+                _=>return Ok(false)
+            }
+        }
+    }
+    if let Some(index)=meta["assetIndex"].as_object(){
+        if let Some(id)=index.get("id").and_then(Value::as_str){
+            validate_version(id)?;
+            let path=base.join("assets").join("indexes").join(format!("{id}.json"));
+            if let Some(hash)=index.get("sha1").and_then(Value::as_str){
+                if !super::downloads::verify_file(&path,hash).await?{return Ok(false);}
+            }else if !fs::try_exists(&path).await.map_err(|e|e.to_string())?{
+                return Ok(false);
+            }
+        }
+    }
+    Ok(true)
+}
+
 #[tauri::command]
 pub async fn is_installed(app: AppHandle, version: String) -> Result<bool, String> {
     validate_version(&version)?;
@@ -428,12 +459,20 @@ async fn launch_inner(app: AppHandle, version: String, nickname: String, memory_
     let cached_metadata = base.join("versions").join(&version).join(format!("{version}.json"));
     // Installed games must remain launchable without contacting Mojang.
     // A manual reinstall explicitly rechecks the downloaded files.
-    let mut meta = if fs::try_exists(base.join("versions").join(&version).join(".installed"))
-        .await.map_err(|e| e.to_string())? && fs::try_exists(&cached_metadata).await.map_err(|e| e.to_string())? {
-        let bytes = fs::read(&cached_metadata).await.map_err(|e| e.to_string())?;
-        serde_json::from_slice::<Value>(&bytes).map_err(|e| e.to_string())?
-    } else {
-        install(&app, &version).await?
+    let cached = if fs::try_exists(base.join("versions").join(&version).join(".installed"))
+        .await.map_err(|e|e.to_string())?
+        && fs::try_exists(&cached_metadata).await.map_err(|e|e.to_string())?{
+        let bytes=fs::read(&cached_metadata).await.map_err(|e|e.to_string())?;
+        serde_json::from_slice::<Value>(&bytes).ok()
+    }else{None};
+    let mut meta = if let Some(metadata)=cached{
+        if critical_cache_ready(&base,&version,&metadata).await?{metadata}
+        else{
+            super::diagnostics::write(&app,"CACHE_REPAIR",&format!("Minecraft {version}: files missing or corrupt"));
+            install(&app,&version).await?
+        }
+    }else{
+        install(&app,&version).await?
     };
     let profile = if let Some(id) = instance_id.as_deref() { Some(super::instances::read(&app, id)?) } else { None };
     if let Some(profile) = &profile {
@@ -574,6 +613,20 @@ mod tests {
     fn sha1_check_detects_tampering() {
         assert!(matches_sha(b"hello", "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"));
         assert!(!matches_sha(b"world", "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"));
+    }
+    #[tokio::test]
+    async fn corrupted_client_invalidates_cached_install() {
+        let base=std::env::temp_dir().join(format!("fre-cached-game-{}",Uuid::new_v4()));
+        let version="1.21.10";
+        let folder=base.join("versions").join(version);
+        fs::create_dir_all(&folder).await.unwrap();
+        fs::write(folder.join(format!("{version}.jar")),b"not a Minecraft client").await.unwrap();
+        let meta=serde_json::json!({
+            "downloads":{"client":{"sha1":"aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"}},
+            "libraries":[],"assetIndex":{}
+        });
+        assert!(!critical_cache_ready(&base,version,&meta).await.unwrap());
+        fs::remove_dir_all(base).await.unwrap();
     }
     #[test]
     fn java_version_detection() {

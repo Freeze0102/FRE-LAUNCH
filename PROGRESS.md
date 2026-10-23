@@ -51,3 +51,5 @@
 
 - Diagnostics also inspects only local WER crash reports matching `fre-launch.exe` (fault module and exception signature) when Windows saved such a report; no automatic uploads.
 - SVG world art is memoized to avoid unnecessary rerenders during download progress.
+- Launch now verifies cached client JAR, hashed libraries and asset index, and repairs missing/corrupt files instead of launching a broken game.
+- Checksum-free Maven artifacts must have a valid JAR header before reuse or installation; cached HTTP error pages are rejected.

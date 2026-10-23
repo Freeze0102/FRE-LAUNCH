@@ -54,6 +54,18 @@ pub fn client() -> Result<reqwest::Client, String> {
         .build().map_err(|e| e.to_string())
 }
 
+fn is_zip_header(bytes: &[u8]) -> bool {
+    matches!(bytes, [b'P',b'K',3,4] | [b'P',b'K',5,6] | [b'P',b'K',7,8])
+}
+async fn looks_like_jar(path: &Path) -> Result<bool, String> {
+    let mut file=fs::File::open(path).await.map_err(|e|e.to_string())?;
+    let mut header=[0u8;4];
+    match file.read_exact(&mut header).await {
+        Ok(_) => Ok(is_zip_header(&header)),
+        Err(error) if error.kind()==std::io::ErrorKind::UnexpectedEof => Ok(false),
+        Err(error)=>Err(error.to_string())
+    }
+}
 pub async fn verify_file(path: &Path, expected_sha1: &str) -> Result<bool, String> {
     if !fs::try_exists(path).await.map_err(|e| e.to_string())? { return Ok(false); }
     let mut file = fs::File::open(path).await.map_err(|e| e.to_string())?;
@@ -97,8 +109,10 @@ async fn download_once(
         if verify_file(destination, sha).await? { return Ok(()); }
     } else if fs::try_exists(destination).await.map_err(|e| e.to_string())?
         && fs::metadata(destination).await.map_err(|e| e.to_string())?.len() > 0 {
-        // Some historical libraries do not carry checksums.
-        return Ok(());
+        // Legacy Maven artifacts without hashes still need a valid JAR signature.
+        let is_jar=destination.extension().and_then(|ext|ext.to_str())
+            .is_some_and(|ext|ext.eq_ignore_ascii_case("jar"));
+        if !is_jar || looks_like_jar(destination).await? {return Ok(());}
     }
 
     if let Some(parent) = destination.parent() {
@@ -135,6 +149,10 @@ async fn download_once(
             if !format!("{:x}", digest.finalize()).eq_ignore_ascii_case(expected) {
                 return Err("Downloaded file hash mismatch".into());
             }
+        } else if destination.extension().and_then(|ext|ext.to_str())
+            .is_some_and(|ext|ext.eq_ignore_ascii_case("jar"))
+            && !looks_like_jar(&temp).await? {
+            return Err("Downloaded Maven artifact has an invalid JAR signature".into());
         }
 
         // Concurrent downloads may finish the same artifact; never replace a
@@ -166,6 +184,20 @@ mod tests {
         assert!(!retryable_download_error("HTTP error: 404 Not Found"));
         assert!(!retryable_download_error("Permission denied: cannot write"));
         assert!(!retryable_download_error("Invalid expected SHA-1 digest"));
+    }
+    #[test]
+    fn maven_jar_requires_valid_archive_signature() {
+        assert!(is_zip_header(&[80,75,3,4]));
+        assert!(!is_zip_header(b"<htm"));
+    }
+    #[tokio::test]
+    async fn cached_maven_html_error_page_is_rejected() {
+        let path=std::env::temp_dir().join(format!("fre-bad-artifact-{}.jar",Uuid::new_v4()));
+        fs::write(&path,b"<html>Service Unavailable</html>").await.unwrap();
+        assert!(!looks_like_jar(&path).await.unwrap());
+        fs::write(&path,&[80,75,3,4,0,0]).await.unwrap();
+        assert!(looks_like_jar(&path).await.unwrap());
+        fs::remove_file(path).await.unwrap();
     }
     #[test]
     fn trusted_host_is_exact() {
