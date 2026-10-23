@@ -1,24 +1,25 @@
-# FRE LAUNCH technical roadmap
+# FRE LAUNCH roadmap
 
-## Implemented in code (runtime verification still required)
-- [x] Desktop Tauri + Rust + React application, GitHub Windows installer.
-- [x] Mojang version discovery, vanilla download/install core with SHA-1.
-- [x] Streamed, bounded verified downloads and restricted HTTPS redirects.
-- [x] Per-instance isolated natives, libraries and Java selection.
-- [x] Windows x64 verified Temurin JRE download.
-- [x] SQLite instances with per-instance RAM and Fabric Loader settings.
-- [x] Official Fabric Meta loader selection and Maven dependency installation.
-- [x] Modrinth Fabric mod installation, required dependencies, SHA-512 and enable/disable/remove.
-- [x] Server list with live Minecraft protocol status checks.
-- [x] Safe per-instance screenshot previews and gallery.
-- [x] Local offline accounts, skin preview/editor, themes, world backups.
-- [x] Legacy virtual asset directories for selected historical versions.
+## Developed
+- [x] Windows Tauri 2 + Rust/React launcher and GitHub Actions builds.
+- [x] Real Mojang downloads, asset checks, launch process and live logs.
+- [x] SQLite instances, settings, offline accounts, skins, Modrinth, server status, screenshots, world backups.
+- [x] Fabric and experimental Quilt metadata integration.
+- [x] Managed Java / installed Java detection.
+- [x] Unique FRE FIELD NOTES interface (no recycled glassmorphism template).
+- [x] Local install diagnostics, async panic handling, install concurrency guard and React error boundary.
+- [x] Separate current-user/admin NSIS build paths and custom-directory install smoke-test code.
 
-## Still to build or verify
-- [ ] Confirm 0.4 Windows CI fully passes and merge stable changes.
-- [ ] Test actual offline-compatible vanilla and Fabric gameplay on Windows.
-- [ ] Microsoft OAuth with entitlement verification and safe credential vault.
-- [ ] Forge, NeoForge and Quilt.
-- [ ] Production-grade rollback, resumable downloads and full repair flows.
-- [ ] Update service, full localization, settings import/export and crash telemetry opt-in.
-- [ ] Extensive security and accessibility review; stable release.
+## Verification required
+- [ ] Confirm both 0.5 Windows NSIS installers and custom-directory CI smoke test green.
+- [ ] Reproduce and fix remaining crash, if any, on the actual affected Windows machine.
+- [ ] Launch a modern Vanilla Minecraft world on Windows, verify Java, natives, assets, game logs.
+- [ ] Fabric and Quilt real-game smoke tests, version matrix.
+
+## After reliability milestone
+- [ ] Microsoft OAuth + entitlement, secure credential storage.
+- [ ] Forge and NeoForge.
+- [ ] Configurable Minecraft game data directory / safe migration to D:.
+- [ ] Resume/pause downloads, updater signing, UI accessibility, complete i18n, user-facing release notes.
+
+**No "fully ready" claim without actual gameplay verification.**
