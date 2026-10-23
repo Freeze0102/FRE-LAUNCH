@@ -206,7 +206,8 @@ async fn materialize_legacy_assets(base: &Path, index_name: &str, index_data: &V
 
 async fn install(app: &AppHandle, version: &str) -> Result<Value, String> {
     // Report inaccessible game-data storage before requesting Mojang assets.
-    super::preflight::ensure_write_access(app)?;
+    let install_root = super::preflight::ensure_write_access(app)?;
+    super::diagnostics::write(app, "INSTALL_TARGET", &install_root.to_string_lossy());
     let http = client()?;
     let base = root(app)?;
     progress(app, "metadata", 0, 1, "Отримання метаданих Mojang");
