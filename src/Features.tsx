@@ -117,7 +117,7 @@ export function InstancesPanel({version, active, setActive, setVersion, setMemor
         <div className="instance-info"><b>{instance.name}</b><span>{instance.version} · {instance.loader==="fabric"||instance.loader==="quilt"?`${instance.loader==="fabric"?"Fabric":"Quilt"} ${instance.loaderVersion??"?"}`:"Vanilla"} · {instance.memoryMb} MB RAM</span></div>
         <button className={"icon-button" + (instance.favorite ? " starred" : "")} title="Обране" onClick={() => void favorite(instance)}><Star size={17} fill={instance.favorite ? "currentColor" : "none"}/></button>
         <button className="icon-button" title="Редагувати" onClick={() => editing === instance.id ? setEditing(null) : beginEdit(instance)}><Pencil size={17}/></button>
-        <button className="secondary" onClick={()=>setFolderFor(folderFor===instance.id?null:instance.id)}>{folderFor===instance.id?"Сховати папки":"Папки гри"}</button>
+        <button className="secondary" onClick={()=>setFolderFor(folderFor===instance.id?null:instance.id)}>{folderFor===instance.id?"Закрити файли":"Файли"}</button>
         <button className="secondary" onClick={() => {setActive(instance.id); setVersion(instance.version); setMemory(instance.memoryMb); navigateHome();}}>Обрати</button>
         <button className="icon-button danger" title="Прибрати (без видалення світів)" onClick={() => void remove(instance)}><Trash2 size={17}/></button>
         {folderFor===instance.id&&<div className="instance-editor"><GameFolders instanceId={instance.id} version={instance.version}/></div>}
