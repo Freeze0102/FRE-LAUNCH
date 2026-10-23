@@ -16,7 +16,16 @@ pub struct ScreenshotInfo {
 
 fn screenshot_folder(app: &AppHandle, instance_id: &str) -> Result<PathBuf, String> {
     let instance = super::instances::read(app, instance_id)?;
-    Ok(super::instances::game_directory(app, instance_id, &instance.version)?.join("screenshots"))
+    let game = super::instances::game_directory(app, instance_id, &instance.version)?;
+    // Do not follow user-placed junctions or symbolic links out of the instance.
+    for path in [&game, &game.join("screenshots")] {
+        if let Ok(meta) = fs::symlink_metadata(path) {
+            if meta.file_type().is_symlink() || !meta.is_dir() {
+                return Err("Screenshot directory must be a normal local directory".into());
+            }
+        }
+    }
+    Ok(game.join("screenshots"))
 }
 
 fn check_filename(filename: &str) -> Result<(), String> {
