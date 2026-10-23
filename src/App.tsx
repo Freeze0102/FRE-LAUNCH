@@ -132,6 +132,7 @@ export default function App() {
   const [java,setJava]=useState("Перевірка Java...");
   const [logs,setLogs]=useState<string[]>([]);
   const [diagnostics,setDiagnostics]=useState<Diagnostics|null>(null);
+  const [windowsCrash,setWindowsCrash]=useState("");
   const [diagnosticsBusy,setDiagnosticsBusy]=useState(false);
   const [diagnosticsError,setDiagnosticsError]=useState("");
   const [lastAttempt,setLastAttempt]=useState<LastInstall|null>(previousInstall);
@@ -150,9 +151,16 @@ export default function App() {
   }
   async function loadDiagnostics() {
     setDiagnosticsBusy(true);setDiagnosticsError("");
-    try{setDiagnostics(await invoke<Diagnostics>("read_diagnostics"));}
-    catch(e){setDiagnosticsError(humanError(e));setDiagnostics({logPath:"",contents:""});}
-    finally{setDiagnosticsBusy(false);}
+    // Native installer logs and the Windows crash report are independent;
+    // display either even when the other is not accessible.
+    const [native,wer]=await Promise.allSettled([
+      invoke<Diagnostics>("read_diagnostics"),
+      invoke<string>("read_windows_crash_report")
+    ]);
+    if(native.status==="fulfilled")setDiagnostics(native.value);
+    else {setDiagnosticsError(humanError(native.reason));setDiagnostics({logPath:"",contents:""});}
+    setWindowsCrash(wer.status==="fulfilled"?wer.value:"");
+    setDiagnosticsBusy(false);
   }
   useEffect(()=>{if(page==="Logs")void loadDiagnostics();},[page]);
   async function refreshVersions(preserveError=false) {
@@ -415,6 +423,7 @@ export default function App() {
               "Java: "+java,
               "Log path: "+(diagnostics?.logPath||"unknown"),
               "Install diagnostics:", diagnostics?.contents||"(no native records)",
+              "Windows crash report:", windowsCrash||"(none available)",
               "UI error:", lastUiCrash||"(none)",
               "Game output:", logs.length?logs.join("\n"):"(none)"
             ].join("\n"))}><Copy size={16}/> КОПІЮВАТИ ЗВІТ</button>
@@ -430,7 +439,10 @@ export default function App() {
           <div className="fre-log-label">02 / INTERFACE · LAST FAILURE</div>
           {lastUiCrash?<><pre className="fre-log-output">{lastUiCrash}</pre><div className="fre-log-toolbar"><button onClick={()=>void copyText(lastUiCrash)}><Copy size={16}/> КОПІЮВАТИ ПОМИЛКУ</button><button onClick={()=>{try{localStorage.removeItem(LAST_UI_CRASH)}catch{}setLastUiCrash("");}}><X size={16}/> ПРИБРАТИ ЗАПИС</button></div></>:
           <div className="fre-log-mini-empty">Помилок інтерфейсу поки не зафіксовано.</div>}
-          <div className="fre-log-label">03 / GAME CONSOLE · LIVE OUTPUT</div>
+          <div className="fre-log-label">03 / WINDOWS · NATIVE PROCESS CRASH</div>
+          {windowsCrash?<pre className="fre-log-output">{windowsCrash}</pre>:
+          <div className="fre-log-mini-empty">Звіт Windows про аварійне завершення FRE LAUNCH не знайдено. Це не означає, що збою не було: збереження звітів Windows може бути вимкнене. Додатково перевір «Монітор стабільності Windows» (Win+R → perfmon /rel).</div>}
+          <div className="fre-log-label">04 / GAME CONSOLE · LIVE OUTPUT</div>
           {logs.length?<pre className="fre-log-output">{logs.join("\n")}</pre>:
           <div className="fre-log-mini-empty">Гра ще не надсилала повідомлень у цьому сеансі.</div>}
         </section>}

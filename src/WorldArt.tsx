@@ -1,11 +1,11 @@
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 
 /**
  * Custom, vector-only FRE LAUNCH landscape.
  * The stepped world is constructed from individual 3D voxels,
  * not a Minecraft screenshot or an external stock illustration.
  */
-export default function WorldArt() {
+function WorldArt() {
   const columns = useMemo(() => {
     const heights = [2,2,3,3,4,6,6,7,9,10,9,8,7,7,8,10,12,13,13,11,10,9,8,7,5,4,3,2,2];
     return heights.map((height, i) => {
@@ -58,3 +58,6 @@ export default function WorldArt() {
     </g>
   </svg>;
 }
+
+// Installation progress must not re-render the complex voxel art on every event.
+export default memo(WorldArt);

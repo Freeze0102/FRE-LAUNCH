@@ -48,3 +48,6 @@
 - Unexpected interruptions are copied from persisted UI state into native diagnostics on next launch.
 - The Windows pipeline now smoke-tests real Minecraft 1.21.10 Mojang metadata and a sample SHA-1 verified asset in addition to existing unit tests.
 - **Limitation:** app execution and the original native crash cannot be verified with CI alone. A Windows crash report from the affected PC remains necessary for certainty.
+
+- Diagnostics also inspects only local WER crash reports matching `fre-launch.exe` (fault module and exception signature) when Windows saved such a report; no automatic uploads.
+- SVG world art is memoized to avoid unnecessary rerenders during download progress.

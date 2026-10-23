@@ -1,5 +1,6 @@
 mod minecraft;
 mod diagnostics;
+mod windows_crash;
 mod preflight;
 mod downloads;
 mod fabric;
@@ -64,7 +65,7 @@ pub fn run() {
             }));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![get_versions, detect_java, minecraft::java_info, minecraft::install_version, diagnostics::read_diagnostics, diagnostics::record_interrupted_install, preflight::install_preflight, minecraft::is_installed, minecraft::launch_game, instances::list_instances, instances::create_instance, instances::update_instance, instances::delete_instance, modrinth::search_modrinth, modrinth::install_resourcepack, backups::create_world_backup, backups::list_world_backups, backups::restore_world_backup, accounts::list_offline_accounts, accounts::create_offline_account, accounts::delete_offline_account, java::list_java_runtimes, fabric::list_fabric_loaders, instances::set_instance_loader, servers::list_servers, servers::save_server, servers::delete_server, servers::check_server_status, mods::install_fabric_mod, mods::list_installed_mods, mods::toggle_installed_mod, mods::remove_installed_mod, managed_java::install_managed_java, screenshots::list_screenshots, screenshots::read_screenshot, screenshots::delete_screenshot])
+        .invoke_handler(tauri::generate_handler![get_versions, detect_java, minecraft::java_info, minecraft::install_version, diagnostics::read_diagnostics, diagnostics::record_interrupted_install, windows_crash::read_windows_crash_report, preflight::install_preflight, minecraft::is_installed, minecraft::launch_game, instances::list_instances, instances::create_instance, instances::update_instance, instances::delete_instance, modrinth::search_modrinth, modrinth::install_resourcepack, backups::create_world_backup, backups::list_world_backups, backups::restore_world_backup, accounts::list_offline_accounts, accounts::create_offline_account, accounts::delete_offline_account, java::list_java_runtimes, fabric::list_fabric_loaders, instances::set_instance_loader, servers::list_servers, servers::save_server, servers::delete_server, servers::check_server_status, mods::install_fabric_mod, mods::list_installed_mods, mods::toggle_installed_mod, mods::remove_installed_mod, managed_java::install_managed_java, screenshots::list_screenshots, screenshots::read_screenshot, screenshots::delete_screenshot])
         .run(tauri::generate_context!())
         .expect("error while running FRE LAUNCH");
 }
