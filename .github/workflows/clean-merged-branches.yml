@@ -49,6 +49,18 @@ jobs:
               github.rest.pulls.list,
               { owner, repo, state: 'open', per_page: 100 }
             );
+            // One-time cleanup explicitly requested by the repository owner.
+            // Match full SHAs to avoid deleting newly updated/unmerged work.
+            const obsolete = new Map([
+              ['feat/quilt-loader','352493ae3be80e1f3662efc2c6a8ea08403bcbe4'],
+              ['feat/screenshot-gallery','67b6437dc4b09c863de58e1169df589cc1373abe'],
+              ['feat/screenshot-gallery-repair','7e089a66a119965545bd8b0d599ccbfebcc90dfa'],
+              ['feat/screenshot-gallery-v04','f1e0b804e1e2ae6688eda219b268828ea0901d43'],
+              ['fix/install-control-v05-rebased','deda7617878e36ddac1c48afe90266237067d597'],
+              ['fix/install-crash-breadcrumbs','8621275dd0eb48704d172c2b4cb1116bb10be1aa'],
+              ['fix/minecraft-install-resilience','f7d738e140a64e00eaecd711e9855faa270ee412']
+            ]);
+
             const active = new Set(activePRs
               .filter(pr => pr.head.repo?.full_name === `${owner}/${repo}`)
               .map(pr => pr.head.ref));
@@ -67,8 +79,9 @@ jobs:
                 pr.head.ref === name &&
                 pr.head.sha === branch.commit.sha
               );
-              if (!mergedExactPR) {
-                core.info(`Preserving ${name}: no matching, exactly merged PR head`);
+              const knownObsolete = obsolete.get(name) === branch.commit.sha;
+              if (!mergedExactPR && !knownObsolete) {
+                core.info(`Preserving ${name}: branch not merged or updated after cleanup approval`);
                 skipped++;
                 continue;
               }
