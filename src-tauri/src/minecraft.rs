@@ -5,7 +5,7 @@ use serde_json::Value;
 use sha1::{Digest, Sha1};
 use std::{collections::HashSet, path::{Path, PathBuf}, process::Stdio, sync::atomic::{AtomicBool, Ordering}};
 use tauri::{AppHandle, Emitter, Manager};
-use tokio::{fs, io::{AsyncBufReadExt, BufReader}, process::Command};
+use tokio::{fs, io::{AsyncReadExt, AsyncSeekExt}, process::Command};
 use uuid::Uuid;
 
 static RUNNING: AtomicBool = AtomicBool::new(false);
@@ -593,7 +593,18 @@ async fn launch_inner(app: AppHandle, version: String, nickname: String, memory_
     let mut command = Command::new(java_bin);
     // The game must not be terminated when the Tauri window or its runtime exits.
     // Keep streaming logs while the launcher is open, but do not tie game lifetime to it.
-    command.args(&args).current_dir(&dir).stdout(Stdio::piped()).stderr(Stdio::piped()).kill_on_drop(false);
+    // Store the JVM console output in an independent OS file handle instead
+    // of launcher-owned pipes. Closing FRE LAUNCH (or its terminal) must not
+    // close Java's stdout/stderr or unexpectedly terminate Minecraft.
+    let log_dir = dir.join("logs");
+    fs::create_dir_all(&log_dir).await.map_err(|e| e.to_string())?;
+    let log_path = log_dir.join("fre-launch-game.log");
+    let log_file = std::fs::OpenOptions::new().create(true).append(true).open(&log_path)
+        .map_err(|e| format!("Не вдалося відкрити журнал гри: {e}"))?;
+    let log_start = log_file.metadata().map_err(|e|e.to_string())?.len();
+    let log_stdout = log_file.try_clone().map_err(|e|e.to_string())?;
+    command.args(&args).current_dir(&dir)
+        .stdout(Stdio::from(log_stdout)).stderr(Stdio::from(log_file)).kill_on_drop(false);
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
@@ -603,20 +614,37 @@ async fn launch_inner(app: AppHandle, version: String, nickname: String, memory_
     let mut child = command.spawn().map_err(|e| format!("Не вдалося запустити Java: {e}"))?;
     let pid = child.id().unwrap_or(0);
     let _ = app.emit("game-status", "running");
-    if let Some(stdout) = child.stdout.take() {
-        let output_app = app.clone();
-        tokio::spawn(async move {
-            let mut lines = BufReader::new(stdout).lines();
-            while let Ok(Some(line)) = lines.next_line().await { let _ = output_app.emit("game-log", line); }
-        });
-    }
-    if let Some(stderr) = child.stderr.take() {
-        let output_app = app.clone();
-        tokio::spawn(async move {
-            let mut lines = BufReader::new(stderr).lines();
-            while let Ok(Some(line)) = lines.next_line().await { let _ = output_app.emit("game-log", line); }
-        });
-    }
+
+    // Follow the console log while the launcher stays open. If it closes,
+    // only the viewer disappears; Java retains its own log file handle.
+    let output_app = app.clone();
+    tokio::spawn(async move {
+        use std::io::SeekFrom;
+        let Ok(mut reader) = fs::File::open(&log_path).await else {return;};
+        if reader.seek(SeekFrom::Start(log_start)).await.is_err() {return;}
+        let mut pending = Vec::new();
+        let mut buffer = [0u8; 8192];
+        while RUNNING.load(Ordering::SeqCst) {
+            match reader.read(&mut buffer).await {
+                Ok(0) => tokio::time::sleep(std::time::Duration::from_millis(150)).await,
+                Ok(size) => {
+                    for &byte in &buffer[..size] {
+                        if byte == b'\n' {
+                            if !pending.is_empty() {
+                                let line = String::from_utf8_lossy(&pending)
+                                    .trim_end_matches('\r').to_owned();
+                                let _ = output_app.emit("game-log", line);
+                                pending.clear();
+                            }
+                        } else if pending.len() < 16384 {
+                            pending.push(byte);
+                        }
+                    }
+                }
+                Err(_) => break,
+            }
+        }
+    });
     tokio::spawn(async move {
         let result = child.wait().await;
         let message = match result {
