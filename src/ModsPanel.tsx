@@ -76,7 +76,7 @@ export default function ModsPanel({version, instanceId}: {version: string; insta
         setMessage(`Встановлено: ${added.join(", ")}`);
         await refreshMods();
       } else if(opened.project_type==="resourcepack") {
-        setMessage(await invoke<string>("install_resourcepack",{instanceId,projectId:opened.project_id}));
+        setMessage(await invoke<string>("install_resourcepack",{instanceId,projectId:opened.project_id,versionId:chosenVersion}));
       } else {throw Error("Автоматичне встановлення цього типу поки не підтримується.");}
     } catch(e){setError(String(e));}finally{setBusy(false);}
   }
