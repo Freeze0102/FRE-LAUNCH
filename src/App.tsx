@@ -4,7 +4,8 @@ import { listen } from "@tauri-apps/api/event";
 import { motion } from "motion/react";
 import { House, Layers3, Puzzle, UserRound, Shirt, Server, Download, ScrollText, Settings2, Archive, Search, RefreshCw, Play, Coffee, ShieldCheck, Sparkles, ChevronDown, HardDriveDownload, Terminal, CheckCircle2, AlertTriangle, Copy } from "lucide-react";
 import { create } from "zustand";
-import { InstancesPanel, ModsPanel } from "./Features";
+import { InstancesPanel } from "./Features";
+import ModsPanel from "./ModsPanel";
 import SkinStudio from "./SkinStudio";
 import BackupsPanel from "./BackupsPanel";
 import AccountsPanel from "./AccountsPanel";
@@ -158,7 +159,7 @@ export default function App() {
       <div className="nav">
         {menus.map(({name, icon: Icon, label}) => <button key={name} className={"nav-item " + (page === name ? "active" : "")} onClick={() => setPage(name)}><Icon size={19}/><span>{label}</span></button>)}
       </div>
-      <div className="side-bottom"><div className="status-dot"/> Версія 0.3.0 · Alpha</div>
+      <div className="side-bottom"><div className="status-dot"/> Версія 0.4.0 · Alpha</div>
     </aside>
     <main className="main">
       <header className="top"><div><div className="eyebrow">FRE LAUNCH / {page.toUpperCase()}</div><h1>{labels[page]}</h1></div><button className="user-pill" onClick={() => setPage("Accounts")}><div className="avatar">{nickname[0]?.toUpperCase() || "P"}</div><div><b>{nickname}</b><small>Offline profile</small></div><ChevronDown size={16}/></button></header>
@@ -186,6 +187,7 @@ export default function App() {
       {page === "Instances" && <InstancesPanel version={selected} active={activeInstanceId} setActive={setActiveInstanceId} setVersion={setSelected} setMemory={setMemoryMb} navigateHome={() => setPage("Home")}/>}
       {page === "Mods" && <ModsPanel version={selected} instanceId={activeInstanceId}/>}
       {page === "Skins" && <SkinStudio/>}
+      {page === "Servers" && <ServersPanel/>}
       {page === "Backups" && <BackupsPanel instanceId={activeInstanceId} instanceName={activeInstanceId ? "Вибрана збірка" : ""}/>}
       {page === "Accounts" && <AccountsPanel nickname={nickname} onSelect={setNickname}/>}
       {page === "Settings" && <section className="panel narrow">
@@ -207,7 +209,6 @@ export default function App() {
         <p>{java}</p><p className="muted">Для власного шляху до Java відкрий налаштування конкретної збірки.</p>
         <JavaPanel instanceId={activeInstanceId}/>
       </section>}
-      {page === "Servers" && <ServersPanel/>}
       {page === "Downloads" && <section className="panel narrow"><div className="panel-heading"><h3>Стан встановлення</h3><Download size={19}/></div>{progress ? <><p>{progress.message}</p><p>{progress.stage}: {progress.current}/{progress.total}</p></> : <p>Наразі немає активних завантажень.</p>}</section>}
       {page === "Logs" && <section className="panel"><div className="panel-heading"><h3>Журнал Minecraft</h3><Terminal size={19}/></div><div className="toolbar"><button className="secondary" disabled={!logs.length} onClick={() => void navigator.clipboard.writeText(logs.join("\n"))}><Copy size={15}/> Копіювати логи</button><button className="secondary" onClick={() => setLogs([])}>Очистити</button></div><pre className="log-view">{logs.length ? logs.join("\n") : "Логи з’являться тут після запуску Minecraft."}</pre></section>}
       {page in future && !["Instances","Mods","Skins","Backups","Servers"].includes(page) && <section className="panel empty"><ShieldCheck size={38}/><h3>Модуль у розробці</h3><p>{future[page]}</p><button className="secondary" onClick={() => setPage("Home")}>На головну</button></section>}

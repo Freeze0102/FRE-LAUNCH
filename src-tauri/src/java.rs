@@ -1,5 +1,6 @@
 use serde::Serialize;
 use std::{collections::{HashSet,VecDeque}, env, fs, path::{Path,PathBuf}, process::Command};
+use tauri::{AppHandle, Manager};
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -53,7 +54,7 @@ fn discover_dir(base: &Path, depth: usize, paths: &mut Vec<PathBuf>) {
 }
 
 #[tauri::command]
-pub fn list_java_runtimes() -> Vec<JavaRuntime> {
+pub fn list_java_runtimes(app: AppHandle) -> Vec<JavaRuntime> {
     let mut candidate = Vec::<PathBuf>::new();
     if let Ok(java_home) = env::var("JAVA_HOME") {
         candidate.push(Path::new(&java_home).join("bin").join(if cfg!(windows) {"java.exe"} else {"java"}));
@@ -74,6 +75,9 @@ pub fn list_java_runtimes() -> Vec<JavaRuntime> {
         discover_dir(&Path::new(&appdata).join(".minecraft").join("runtime"),5,&mut candidate);
     }
 
+    if let Ok(data) = app.path().app_data_dir() {
+        discover_dir(&data.join("java"), 2, &mut candidate);
+    }
     let mut seen = HashSet::new();
     let mut runtimes = Vec::new();
     for java in candidate {
