@@ -191,6 +191,9 @@ export default function ModsPanel({version, instanceId}: {version: string; insta
         <button className="icon-button danger" title="Видалити" disabled={busy} onClick={()=>void remove(mod)}><Trash2 size={16}/></button>
       </div>)}
     </div>}
-    <p className="muted">Моди — сторонній виконуваний код. Встановлюй лише перевірені проєкти. Вимкнення необхідної залежності може завадити запуску гри.</p>
+    <div className="notice"><ShieldCheck size={18}/>
+      <span><strong>FRE SAFE DOWNLOAD</strong> · Завантаження тільки з офіційного CDN Modrinth через HTTPS, перевірка SHA-512, розміру, формату JAR та сумісності Minecraft/Fabric. Залежності перевіряються перед встановленням. Це перевірка цілісності, а не антивірус: навіть справжній мод може містити шкідливий код.</span>
+    </div>
+    <p className="muted">Не встановлюй випадкові JAR з Google. Якщо мод відсутній у Modrinth, його не можна автоматично підтвердити через цей каталог. Моди — сторонній виконуваний код; перед запуском перевіряй автора й репутацію проєкту.</p>
   </section>;
 }
