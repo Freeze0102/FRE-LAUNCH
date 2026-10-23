@@ -21,6 +21,27 @@ concurrency:
 
 
 jobs:
+  quarantine-flagged-release:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Keep flagged v0.5.5 installer unavailable pending malware investigation
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if gh release view v0.5.5 --repo "$GH_REPO" >/dev/null 2>&1; then
+            gh release edit v0.5.5 --repo "$GH_REPO" --draft \
+              --notes "SECURITY HOLD: Windows Defender reported Trojan:Win32/Bearfoos.B!ml for the 0.5.5 administrator installer. Do not download, run or restore the installer. Await investigation and a separately reviewed release."
+            echo "v0.5.5 has been converted to a draft pending investigation."
+          else
+            echo "No v0.5.5 release to quarantine in this repository."
+          fi
+
   build:
     runs-on: windows-latest
     timeout-minutes: 65
@@ -40,6 +61,8 @@ jobs:
           workspaces: src-tauri -> target
       - name: Install frontend dependencies
         run: npm install --no-audit --no-fund
+      - name: Audit production npm dependencies
+        run: npm audit --omit=dev --audit-level=high
       - name: Verify TypeScript
         run: npm run check
       - name: Build frontend
@@ -60,6 +83,34 @@ jobs:
           if (!$file) { throw "NSIS current-user installer not found" }
           New-Item -ItemType Directory -Force -Path "$base/current-user" | Out-Null
           Copy-Item $file.FullName "$base/current-user/FRE-LAUNCH-CurrentUser-Setup.exe"
+      - name: Security gate - Defender scan before running any FRE executable
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (!(Get-Command Get-MpComputerStatus -ErrorAction SilentlyContinue)) {
+            throw 'Microsoft Defender is not available on this runner. Security scanning cannot be bypassed.'
+          }
+          $status = Get-MpComputerStatus -ErrorAction Stop
+          if (!$status.AMServiceEnabled -or !$status.AntivirusEnabled) {
+            throw 'Defender antivirus engine is not enabled. Refusing to test or publish unscanned executable.'
+          }
+          Update-MpSignature -ErrorAction Stop
+          $status = Get-MpComputerStatus -ErrorAction Stop
+          Write-Host "Defender AV definitions: $($status.AntivirusSignatureVersion)"
+          $file = "src-tauri/target/release/fre-launch.exe"
+          if (!(Test-Path $file)) { throw "Missing scan target: $file" }
+          Start-MpScan -ScanType CustomScan -ScanPath (Resolve-Path $file).Path -ErrorAction Stop
+          if (!(Test-Path $file)) { throw "Defender removed or quarantined: $file" }
+          $file = "src-tauri/target/release/bundle/nsis/current-user/FRE-LAUNCH-CurrentUser-Setup.exe"
+          if (!(Test-Path $file)) { throw "Missing scan target: $file" }
+          Start-MpScan -ScanType CustomScan -ScanPath (Resolve-Path $file).Path -ErrorAction Stop
+          if (!(Test-Path $file)) { throw "Defender removed or quarantined: $file" }
+          $threats = @(Get-MpThreatDetection -ErrorAction Stop)
+          if ($threats.Count -gt 0) {
+            $threats | Format-List ThreatID,ThreatStatusID,Resources | Out-String | Write-Host
+            throw 'Defender recorded a malware detection: installers must not be published.'
+          }
+          Write-Host 'Defender scan passed; no detections reported on this runner'
       - name: Smoke-test installing in a custom Windows directory
         shell: pwsh
         timeout-minutes: 4
@@ -210,26 +261,51 @@ jobs:
           if (!$file) { throw "NSIS administrator installer not found" }
           New-Item -ItemType Directory -Force -Path "$base/administrator" | Out-Null
           Copy-Item $file.FullName "$base/administrator/FRE-LAUNCH-Administrator-Setup.exe"
+      - name: Security gate - Defender scan administrator installer before publishing
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (!(Get-Command Get-MpComputerStatus -ErrorAction SilentlyContinue)) {
+            throw 'Microsoft Defender is not available on this runner. Security scanning cannot be bypassed.'
+          }
+          $status = Get-MpComputerStatus -ErrorAction Stop
+          if (!$status.AMServiceEnabled -or !$status.AntivirusEnabled) {
+            throw 'Defender antivirus engine is not enabled. Refusing to test or publish unscanned executable.'
+          }
+          Write-Host "Defender AV definitions: $($status.AntivirusSignatureVersion)"
+          $file = "src-tauri/target/release/bundle/nsis/administrator/FRE-LAUNCH-Administrator-Setup.exe"
+          if (!(Test-Path $file)) { throw "Missing scan target: $file" }
+          Start-MpScan -ScanType CustomScan -ScanPath (Resolve-Path $file).Path -ErrorAction Stop
+          if (!(Test-Path $file)) { throw "Defender removed or quarantined: $file" }
+          $threats = @(Get-MpThreatDetection -ErrorAction Stop)
+          if ($threats.Count -gt 0) {
+            $threats | Format-List ThreatID,ThreatStatusID,Resources | Out-String | Write-Host
+            throw 'Defender recorded a malware detection: installers must not be published.'
+          }
+          Write-Host 'Defender scan passed; no detections reported on this runner'
       - name: Upload non-admin Windows installer
+        if: vars.FRE_LAUNCH_SECURITY_APPROVED == 'true'
         uses: actions/upload-artifact@v6
         with:
           name: FRE-LAUNCH-Windows-Installer
           path: src-tauri/target/release/bundle/nsis/current-user/*.exe
           if-no-files-found: error
       - name: Upload administrator Windows installer
+        if: vars.FRE_LAUNCH_SECURITY_APPROVED == 'true'
         uses: actions/upload-artifact@v6
         with:
           name: FRE-LAUNCH-Windows-Admin-Installer
           path: src-tauri/target/release/bundle/nsis/administrator/*.exe
           if-no-files-found: error
       - name: Upload portable Windows executable
+        if: vars.FRE_LAUNCH_SECURITY_APPROVED == 'true'
         uses: actions/upload-artifact@v6
         with:
           name: FRE-LAUNCH-Windows-Portable
           path: src-tauri/target/release/fre-launch.exe
           if-no-files-found: warn
       - name: Publish versioned Windows release for in-app updates
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.FRE_LAUNCH_SECURITY_APPROVED == 'true' && !cancelled()
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
