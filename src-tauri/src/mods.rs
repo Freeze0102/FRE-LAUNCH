@@ -49,8 +49,10 @@ fn valid_id(id: &str) -> Result<(), String> {
 }
 fn valid_filename(name: &str, suffix: &str) -> bool {
     name.len()<=180 && name.len()>suffix.len() && name.to_ascii_lowercase().ends_with(suffix)
-    && name.bytes().all(|c|c.is_ascii_alphanumeric() || matches!(c,b'.'|b'-'|b'_'|b'+'|b'('|b')'|b' '))
-    && !name.starts_with('.') && !name.contains("..")
+    // Local mods may be renamed with Ukrainian or other Unicode letters.
+    // Still reject separators, control characters, and traversal components.
+    && name.chars().all(|c|c.is_alphanumeric() || matches!(c,'.'|'-'|'_'|'+'|'('|')'|' '))
+    && !name.starts_with('.') && !name.contains("..") && !name.ends_with(['.',' '])
 }
 async fn fetch_json(client: &Client, url: &str) -> Result<Value, String> {
     client.get(url).send().await.map_err(|e|e.to_string())?
@@ -360,5 +362,8 @@ mod tests {
         assert!(!valid_filename("../evil.jar",".jar"));
         assert!(!valid_filename("foo.zip",".jar"));
         assert!(valid_filename("abc.jar.disabled",".jar.disabled"));
+        assert!(valid_filename("мій-мод-1.21.jar",".jar"));
+        assert!(!valid_filename("subdir/evil.jar",".jar"));
+        assert!(!valid_filename("bad\\\\name.jar",".jar"));
     }
 }
