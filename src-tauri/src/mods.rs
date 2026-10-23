@@ -193,8 +193,7 @@ pub async fn install_fabric_mod(app: AppHandle, instance_id: String, project_id:
         let name=verified_jar(&client,version,&directory).await?;
         added.push(name);
     }
-    // Catalog installations are checked automatically, without an extra UI action.
-    // If Defender cannot verify a file, report failure instead of claiming success.
+    // Catalog installations receive the same built-in archive inspection.
     scan_instance_mods(&app, &instance_id).await?;
     Ok(added)
 }
@@ -242,54 +241,56 @@ pub async fn remove_installed_mod(app: AppHandle, instance_id: String, filename:
     fs::remove_file(directory.join(filename)).await.map_err(|e|e.to_string())
 }
 
-/// Scan enabled JARs before Minecraft starts. Files manually copied to
-/// the instance's mods folder are covered by the same launch gate.
-pub async fn scan_instance_mods(app: &AppHandle, instance_id: &str) -> Result<(), String> {
-    let directory = mods_dir(app, instance_id)?;
-    if !fs::try_exists(&directory).await.map_err(|e|e.to_string())? { return Ok(()); }
-    let mods = list_installed_mods(app.clone(), instance_id.to_owned()).await?;
-    for item in mods.into_iter().filter(|m|m.enabled) {
-        scan_installed_mod(app.clone(), instance_id.to_owned(), item.filename.clone()).await
-            .map_err(|e|format!("Мод {} не пройшов антивірусну перевірку: {e}",item.filename))?;
+/// Defensive structural inspection, not a malware signature scanner.
+/// Reject corrupt, excessive, or executable-bearing ZIPs before loading mods.
+/// This cannot establish that arbitrary Java bytecode is harmless.
+fn inspect_jar(path: &Path) -> Result<(), String> {
+    use std::io::Read;
+    const MAX_FILES: usize = 20_000;
+    const MAX_UNPACKED: u64 = 768 * 1024 * 1024;
+    let file = std::fs::File::open(path).map_err(|e|e.to_string())?;
+    if file.metadata().map_err(|e|e.to_string())?.len() > MAX_MOD_BYTES {
+        return Err("Mod JAR exceeds the size limit".into());
     }
+    let mut archive = zip::ZipArchive::new(file).map_err(|e|format!("Invalid JAR archive: {e}"))?;
+    if archive.len()==0 || archive.len()>MAX_FILES {return Err("JAR has an invalid number of entries".into());}
+    let mut total=0u64;
+    let mut has_mod_descriptor=false;
+    for i in 0..archive.len() {
+        let mut entry=archive.by_index(i).map_err(|e|e.to_string())?;
+        let name=entry.name().replace('\\',"/");
+        if name.starts_with('/') || name.split('/').any(|part|part=="..") {
+            return Err("JAR contains unsafe paths".into());
+        }
+        if entry.is_dir() {continue;}
+        total=total.checked_add(entry.size()).ok_or("Unpacked size overflow")?;
+        if total>MAX_UNPACKED {return Err("JAR expands beyond safe limits".into());}
+        let lower=name.to_ascii_lowercase();
+        if lower.ends_with(".exe") || lower.ends_with(".bat") || lower.ends_with(".cmd")
+            || lower.ends_with(".ps1") || lower.ends_with(".vbs") || lower.ends_with(".scr") {
+            return Err(format!("JAR includes a risky executable or script: {name}"));
+        }
+        if lower=="fabric.mod.json" || lower=="quilt.mod.json" || lower=="meta-inf/mods.toml" || lower=="meta-inf/neoforge.mods.toml" {
+            has_mod_descriptor=true;
+        }
+        // Read every entry to verify decompression and CRC rather than trusting headers.
+        std::io::copy(&mut entry,&mut std::io::sink()).map_err(|e|format!("Damaged JAR entry: {e}"))?;
+    }
+    if !has_mod_descriptor {return Err("Not a recognized Fabric/Quilt/Forge mod archive".into());}
     Ok(())
 }
 
-/// On-demand malware scan using the Windows Defender command-line scanner.
-/// This supplements, but cannot replace, Modrinth integrity verification.
-#[tauri::command]
-pub async fn scan_installed_mod(app: AppHandle, instance_id: String, filename: String) -> Result<String, String> {
-    if !valid_filename(&filename, ".jar") && !valid_filename(&filename, ".jar.disabled") {
-        return Err("Invalid mod filename".into());
+pub async fn scan_instance_mods(app: &AppHandle, instance_id: &str) -> Result<(), String> {
+    let directory=mods_dir(app,instance_id)?;
+    if !fs::try_exists(&directory).await.map_err(|e|e.to_string())? {return Ok(());}
+    let mods=list_installed_mods(app.clone(),instance_id.to_owned()).await?;
+    for item in mods.into_iter().filter(|m|m.enabled) {
+        let path=directory.join(&item.filename);
+        tokio::task::spawn_blocking(move || inspect_jar(&path))
+            .await.map_err(|e|e.to_string())?
+            .map_err(|e|format!("Mod {} failed internal archive inspection: {e}",item.filename))?;
     }
-    let dir = mods_dir(&app, &instance_id)?;
-    let path = dir.join(&filename);
-    let metadata = fs::symlink_metadata(&path).await.map_err(|e| e.to_string())?;
-    if !metadata.is_file() || metadata.file_type().is_symlink() {
-        return Err("Only regular mod files can be scanned".into());
-    }
-    #[cfg(windows)]
-    {
-        let program_files = std::env::var_os("ProgramFiles")
-            .ok_or("Cannot find the Windows Program Files directory")?;
-        let scanner = std::path::PathBuf::from(program_files)
-            .join("Windows Defender").join("MpCmdRun.exe");
-        if !scanner.is_file() {
-            return Err("Microsoft Defender scanner unavailable. Scan this mod with your installed antivirus before launching.".into());
-        }
-        let output = tokio::process::Command::new(&scanner)
-            .arg("-Scan").arg("-ScanType").arg("3").arg("-File").arg(&path)
-            .output().await.map_err(|e| format!("Defender scan failed: {e}"))?;
-        if !output.status.success() {
-            return Err(format!("Defender did not clear this mod (exit code {:?}). Check Windows Security protection history.",output.status.code()));
-        }
-        Ok(format!("Microsoft Defender scan completed without a reported detection: {filename}. This does not guarantee the mod is safe."))
-    }
-    #[cfg(not(windows))]
-    {
-        let _ = path;
-        Err("Microsoft Defender scan is available on Windows only".into())
-    }
+    Ok(())
 }
 
 #[cfg(test)]
