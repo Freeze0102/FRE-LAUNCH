@@ -6,7 +6,56 @@ fn marker_path() -> Option<std::path::PathBuf> {
     Some(std::path::PathBuf::from(local).join("FRE-LAUNCH").join("bootstrap.pending"))
 }
 
+
+const BOOTSTRAP_MAX_BYTES: u64 = 256 * 1024;
+
+#[cfg(windows)]
+fn bootstrap_log_path() -> Option<std::path::PathBuf> {
+    let local = std::env::var_os("LOCALAPPDATA")?;
+    Some(std::path::PathBuf::from(local).join("FRE-LAUNCH").join("startup.log"))
+}
+
+/// Best-effort trace before the Tauri window, AppHandle, or WebView2 exists.
+pub fn log_bootstrap(stage: &str, message: &str) {
+    #[cfg(windows)]
+    {
+        use std::{fs::{self, OpenOptions}, io::Write, time::{SystemTime, UNIX_EPOCH}};
+        let Some(path) = bootstrap_log_path() else {return;};
+        let Some(parent) = path.parent() else {return;};
+        if fs::create_dir_all(parent).is_err() {return;}
+        if fs::metadata(&path).is_ok_and(|meta|meta.len()>BOOTSTRAP_MAX_BYTES) {
+            let _=fs::remove_file(path.with_extension("previous.log"));
+            let _=fs::rename(&path,path.with_extension("previous.log"));
+        }
+        let timestamp=SystemTime::now().duration_since(UNIX_EPOCH)
+            .map(|d|d.as_secs()).unwrap_or_default();
+        let compact=message.replace('\n'," ").replace('\r'," ");
+        if let Ok(mut f)=OpenOptions::new().append(true).create(true).open(path) {
+            let _=writeln!(f,"[{timestamp}] [{stage}] {compact}");
+        }
+    }
+    #[cfg(not(windows))]
+    {let _=(stage,message);}
+}
+
+pub fn recent_bootstrap_log() -> Option<String> {
+    #[cfg(windows)]
+    {
+        let contents=std::fs::read(bootstrap_log_path()?).ok()?;
+        let start=contents.len().saturating_sub(32 * 1024);
+        return Some(String::from_utf8_lossy(&contents[start..]).into_owned());
+    }
+    #[cfg(not(windows))]
+    {None}
+}
+
 pub fn prepare_windows_webview() {
+    log_bootstrap("PROCESS_START", "Executable entered Rust bootstrap");
+    let previous_hook=std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |panic| {
+        log_bootstrap("EARLY_PANIC", &panic.to_string());
+        previous_hook(panic);
+    }));
     #[cfg(windows)]
     {
         use std::time::Duration;
@@ -30,6 +79,7 @@ pub fn prepare_windows_webview() {
             std::env::set_var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
                 format!("{existing} --disable-gpu --disable-accelerated-2d-canvas --disable-gpu-compositing"));
             std::env::set_var("FRE_LAUNCH_SAFE_MODE","1");
+            log_bootstrap("WEBVIEW_SAFE_MODE", "GPU disabled; recovery profile selected");
             // The default WebView2 profile can be corrupt or located next to
             // an admin-installed EXE, where the user has no write access.
             // Recovery uses a separate writable local profile; worlds stay intact.
@@ -42,6 +92,7 @@ pub fn prepare_windows_webview() {
         }
         if let Some(parent) = marker.parent() {
             if std::fs::create_dir_all(parent).is_ok() {
+                log_bootstrap("WEBVIEW_INITIALIZING", "Preparing WebView2 and Tauri window");
                 let _=std::fs::write(marker,b"startup pending; cleared after 20 seconds of responsive UI");
             }
         }
@@ -79,6 +130,7 @@ pub fn mark_frontend_ready() -> Result<(),String> {
             Err(e)=>return Err(format!("Startup marker cleanup: {e}")),
         }
     }
+    log_bootstrap("FRONTEND_READY", "React interface responsive after 20 seconds");
     Ok(())
 }
 

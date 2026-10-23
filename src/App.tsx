@@ -311,7 +311,7 @@ export default function App() {
       <UpdateCenter/>
       <div className="fre-rail-foot">
         <span className="fre-status-live"><i/> FRE LAUNCH / JAVA</span>
-        <div className="fre-build-status"><strong>0.5.3 <span>ALPHA</span></strong><small>ТЕСТОВА ВЕРСІЯ</small></div>
+        <div className="fre-build-status"><strong>0.5.4 <span>ALPHA</span></strong><small>ТЕСТОВА ВЕРСІЯ</small></div>
       </div>
     </aside>
     <div className="fre-workspace">

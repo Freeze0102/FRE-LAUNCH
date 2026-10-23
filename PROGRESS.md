@@ -66,3 +66,11 @@
 - Successful main Windows Builds publish GitHub Releases with installer SHA-256 files. Releases must use new SemVer; old releases are immutable.
 - Limits: SHA-256 from GitHub Releases is not a separate publisher signature, and actual startup crash resolution on the user's Windows machine is not yet verified.
 
+
+## 0.5.4 / STARTUP PROBE + PUBLIC RELEASE CHANNEL
+
+- Write early Rust/Tauri/WebView2 breadcrumbs to `%LOCALAPPDATA%\FRE-LAUNCH\startup.log`, even if the UI never opens; diagnostics includes this log. The WebView2 recovery profile added in 0.5.3 remains intact.
+- Windows CI checks that the installed executable survives 12 seconds, not only that NSIS copied it into the selected directory. A runner smoke test cannot prove that crashes on the user's Windows GPU are fixed.
+- Stage current-user and all-user installers separately by removing the first NSIS output before building the administrator variant.
+- For anonymous, in-app updates while the source repository stays private, create an existing **public Releases-only repository** with a main branch, set Actions variable `FRE_LAUNCH_RELEASE_REPO` to `owner/repo` and Actions secret `FRE_RELEASE_TOKEN` with Contents write permission on that public repository. The token is never shipped inside the application.
+- Without the public distribution repository, update checks report the private/missing release feed clearly instead of incorrectly saying the client is current. Existing installed versions without an updater still require one manual installation.

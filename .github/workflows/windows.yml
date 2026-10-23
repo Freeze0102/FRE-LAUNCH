@@ -9,6 +9,11 @@ on:
 permissions:
   contents: write
 
+# Set Actions variable FRE_LAUNCH_RELEASE_REPO to an existing public repo.
+# Set Actions secret FRE_RELEASE_TOKEN (Contents write on that repo).
+env:
+  FRE_LAUNCH_RELEASE_REPO: ${{ vars.FRE_LAUNCH_RELEASE_REPO }}
+
 concurrency:
   group: windows-build-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   # Keep CI feedback focused on the newest commit; old installer runs are obsolete.
@@ -68,6 +73,26 @@ jobs:
             throw "Installer exited but fre-launch.exe was not installed at the requested path"
           }
           Write-Host "NSIS installed to custom path: $folder"
+      - name: Smoke-test installed launcher survives startup
+        shell: pwsh
+        timeout-minutes: 2
+        run: |
+          $exe = Join-Path $env:RUNNER_TEMP "FRELaunchSmoke/fre-launch.exe"
+          if (!(Test-Path $exe)) { throw "Installed EXE missing" }
+          $p = Start-Process -FilePath $exe -PassThru
+          Start-Sleep -Seconds 12
+          $p.Refresh()
+          if ($p.HasExited) {
+            $log = Join-Path $env:LOCALAPPDATA "FRE-LAUNCH/startup.log"
+            if (Test-Path $log) { Get-Content $log -Tail 50 | Write-Host }
+            throw "FRE LAUNCH exited within 12 seconds of startup (exit code $($p.ExitCode))"
+          }
+          Write-Host "Installed launcher survived 12-second smoke test"
+          Stop-Process -Id $p.Id -Force
+      - name: Remove first NSIS installer before admin build
+        shell: pwsh
+        run: |
+          Get-ChildItem "src-tauri/target/release/bundle/nsis" -File -Filter "*.exe" | Remove-Item -Force
       - name: Build alternative all-users installer
         run: npm run tauri build -- --config src-tauri/tauri.admin.conf.json
       - name: Stage administrator installer
@@ -101,10 +126,19 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          PUBLIC_RELEASE_TOKEN: ${{ secrets.FRE_RELEASE_TOKEN }}
         run: |
           $ErrorActionPreference = 'Stop'
           $version = (Get-Content 'src-tauri/tauri.conf.json' -Raw | ConvertFrom-Json).version
           $tag = "v$version"
+          $repo = if ($env:FRE_LAUNCH_RELEASE_REPO) { $env:FRE_LAUNCH_RELEASE_REPO.Trim() } else { $env:GITHUB_REPOSITORY }
+          $target = if ($repo -eq $env:GITHUB_REPOSITORY) { $env:GITHUB_SHA } else { 'main' }
+          if ($repo -ne $env:GITHUB_REPOSITORY) {
+            if (!$env:PUBLIC_RELEASE_TOKEN) { throw 'FRE_RELEASE_TOKEN must have Contents write on the public distribution repository' }
+            $env:GH_TOKEN = $env:PUBLIC_RELEASE_TOKEN
+          } else {
+            Write-Warning 'Private source repository cannot serve anonymous in-app updates; configure a public FRE_LAUNCH_RELEASE_REPO.'
+          }
           $normal = 'src-tauri/target/release/bundle/nsis/current-user/FRE-LAUNCH-CurrentUser-Setup.exe'
           $admin = 'src-tauri/target/release/bundle/nsis/administrator/FRE-LAUNCH-Administrator-Setup.exe'
           foreach ($file in @($normal, $admin)) {
@@ -114,10 +148,11 @@ jobs:
             Write-Host "Release SHA256 for $file is $digest"
           }
           # Keep previously published releases immutable. Bump app version for a new release.
-          gh release view $tag --repo $env:GITHUB_REPOSITORY --json tagName *> $null
-          if ($LASTEXITCODE -eq 0) {
+          $published = @(gh release list --repo $repo --json tagName --limit 100 | ConvertFrom-Json)
+          if ($LASTEXITCODE -ne 0) { throw 'Could not list release tags' }
+          if (@($published | Where-Object { $_.tagName -eq $tag }).Count -gt 0) {
             Write-Host "Existing $tag release is unchanged."
           } else {
-            gh release create $tag $normal "$normal.sha256" $admin "$admin.sha256" --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "FRE LAUNCH $version" --notes "FRE LAUNCH $version for Windows. Includes user/admin installers and SHA256 files for in-app updates. Existing Minecraft data is preserved by normal upgrades." --latest
+            gh release create $tag $normal "$normal.sha256" $admin "$admin.sha256" --repo $repo --target $target --title "FRE LAUNCH $version" --notes "FRE LAUNCH $version for Windows. Includes user/admin installers and SHA256 files for in-app updates. Existing Minecraft data is preserved by normal upgrades." --latest
             if ($LASTEXITCODE -ne 0) { throw "Could not publish GitHub release $tag" }
           }

@@ -9,7 +9,15 @@ use std::{path::Path, sync::atomic::{AtomicBool, Ordering}};
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::io::AsyncWriteExt;
 
-const LATEST_URL: &str = "https://api.github.com/repos/Freeze0102/FRE-LAUNCH/releases/latest";
+// Public release channel can differ from the private source repository.
+fn release_repo() -> &'static str {
+    option_env!("FRE_LAUNCH_RELEASE_REPO")
+        .filter(|repo| !repo.trim().is_empty())
+        .unwrap_or("Freeze0102/FRE-LAUNCH")
+}
+fn latest_url() -> String {
+    format!("https://api.github.com/repos/{}/releases/latest", release_repo())
+}
 const MAX_INSTALLER_BYTES: u64 = 160 * 1024 * 1024;
 static UPDATING: AtomicBool = AtomicBool::new(false);
 
@@ -48,7 +56,7 @@ struct UpdateProgress {
 
 fn http() -> Result<reqwest::Client, String> {
     reqwest::Client::builder()
-        .user_agent("FRE-LAUNCH-Updater/0.5.3 (https://github.com/Freeze0102/FRE-LAUNCH)")
+        .user_agent("FRE-LAUNCH-Updater/0.5.4 (https://github.com/Freeze0102/FRE-LAUNCH)")
         .timeout(std::time::Duration::from_secs(90))
         .build().map_err(|e|e.to_string())
 }
@@ -71,7 +79,7 @@ fn expected_asset(release: &GithubRelease, filename: &str) -> Result<ReleaseAsse
     // Exclude mirrors, external domains and path substitution. Only Github
     // release download URLs of this exact repository and tagged release qualify.
     let parsed=reqwest::Url::parse(&asset.browser_download_url).map_err(|e|e.to_string())?;
-    let prefix=format!("/Freeze0102/FRE-LAUNCH/releases/download/{}/",release.tag_name);
+    let prefix=format!("/{}/releases/download/{}/",release_repo(),release.tag_name);
     if parsed.scheme()!="https" || parsed.host_str()!=Some("github.com")
         || parsed.path()!=format!("{prefix}{filename}")
         || parsed.query().is_some() || parsed.fragment().is_some() {
@@ -89,16 +97,18 @@ fn expected_checksum_asset(release: &GithubRelease, filename: &str) -> Result<Re
     }
     let parsed=reqwest::Url::parse(&asset.browser_download_url).map_err(|e|e.to_string())?;
     if parsed.scheme()!="https" || parsed.host_str()!=Some("github.com")
-        || parsed.path()!=format!("/Freeze0102/FRE-LAUNCH/releases/download/{}/{name}",release.tag_name)
-        || parsed.query().is_some() {
+        || parsed.path()!=format!("/{}/releases/download/{}/{name}",release_repo(),release.tag_name)
+        || parsed.query().is_some() || parsed.fragment().is_some() {
         return Err("Checksum origin is not the official GitHub repository".into());
     }
     Ok(asset)
 }
 
 async fn latest_release(client: &reqwest::Client) -> Result<Option<GithubRelease>, String> {
-    let response=client.get(LATEST_URL).send().await.map_err(|e|format!("GitHub update check: {e}"))?;
-    if response.status()==reqwest::StatusCode::NOT_FOUND {return Ok(None);}
+    let response=client.get(latest_url()).send().await.map_err(|e|format!("GitHub update check: {e}"))?;
+    if response.status()==reqwest::StatusCode::NOT_FOUND {
+        return Err("Канал оновлень недоступний: немає публічного релізу або репозиторій приватний".into());
+    }
     let response=response.error_for_status().map_err(|e|format!("GitHub releases: {e}"))?;
     let release:GithubRelease=response.json().await.map_err(|e|format!("Invalid release metadata: {e}"))?;
     if release.draft {return Ok(None);}

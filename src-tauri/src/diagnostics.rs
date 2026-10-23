@@ -43,9 +43,14 @@ pub fn read_diagnostics(app: AppHandle) -> Result<Diagnostics, String> {
     let tail=if bytes.len()>MAX_VIEW_BYTES {
         &bytes[bytes.len()-MAX_VIEW_BYTES..]
     } else { &bytes[..] };
+    let install_log=String::from_utf8_lossy(tail);
+    let contents=match super::startup::recent_bootstrap_log() {
+        Some(startup) => format!("=== STARTUP / WEBVIEW2 ===\n{startup}\n=== MINECRAFT INSTALL ===\n{install_log}"),
+        None => install_log.into_owned(),
+    };
     Ok(Diagnostics{
         log_path:path.to_string_lossy().to_string(),
-        contents:String::from_utf8_lossy(tail).to_string()
+        contents
     })
 }
 
