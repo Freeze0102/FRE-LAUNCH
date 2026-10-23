@@ -225,12 +225,23 @@ async fn install_pack(app: AppHandle, instance_id: String, project_id: String,
     if fs::symlink_metadata(&path).is_ok() {
         return Err("Content pack already exists; remove it before reinstalling".into());
     }
-    let temporary = dir.join(format!("{filename}.fre-download"));
-    fs::write(&temporary, bytes).map_err(|e| e.to_string())?;
-    if let Err(error) = fs::rename(&temporary, &path) {
-        let _ = fs::remove_file(&temporary);
-        return Err(error.to_string());
-    }
+    // create_new + a randomized staging name prevents following an existing
+    // .fre-download symlink and avoids overwriting another install's partial file.
+    let temporary = dir.join(format!(".fre-{}-{}.download", uuid::Uuid::new_v4(), filename));
+    let result = (|| -> Result<(), String> {
+        use std::io::Write;
+        let mut output = fs::OpenOptions::new().create_new(true).write(true)
+            .open(&temporary).map_err(|e| e.to_string())?;
+        output.write_all(&bytes).map_err(|e| e.to_string())?;
+        output.sync_all().map_err(|e| e.to_string())?;
+        drop(output);
+        if fs::symlink_metadata(&path).is_ok() {
+            return Err("Pack appeared during download; refusing overwrite".into());
+        }
+        fs::rename(&temporary, &path).map_err(|e| e.to_string())
+    })();
+    if result.is_err() { let _ = fs::remove_file(&temporary); }
+    result?;
     Ok(format!("Installed {}: {}", kind, filename))
 }
 
@@ -313,6 +324,33 @@ pub fn remove_installed_pack(app: AppHandle, instance_id: String, kind: String, 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn protects_pack_filenames() {
+        assert!(safe_pack_filename("ComplementaryShaders_v5.2.zip"));
+        assert!(safe_pack_filename("мій-ресурспак.zip"));
+        assert!(!safe_pack_filename("../evil.zip"));
+        assert!(!safe_pack_filename("evil\\name.zip"));
+        assert!(!safe_pack_filename("pack.jar"));
+        assert!(!safe_local_pack("pack.zip/../../"));
+        assert!(safe_local_pack("pack.zip.disabled"));
+    }
+    #[test]
+    fn rejects_executable_zip_entry() {
+        use std::io::Write;
+        let buffer = std::io::Cursor::new(Vec::new());
+        let mut writer = zip::ZipWriter::new(buffer);
+        writer.start_file("pack.mcmeta", zip::write::SimpleFileOptions::default()).unwrap();
+        writer.write_all(b"{}").unwrap();
+        let bytes = writer.finish().unwrap().into_inner();
+        assert!(inspect_pack_archive(&bytes).is_ok());
+
+        let buffer = std::io::Cursor::new(Vec::new());
+        let mut writer = zip::ZipWriter::new(buffer);
+        writer.start_file("payload.exe", zip::write::SimpleFileOptions::default()).unwrap();
+        writer.write_all(b"unsafe").unwrap();
+        let bytes = writer.finish().unwrap().into_inner();
+        assert!(inspect_pack_archive(&bytes).is_err());
+    }
     #[test]
     fn ids_are_sanitized() {
         assert!(validate_project_id("sodium").is_ok());
