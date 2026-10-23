@@ -37,7 +37,10 @@
     ],
     "windows": {
       "nsis": {
-        "installMode": "both"
+        "installMode": "currentUser"
+      },
+      "webviewInstallMode": {
+        "type": "embedBootstrapper"
       }
     }
   }
