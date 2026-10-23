@@ -1,9 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { motion } from "motion/react";
-import { House, Layers3, Puzzle, UserRound, Shirt, Server, Download, ScrollText, Settings2, Archive, Search, RefreshCw, Play, Coffee, ShieldCheck, Sparkles, ChevronDown, HardDriveDownload, Terminal, CheckCircle2, AlertTriangle, Copy, Camera } from "lucide-react";
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import {
+  ArrowDownToLine, ArrowRight, AlertTriangle, Boxes, Check, ChevronRight, CircleHelp,
+  Coffee, Copy, Download, FolderOpen, HardDriveDownload, House, Images, Layers3,
+  ListFilter, MonitorDot, Orbit, PauseCircle, Play, Puzzle, RefreshCw, Search,
+  Server, Settings2, ShieldCheck, Shirt, SlidersHorizontal, Terminal, UserRound,
+  Wrench, X, Zap, Archive, ScrollText
+} from "lucide-react";
+import WorldArt from "./WorldArt";
 import { InstancesPanel } from "./Features";
 import ModsPanel from "./ModsPanel";
 import SkinStudio from "./SkinStudio";
@@ -12,210 +20,339 @@ import AccountsPanel from "./AccountsPanel";
 import JavaPanel from "./JavaPanel";
 import ServersPanel from "./ServersPanel";
 import ScreenshotsPanel from "./ScreenshotsPanel";
-import { persist } from "zustand/middleware";
 
 type Version = { id: string; type: string; url: string; time: string; releaseTime: string };
-type Progress = { stage: string; current: number; total: number; message: string };
-type Page = "Home" | "Versions" | "Instances" | "Mods" | "Skins" | "Accounts" | "Servers" | "Downloads" | "Logs" | "Backups" | "Screenshots" | "Settings";
+type Progress = {stage: string; current: number; total: number; message: string};
+type Diagnostics = {logPath:string; contents:string};
 type Task = "idle" | "installing" | "launching" | "running";
+type Page = "Home" | "Versions" | "Instances" | "Mods" | "Skins" | "Accounts" |
+  "Servers" | "Downloads" | "Logs" | "Backups" | "Screenshots" | "Settings";
 type Store = {
-  page: Page; setPage: (page: Page) => void;
-  selected: string; setSelected: (version: string) => void;
-  nickname: string; setNickname: (name: string) => void;
-  memoryMb: number; setMemoryMb: (value: number) => void;
-  activeInstanceId: string; setActiveInstanceId: (value: string) => void;
-  theme: string; setTheme: (value: string) => void;
+  page: Page; setPage:(page:Page)=>void;
+  selected:string; setSelected:(version:string)=>void;
+  nickname:string; setNickname:(name:string)=>void;
+  memoryMb:number; setMemoryMb:(mb:number)=>void;
+  activeInstanceId:string; setActiveInstanceId:(id:string)=>void;
+  theme:string; setTheme:(theme:string)=>void;
 };
-const useApp = create<Store>()(persist((set) => ({
-  page: "Home", setPage: (page) => set({page}),
-  selected: "", setSelected: (selected) => set({selected}),
-  nickname: "Player", setNickname: (nickname) => set({nickname}),
-  memoryMb: 4096, setMemoryMb: (memoryMb) => set({memoryMb}),
-  activeInstanceId: "", setActiveInstanceId: (activeInstanceId) => set({activeInstanceId}),
-  theme: "midnight", setTheme: (theme) => set({theme})
-}), {name: "fre-launch-preferences"}));
+const useApp = create<Store>()(persist(set=>({
+  page:"Home",setPage:(page)=>set({page}),
+  selected:"",setSelected:(selected)=>set({selected}),
+  nickname:"Player",setNickname:(nickname)=>set({nickname}),
+  memoryMb:4096,setMemoryMb:(memoryMb)=>set({memoryMb}),
+  activeInstanceId:"",setActiveInstanceId:(activeInstanceId)=>set({activeInstanceId}),
+  theme:"midnight",setTheme:(theme)=>set({theme})
+}),{name:"fre-launch-preferences"}));
 
 const menus = [
-  {name: "Home", icon: House, label: "Головна"},
-  {name: "Versions", icon: Layers3, label: "Версії"},
-  {name: "Instances", icon: Layers3, label: "Збірки"},
-  {name: "Mods", icon: Puzzle, label: "Моди"},
-  {name: "Skins", icon: Shirt, label: "Скіни"},
-  {name: "Accounts", icon: UserRound, label: "Акаунти"},
-  {name: "Servers", icon: Server, label: "Сервери"},
-  {name: "Downloads", icon: Download, label: "Завантаження"},
-  {name: "Logs", icon: ScrollText, label: "Логи"},
-  {name: "Backups", icon: Archive, label: "Копії"},
-  {name: "Screenshots", icon: Camera, label: "Скріншоти"},
-  {name: "Settings", icon: Settings2, label: "Налаштування"}
+  {name:"Home",label:"Пункт запуску",icon:House,index:"01"},
+  {name:"Versions",label:"Версії Minecraft",icon:Layers3,index:"02"},
+  {name:"Instances",label:"Мої збірки",icon:Boxes,index:"03"},
+  {name:"Mods",label:"Моди / ресурси",icon:Puzzle,index:"04"},
+  {name:"Skins",label:"Скін-студія",icon:Shirt,index:"05"},
+  {name:"Servers",label:"Мережа серверів",icon:Server,index:"06"},
+  {name:"Screenshots",label:"Кадри зі світів",icon:Images,index:"07"},
+  {name:"Backups",label:"Архів світів",icon:Archive,index:"08"},
+  {name:"Accounts",label:"Профілі",icon:UserRound,index:"09"},
+  {name:"Downloads",label:"Завантаження",icon:Download,index:"10"},
+  {name:"Logs",label:"Діагностика",icon:ScrollText,index:"11"},
+  {name:"Settings",label:"Параметри",icon:Settings2,index:"12"}
 ] as const;
-const labels: Record<Page, string> = {
-  Home: "Головна", Versions: "Версії Minecraft", Instances: "Мої збірки",
-  Mods: "Моди та модпаки", Skins: "Студія скінів", Accounts: "Акаунти",
-  Servers: "Сервери", Downloads: "Завантаження", Logs: "Логи та діагностика",
-  Backups: "Резервні копії", Screenshots: "Скріншоти", Settings: "Налаштування"
+const titles:Record<Page,string>={
+  Home:"ПУНКТ ЗАПУСКУ",Versions:"КАТАЛОГ ВЕРСІЙ",Instances:"МОЇ ЗБІРКИ",
+  Mods:"МАЙСТЕРНЯ МОДІВ",Skins:"СКІН-СТУДІЯ",Servers:"СЕРВЕРНА МЕРЕЖА",
+  Screenshots:"СКРИНШОТИ",Backups:"АРХІВ СВІТІВ",Accounts:"МОЇ ПРОФІЛІ",
+  Downloads:"ЗАВАНТАЖЕННЯ",Logs:"ЖУРНАЛ ПОДІЙ",Settings:"ПАРАМЕТРИ"
 };
-const future: Record<string, string> = {
-  Instances: "Керування окремими збірками та модлоадерами буде додано після стабілізації запуску.",
-  Mods: "Інтеграція Fabric, Forge, NeoForge, Quilt та Modrinth ще не готова.",
-  Skins: "3D-перегляд і застосування скінів буде додано в наступних версіях.",
-  Servers: "Менеджер серверів перебуває в плані розробки.",
-  Backups: "Резервні копії світів та профілів ще не реалізовані."
+const taglines:Record<Page,string>={
+  Home:"Твій наступний світ починається звідси.",
+  Versions:"Від старої класики до найновіших пригод.",
+  Instances:"Кожному світові — власне місце.",
+  Mods:"Збирай гру під себе, не навпаки.",
+  Skins:"Намалюй героя своєї наступної історії.",
+  Servers:"Знайди, де зараз твої друзі.",
+  Screenshots:"Збережені миті зі своїх пригод.",
+  Backups:"Твій світ заслуговує на запасну копію.",
+  Accounts:"Обери, ким ти заходиш у гру.",
+  Downloads:"Жодного удаваного прогресу. Лише справжні файли.",
+  Logs:"Тут видно, що насправді робить лаунчер.",
+  Settings:"Налаштуй свій простір так, як хочеш."
 };
+const stages:Record<string,string>={
+  metadata:"МЕТАДАНІ",client:"КЛІЄНТ",libraries:"БІБЛІОТЕКИ",
+  assets:"РЕСУРСИ",fabric:"FABRIC",quilt:"QUILT",complete:"ГОТОВО"
+};
+const themes=[
+  {id:"midnight",label:"FIELD NOTES",color:"#c9f079"},
+  {id:"neon",label:"AFTER DARK",color:"#ed9275"},
+  {id:"ocean",label:"DEEP WATER",color:"#79d9db"},
+  {id:"emerald",label:"WILDERNESS",color:"#98d885"},
+  {id:"light",label:"PAPER TRAIL",color:"#f5f1e5"}
+];
+
+function truncate(text:string, max=55) {return text.length>max?text.slice(0,max-1)+"…":text;}
+function humanError(error:unknown) {return typeof error==="string"?error:error instanceof Error?error.message:String(error);}
+function progressPercent(progress:Progress|null){
+  if(!progress)return 0;
+  if(progress.stage==="complete")return 100;
+  return progress.total>0?Math.min(99,Math.round(progress.current/progress.total*100)):0;
+}
 
 export default function App() {
-  const {page, setPage, selected, setSelected, nickname, setNickname, memoryMb, setMemoryMb, activeInstanceId, setActiveInstanceId, theme, setTheme} = useApp();
-  const [versions, setVersions] = useState<Version[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState("all");
-  const [java, setJava] = useState("Перевірка Java...");
-  const [task, setTask] = useState<Task>("idle");
-  const [installed, setInstalled] = useState(false);
-  const [progress, setProgress] = useState<Progress | null>(null);
-  const [message, setMessage] = useState("");
-  const [logs, setLogs] = useState<string[]>([]);
-  useEffect(() => {document.documentElement.dataset.theme = theme;}, [theme]);
+  const {page,setPage,selected,setSelected,nickname,setNickname,memoryMb,setMemoryMb,activeInstanceId,setActiveInstanceId,theme,setTheme}=useApp();
+  const [versions,setVersions]=useState<Version[]>([]);
+  const [loading,setLoading]=useState(false);
+  const [error,setError]=useState("");
+  const [message,setMessage]=useState("");
+  const [task,setTask]=useState<Task>("idle");
+  const [installed,setInstalled]=useState(false);
+  const [progress,setProgress]=useState<Progress|null>(null);
+  const [search,setSearch]=useState("");
+  const [filter,setFilter]=useState("release");
+  const [java,setJava]=useState("Перевірка Java...");
+  const [logs,setLogs]=useState<string[]>([]);
+  const [diagnostics,setDiagnostics]=useState<Diagnostics|null>(null);
+  const busyRef=useRef(false);
+  const activeVersionRef=useRef("");
+  const [showMore,setShowMore]=useState(false);
+  const isBusy=task==="installing"||task==="launching"||task==="running";
+  const activeLabel=menus.find(item=>item.name===page)?.index??"01";
 
-  async function refresh() {
-    setLoading(true);
-    setError("");
-    try {
-      const data = await invoke<Version[]>("get_versions");
-      setVersions(data);
-      if (!useApp.getState().selected && data.length) {
-        setSelected(data.find((v) => v.type === "release")?.id ?? data[0].id);
-      }
-    } catch (e) {
-      setError(String(e));
-    } finally { setLoading(false); }
+  useEffect(()=>{document.documentElement.dataset.theme=theme;},[theme]);
+  async function loadDiagnostics() {
+    try{setDiagnostics(await invoke<Diagnostics>("read_diagnostics"));}
+    catch(e){setDiagnostics({logPath:"Недоступний файл журналу",contents:"Не вдалося прочитати журнал: "+humanError(e)});}
   }
-
-  useEffect(() => {
-    void refresh();
-    void invoke<string>("java_info").then(setJava).catch((e) => setJava(String(e)));
-    const a = listen<Progress>("install-progress", (event) => setProgress(event.payload));
-    const b = listen<string>("game-log", (event) => {
-      setLogs((prev) => [...prev.slice(-499), event.payload]);
+  async function refreshVersions() {
+    setLoading(true);setError("");
+    try{
+      const data=await invoke<Version[]>("get_versions");
+      setVersions(data);
+      if(!useApp.getState().selected && data.length) {
+        setSelected(data.find(v=>v.type==="release")?.id??data[0].id);
+      }
+    }catch(e){setError("Не вдалося отримати список Mojang: "+humanError(e));}
+    finally{setLoading(false);}
+  }
+  useEffect(()=>{
+    void refreshVersions();
+    void invoke<string>("java_info").then(setJava).catch(e=>setJava("Java в PATH не знайдена: "+humanError(e)));
+    const a=listen<Progress>("install-progress",event=>setProgress(event.payload));
+    const b=listen<string>("game-log",event=>setLogs(prev=>[...prev.slice(-499),event.payload]));
+    const c=listen<string>("game-status",event=>{
+      const status=event.payload;
+      setMessage(status==="running"?"Minecraft запущено. Приємної гри!":status);
+      setTask(status==="running"?"running":"idle");
+      if(status!=="running")busyRef.current=false;
     });
-    const c = listen<string>("game-status", (event) => {
-      const status = event.payload;
-      setMessage(status === "running" ? "Гра запущена" : status);
-      setTask(status === "running" ? "running" : "idle");
-    });
-    return () => { void a.then((stop) => stop()); void b.then((stop) => stop()); void c.then((stop) => stop()); };
-  }, []);
-
-  useEffect(() => {
-    let alive = true;
+    return ()=>{void a.then(stop=>stop());void b.then(stop=>stop());void c.then(stop=>stop());};
+  },[]);
+  useEffect(()=>{
+    let current=true;
     setInstalled(false);
-    if (selected) {
-      void invoke<boolean>("is_installed", {version: selected}).then((yes) => {if (alive) setInstalled(yes);})
-        .catch((e) => {if (alive) setError(String(e));});
-    }
-    return () => {alive = false;};
-  }, [selected]);
+    if(selected)void invoke<boolean>("is_installed",{version:selected})
+      .then(yes=>{if(current)setInstalled(yes);})
+      .catch(e=>{if(current)setError(humanError(e));});
+    return ()=>{current=false;};
+  },[selected]);
 
-  const filtered = useMemo(() => versions.filter((v) =>
-    (filter === "all" || v.type === filter) && v.id.toLowerCase().includes(search.toLowerCase())
-  ).slice(0, 150), [versions, filter, search]);
+  const filtered=useMemo(()=>versions.filter(v=>
+    (filter==="all"||v.type===filter)&&v.id.toLowerCase().includes(search.toLowerCase())
+  ).slice(0,120),[versions,search,filter]);
 
-  async function installVersion(version: string) {
-    if (!version || task !== "idle") return;
+  async function installVersion(version:string) {
+    if(!version||busyRef.current)return;
+    busyRef.current=true;
+    activeVersionRef.current=version;
     setSelected(version);
     setTask("installing");
-    setError("");
-    setMessage("");
-    setProgress(null);
-    try {
-      const result = await invoke<string>("install_version", {version});
-      setInstalled(true);
+    setError("");setMessage("");setProgress({stage:"metadata",current:0,total:1,message:"Починаємо встановлення Minecraft..."});
+    try{
+      const result=await invoke<string>("install_version",{version});
       setMessage(result);
-    } catch (e) { setError(String(e)); }
-    finally { setTask("idle"); }
-  }
-
-  async function play() {
-    if (!selected || task !== "idle") return;
-    if (!installed) { await installVersion(selected); return; }
-    setTask("launching");
-    setError("");
-    setMessage("");
-    setLogs([]);
-    try {
-      const result = await invoke<string>("launch_game", {version: selected, nickname, memoryMb, instanceId: activeInstanceId || null});
-      setMessage(result);
-    } catch (e) {
-      setError(String(e));
+      if(useApp.getState().selected===version)setInstalled(true);
+    }catch(e){
+      setError(humanError(e));
+      setPage("Downloads");
+      void loadDiagnostics();
+    }finally{
+      busyRef.current=false;
       setTask("idle");
     }
   }
+  async function launch() {
+    if(!selected||busyRef.current||task==="running")return;
+    if(!installed){await installVersion(selected);return;}
+    busyRef.current=true;
+    setTask("launching");setError("");setMessage("");setLogs([]);
+    try{
+      const response=await invoke<string>("launch_game",{version:selected,nickname,memoryMb,instanceId:activeInstanceId||null});
+      setMessage(response);
+      setTask("running");
+    }catch(e){
+      setError(humanError(e));
+      setTask("idle");
+      busyRef.current=false;
+      setPage("Logs");
+      void loadDiagnostics();
+    }
+  }
+  async function copyText(text:string){
+    try{await navigator.clipboard.writeText(text);setMessage("Скопійовано в буфер обміну.");}
+    catch(e){setError("Не вдалося скопіювати: "+humanError(e));}
+  }
+  const percent=progressPercent(progress);
+  const installAction=task==="installing"?"ЗАВАНТАЖЕННЯ...":task==="launching"?"ЗАПУСК...":task==="running"?"ГРА ПРАЦЮЄ":installed?"ГРАТИ ЗАРАЗ":"ВСТАНОВИТИ";
+  const selectedKind=versions.find(v=>v.id===selected)?.type??"release";
 
-  const busy = task === "installing" || task === "launching" || task === "running";
-  const playLabel = task === "installing" ? "ВСТАНОВЛЕННЯ..." : task === "launching" ? "ЗАПУСК..." :
-    task === "running" ? "ГРА ЗАПУЩЕНА" : installed ? "ГРАТИ" : "ВСТАНОВИТИ";
-  return <div className="shell">
-    <aside className="sidebar">
-      <div className="brand"><div className="brand-icon">F</div><div><strong>FRE <span>LAUNCH</span></strong><small>YOUR MINECRAFT. YOUR RULES.</small></div></div>
-      <div className="nav">
-        {menus.map(({name, icon: Icon, label}) => <button key={name} className={"nav-item " + (page === name ? "active" : "")} onClick={() => setPage(name)}><Icon size={19}/><span>{label}</span></button>)}
+  return <div className="fre-app">
+    <aside className="fre-rail">
+      <button className="fre-identity" onClick={()=>setPage("Home")} title="На головну">
+        <span className="fre-identity-mark">F<span>↗</span></span>
+        <span className="fre-identity-word"><b>FRE.</b><small>LAUNCH / JAVA EDITION</small></span>
+      </button>
+      <div className="fre-rail-divider"><span>НАВІГАЦІЯ / 12</span><span>•••</span></div>
+      <nav className="fre-nav" aria-label="Розділи лаунчера">
+        {menus.map(({name,label,icon:Icon,index})=><button key={name}
+          className={"fre-nav-link"+(page===name?" is-active":"")}
+          onClick={()=>setPage(name)}
+          aria-current={page===name?"page":undefined}
+          title={label}>
+          <span className="fre-nav-index">{index}</span><Icon size={18} strokeWidth={1.8}/>
+          <span className="fre-nav-label">{label}</span>
+          {page===name&&<ChevronRight size={15} strokeWidth={2}/>}
+        </button>)}
+      </nav>
+      <div className="fre-rail-foot">
+        <span className="fre-status-live"><i/> СИСТЕМА ONLINE</span>
+        <strong>ALPHA / 0.5</strong>
+        <small>НЕОФІЦІЙНИЙ MINECRAFT LAUNCHER</small>
       </div>
-      <div className="side-bottom"><div className="status-dot"/> Версія 0.4.0 · Alpha</div>
     </aside>
-    <main className="main">
-      <header className="top"><div><div className="eyebrow">FRE LAUNCH / {page.toUpperCase()}</div><h1>{labels[page]}</h1></div><button className="user-pill" onClick={() => setPage("Accounts")}><div className="avatar">{nickname[0]?.toUpperCase() || "P"}</div><div><b>{nickname}</b><small>Offline profile</small></div><ChevronDown size={16}/></button></header>
-      {error && <div className="error"><AlertTriangle size={17}/> {error}</div>}
-      {message && <div className="notice"><CheckCircle2 size={17}/> {message}</div>}
-      {task === "installing" && progress && <div className="progress-panel"><div><b>{progress.message}</b><span>{progress.total ? Math.floor(progress.current / progress.total * 100) : 0}%</span></div><div className="progress-bar"><div style={{width: progress.total ? Math.floor(progress.current / progress.total * 100) + "%" : "0%"}}/></div></div>}
-      {page === "Home" && <>
-        <motion.section className="hero" initial={{opacity: 0, y: 14}} animate={{opacity: 1, y: 0}}>
-          <div className="hero-glow"/>
-          <div className="hero-content"><span className="pill"><Sparkles size={14}/> FRE LAUNCH ALPHA</span><h2>Твій світ.<br/><em>Твої правила.</em></h2><p>Обери Minecraft Java Edition та вирушай у пригоду.</p>
-            <div className="hero-actions"><button className="play" disabled={!selected || busy} onClick={() => void play()}>{installed ? <Play fill="currentColor" size={20}/> : <HardDriveDownload size={20}/>} {playLabel}</button><button className="secondary" onClick={() => setPage("Versions")}>Усі версії</button></div>
-          </div><div className="hero-decoration">F<span>RE</span></div>
-        </motion.section>
-        <div className="grid2">
-          <section className="panel"><div className="panel-heading"><h3>Обрана версія</h3><Layers3 size={19}/></div><div className="value">{selected || "Не вибрано"}</div><p>{installed ? "Позначена як встановлена" : "Потрібне завантаження"}</p><p className="muted">{activeInstanceId ? "Окрема збірка активна · власні світи" : "Швидкий запуск · спільний профіль версії"}</p><button className="text-button" onClick={() => setPage("Versions")}>Змінити версію →</button></section>
-          <section className="panel"><div className="panel-heading"><h3>Система</h3><Coffee size={19}/></div><div className="system-status">{java}</div><p>Java визначається через PATH. Для різних версій потрібні сумісні JDK.</p><button className="text-button" onClick={() => void invoke<string>("java_info").then(setJava).catch((e) => setJava(String(e)))}>Перевірити Java →</button></section>
+    <div className="fre-workspace">
+      <header className="fre-commandbar">
+        <div className="fre-command-left"><span className="fre-command-square"><Orbit size={17}/></span>
+          <span>FRE / CONTROL ROOM</span><span className="fre-command-slash">/</span><b>{titles[page]}</b>
         </div>
-      </>}
-      {page === "Versions" && <section className="panel"><div className="toolbar"><div className="search"><Search size={18}/><input placeholder="Знайти версію, наприклад 1.21..." value={search} onChange={(e) => setSearch(e.target.value)}/></div><select value={filter} onChange={(e) => setFilter(e.target.value)}><option value="all">Усі типи</option><option value="release">Release</option><option value="snapshot">Snapshot</option><option value="old_beta">Old Beta</option><option value="old_alpha">Old Alpha</option></select><button className="icon-button" onClick={() => void refresh()} title="Оновити" disabled={loading}><RefreshCw size={18}/></button></div>
-        <p className="muted">{loading ? "Завантаження з Mojang..." : `Знайдено ${versions.length} версій · показано ${filtered.length}`}</p>
-        <div className="version-list">{filtered.map((v) => <button className={"version-row " + (selected === v.id ? "chosen" : "")} key={v.id} onClick={() => {setSelected(v.id); setActiveInstanceId("");}}><div className="version-mark"><Layers3 size={19}/></div><div><b>{v.id}</b><small>{v.type.replace("_", " ").toUpperCase()}</small></div><span>{new Date(v.releaseTime).toLocaleDateString("uk-UA")}</span><span className="choose">{selected === v.id ? "Обрано" : "Обрати"}</span></button>)}</div>
-        <div className="toolbar version-footer"><b>Обрано: {selected || "нічого"}</b><button className="primary" disabled={!selected || busy} onClick={() => void installVersion(selected)}><HardDriveDownload size={17}/> Встановити / перевірити</button></div>
-        <p className="muted">Сумісність історичних версій може відрізнятися. Підтримка окремих модлоадерів ще не готова.</p>
-      </section>}
-      {page === "Instances" && <InstancesPanel version={selected} active={activeInstanceId} setActive={setActiveInstanceId} setVersion={setSelected} setMemory={setMemoryMb} navigateHome={() => setPage("Home")}/>}
-      {page === "Mods" && <ModsPanel version={selected} instanceId={activeInstanceId}/>}
-      {page === "Skins" && <SkinStudio/>}
-      {page === "Servers" && <ServersPanel/>}
-      {page === "Screenshots" && <ScreenshotsPanel instanceId={activeInstanceId}/>}
-      {page === "Backups" && <BackupsPanel instanceId={activeInstanceId} instanceName={activeInstanceId ? "Вибрана збірка" : ""}/>}
-      {page === "Accounts" && <AccountsPanel nickname={nickname} onSelect={setNickname}/>}
-      {page === "Settings" && <section className="panel narrow">
-        <div className="panel-heading"><h3>FRE THEMES</h3><Settings2 size={19}/></div>
-        <p>Зміна теми застосовується миттєво і зберігається після перезапуску лаунчера.</p>
-        <div className="theme-options">{[
-          {id:"midnight", label:"Midnight",color:"#9063f4"},
-          {id:"neon",label:"Neon",color:"#df4dff"},
-          {id:"ocean",label:"Ocean",color:"#15b5df"},
-          {id:"emerald",label:"Emerald",color:"#35c99d"},
-          {id:"light",label:"Light",color:"#7790fa"}
-        ].map(t=><button className={"theme-choice"+(theme===t.id?" current":"")} onClick={()=>setTheme(t.id)} key={t.id}>
-          <span style={{backgroundColor:t.color}}/>{t.label}{theme===t.id?" ✓":""}</button>)}</div>
-        <hr/><div className="panel-heading"><h3>Налаштування гри</h3><Settings2 size={19}/></div>
-        <label className="field-label">Максимальна RAM: {memoryMb} MB</label>
-        <input className="memory-slider" type="range" min="1024" max="16384" step="512" value={memoryMb} onChange={(e) => setMemoryMb(Number(e.target.value))}/>
-        <p>RAM зберігається локально. Окремі збірки можуть мати власні налаштування у FRE INSTANCES.</p>
-        <hr/><div className="panel-heading"><h3>Java</h3><Coffee size={19}/></div>
-        <p>{java}</p><p className="muted">Для власного шляху до Java відкрий налаштування конкретної збірки.</p>
-        <JavaPanel instanceId={activeInstanceId}/>
-      </section>}
-      {page === "Downloads" && <section className="panel narrow"><div className="panel-heading"><h3>Стан встановлення</h3><Download size={19}/></div>{progress ? <><p>{progress.message}</p><p>{progress.stage}: {progress.current}/{progress.total}</p></> : <p>Наразі немає активних завантажень.</p>}</section>}
-      {page === "Logs" && <section className="panel"><div className="panel-heading"><h3>Журнал Minecraft</h3><Terminal size={19}/></div><div className="toolbar"><button className="secondary" disabled={!logs.length} onClick={() => void navigator.clipboard.writeText(logs.join("\n"))}><Copy size={15}/> Копіювати логи</button><button className="secondary" onClick={() => setLogs([])}>Очистити</button></div><pre className="log-view">{logs.length ? logs.join("\n") : "Логи з’являться тут після запуску Minecraft."}</pre></section>}
-      {page in future && !["Instances","Mods","Skins","Backups","Servers"].includes(page) && <section className="panel empty"><ShieldCheck size={38}/><h3>Модуль у розробці</h3><p>{future[page]}</p><button className="secondary" onClick={() => setPage("Home")}>На головну</button></section>}
-      <footer>FRE LAUNCH <span>•</span> Your Minecraft. Your Rules. <span>•</span> Alpha build</footer>
-    </main>
+        <div className="fre-command-right">
+          <button className="fre-command-java" onClick={()=>setPage("Settings")} title="Стан Java"><Coffee size={16}/><span>{java.startsWith("Java в PATH")?"JAVA НЕ ЗНАЙДЕНА":"JAVA READY"}</span></button>
+          <button className="fre-command-account" onClick={()=>setPage("Accounts")} title="Вибрати профіль">
+            <span className="fre-avatar">{nickname[0]?.toUpperCase()||"P"}</span><span>{nickname}</span><ChevronRight size={15}/>
+          </button>
+        </div>
+      </header>
+      <main className="fre-main">
+        <div className="fre-page-intro">
+          <div className="fre-kicker"><span className="fre-small-line"/> РОЗДІЛ {activeLabel} / 12 <span className="fre-kicker-dot">✦</span> FRE LAUNCH</div>
+          <div className="fre-heading-row"><div><h1>{titles[page]}</h1><p>{taglines[page]}</p></div>
+            {page!=="Home"&&<button className="fre-return" onClick={()=>setPage("Home")}><House size={16}/> ПУНКТ ЗАПУСКУ <ArrowRight size={15}/></button>}
+          </div>
+        </div>
+        {error&&<div className="fre-alert" role="alert"><AlertTriangle size={20}/><div><strong>ПОМИЛКА ОПЕРАЦІЇ</strong><p>{error}</p></div><button onClick={()=>{setPage("Logs");void loadDiagnostics();}}>ДІАГНОСТИКА <ArrowRight size={15}/></button><button className="fre-alert-close" onClick={()=>setError("")} title="Закрити"><X size={18}/></button></div>}
+        {message&&<div className="fre-flash" role="status"><Check size={17}/><span>{message}</span><button onClick={()=>setMessage("")} title="Закрити"><X size={16}/></button></div>}
+
+        {page==="Home"&&<>
+          <div className="fre-home-layout">
+            <motion.section className="fre-feature" initial={{opacity:0,y:14}} animate={{opacity:1,y:0}} transition={{duration:.35}}>
+              <div className="fre-feature-top"><span><span className="fre-feature-star">✳</span> FRE / OVERWORLD COLLECTION</span><span>001 — INFINITE</span></div>
+              <div className="fre-feature-content"><div className="fre-cover-label">НЕ ПРОСТО ЛАУНЧЕР.</div>
+                <h2>ТУТ<br/>ПОЧИНАЄТЬСЯ<br/><em>ТВІЙ СВІТ<span>↗</span></em></h2>
+                <p>Вибери версію. Збери власні правила. А далі — тільки ти та нескінченний світ блоків.</p>
+              </div>
+              <div className="fre-feature-art"><WorldArt/></div>
+              <div className="fre-feature-foot"><span>NO. 001 / WORLD SELECT</span><span>CRAFT YOUR OWN WAY <ArrowRight size={14}/></span></div>
+            </motion.section>
+            <aside className="fre-console">
+              <div className="fre-console-heading"><div><span>01 // LAUNCH CONTROL</span><h3>ГОТОВИЙ<br/>ДО СТАРТУ?</h3></div><div className="fre-console-orbit"><Zap size={21}/></div></div>
+              <div className="fre-console-divider"/>
+              <span className="fre-field-label">ОБРАНА ВЕРСІЯ</span>
+              <button className="fre-version-selection" onClick={()=>setPage("Versions")}><span className="fre-version-symbol"><Layers3 size={24}/></span>
+                <span><strong>{selected||"ВИБЕРИ ВЕРСІЮ"}</strong><small>{selectedKind.toUpperCase()} · JAVA EDITION</small></span><ChevronRight size={18}/></button>
+              <div className="fre-console-mini"><span>ПРОФІЛЬ</span><button onClick={()=>setPage("Accounts")}><UserRound size={15}/> {nickname} <ChevronRight size={14}/></button></div>
+              <div className="fre-console-mini"><span>БІБЛІОТЕКА</span><button onClick={()=>setPage("Instances")}><Boxes size={15}/> {activeInstanceId?"ВИБРАНА ЗБІРКА":"ШВИДКИЙ РЕЖИМ"} <ChevronRight size={14}/></button></div>
+              <div className="fre-console-mini"><span>ПАМ'ЯТЬ</span><button onClick={()=>setPage("Settings")}><SlidersHorizontal size={15}/> {Math.round(memoryMb/1024*10)/10} GB RAM <ChevronRight size={14}/></button></div>
+              <button className="fre-launch-now" disabled={!selected||isBusy} onClick={()=>void launch()}>
+                <span>{installed?<Play size={22} fill="currentColor"/>:<ArrowDownToLine size={22}/>}</span>
+                <strong>{installAction}</strong><ArrowRight size={22}/>
+              </button>
+              <div className="fre-console-bottom">{installed?"ФАЙЛИ ГРИ ВЖЕ ВСТАНОВЛЕНО":"СПОЧАТКУ ЗАВАНТАЖИМО ОФІЦІЙНІ ФАЙЛИ"} <span>✳</span></div>
+            </aside>
+          </div>
+          <div className="fre-quick-links">
+            <button onClick={()=>setPage("Instances")}><span>01 / BUILD</span><div><Boxes size={27}/><b>ВЛАСНІ ЗБІРКИ</b><ArrowRight size={20}/></div><p>Твої світи. Твої модлоадери.</p></button>
+            <button onClick={()=>setPage("Mods")}><span>02 / EXPLORE</span><div><Puzzle size={27}/><b>МОДИ І РЕСУРСИ</b><ArrowRight size={20}/></div><p>Відкривай нові можливості.</p></button>
+            <button onClick={()=>setPage("Skins")}><span>03 / CREATE</span><div><Shirt size={27}/><b>СТУДІЯ СКІНІВ</b><ArrowRight size={20}/></div><p>Створи того, ким станеш.</p></button>
+          </div>
+          <div className="fre-system-strip"><span><i/> ЛАУНЧЕР ГОТОВИЙ</span><span>JAVA: {truncate(java,38)}</span><button onClick={()=>setPage("Logs")}>ДІАГНОСТИКА <ArrowRight size={15}/></button></div>
+        </>}
+
+        {page==="Versions"&&<section className="fre-version-catalog">
+          <div className="fre-catalog-toolbar">
+            <div className="fre-catalog-search"><Search size={19}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="ПОШУК ВЕРСІЇ — 1.21.4..." aria-label="Пошук версії"/></div>
+            <div className="fre-catalog-pills">{[{id:"release",label:"RELEASE"},{id:"snapshot",label:"SNAPSHOT"},{id:"all",label:"УСІ"}].map(t=><button key={t.id} className={filter===t.id?"is-current":""} onClick={()=>setFilter(t.id)}>{t.label}</button>)}</div>
+            <button className="fre-catalog-refresh" onClick={()=>void refreshVersions()} disabled={loading} title="Оновити з Mojang"><RefreshCw size={18}/></button>
+          </div>
+          <div className="fre-catalog-counter"><ListFilter size={15}/> {loading?"ОТРИМАННЯ ДАНИХ MOJANG":`ЗНАЙДЕНО ${versions.length} · ПОКАЗАНО ${filtered.length}`} <span>ОФІЦІЙНИЙ КАТАЛОГ</span></div>
+          <div className="fre-version-list">{filtered.map((version,index)=><button disabled={isBusy} key={version.id} className={"fre-version-row"+(selected===version.id?" is-chosen":"")} onClick={()=>{setSelected(version.id);setActiveInstanceId("");}}>
+            <span className="fre-vrow-no">{String(index+1).padStart(2,"0")}</span><span className="fre-vrow-title"><b>{version.id}</b><small>{version.type.replace("_"," ").toUpperCase()}</small></span>
+            <span className="fre-vrow-date">{new Date(version.releaseTime).toLocaleDateString("uk-UA")}</span><span className="fre-vrow-select">{selected===version.id?"ОБРАНО ✓":"ОБРАТИ ↗"}</span>
+          </button>)}</div>
+          <div className="fre-catalog-bottom"><span>АКТИВНА: <strong>{selected||"НЕ ОБРАНО"}</strong></span>
+            <button className="fre-install-cta" disabled={!selected||isBusy} onClick={()=>void installVersion(selected)}><HardDriveDownload size={19}/> {task==="installing"?"ВСТАНОВЛЕННЯ...":"ВСТАНОВИТИ / ПЕРЕВІРИТИ"} <ArrowRight size={18}/></button>
+          </div>
+        </section>}
+
+        {task==="installing" && progress && <div className="fre-install-activity" aria-live="polite"><div><span>ПРОЦЕС: {stages[progress.stage]??progress.stage.toUpperCase()}</span><strong>{progress.message}</strong></div><span className="fre-install-percent">{percent}%</span><div className="fre-install-track"><div style={{width:percent+"%"}}/></div><button onClick={()=>setPage("Downloads")}>ДЕТАЛІ <ArrowRight size={14}/></button></div>}
+
+        {page==="Instances"&&<div className="fre-module"><InstancesPanel version={selected} active={activeInstanceId} setActive={setActiveInstanceId} setVersion={setSelected} setMemory={setMemoryMb} navigateHome={()=>setPage("Home")}/></div>}
+        {page==="Mods"&&<div className="fre-module"><ModsPanel version={selected} instanceId={activeInstanceId}/></div>}
+        {page==="Skins"&&<div className="fre-module"><SkinStudio/></div>}
+        {page==="Servers"&&<div className="fre-module"><ServersPanel/></div>}
+        {page==="Screenshots"&&<div className="fre-module"><ScreenshotsPanel instanceId={activeInstanceId}/></div>}
+        {page==="Backups"&&<div className="fre-module"><BackupsPanel instanceId={activeInstanceId} instanceName={activeInstanceId?"ВИБРАНА ЗБІРКА":""}/></div>}
+        {page==="Accounts"&&<div className="fre-module"><AccountsPanel nickname={nickname} onSelect={setNickname}/></div>}
+
+        {page==="Settings"&&<div className="fre-settings-stack">
+          <section className="fre-control-paper"><div className="fre-module-label"><span>01 / ВИГЛЯД</span><Wrench size={18}/></div>
+            <h2>ТВОЯ АТМОСФЕРА.</h2><p>П'ять настроїв FRE LAUNCH. Вибери свій — усе зберігається автоматично.</p>
+            <div className="fre-theme-grid">{themes.map(item=><button key={item.id} className={"fre-theme-choice"+(theme===item.id?" is-selected":"")} onClick={()=>setTheme(item.id)}>
+              <span style={{background:item.color}}/><b>{item.label}</b>{theme===item.id?<Check size={18}/>:<ArrowRight size={17}/>}</button>)}</div>
+          </section>
+          <section className="fre-control-paper"><div className="fre-module-label"><span>02 / РЕСУРСИ</span><SlidersHorizontal size={18}/></div>
+            <h2>ПОТУЖНІСТЬ ГРИ.</h2><p>Виділена RAM: <strong>{memoryMb} MB</strong></p>
+            <input type="range" min={1024} max={16384} step={512} value={memoryMb} onChange={e=>setMemoryMb(Number(e.target.value))} className="fre-ram-range"/>
+            <div className="fre-ram-ends"><span>1 GB</span><span>16 GB</span></div>
+            <p>Збірки можуть мати власні Java та RAM.</p>
+          </section>
+          <section className="fre-control-paper"><div className="fre-module-label"><span>03 / JAVA</span><Coffee size={18}/></div><JavaPanel instanceId={activeInstanceId}/></section>
+        </div>}
+
+        {page==="Downloads"&&<section className="fre-diag-sheet">
+          <div className="fre-module-label"><span>INSTALL MONITOR / LIVE</span><MonitorDot size={19}/></div>
+          <h2>{task==="installing"?"ЙДЕ ВСТАНОВЛЕННЯ":"МОНІТОР ЗАВАНТАЖЕНЬ"}</h2>
+          {progress?<><p>{progress.message}</p><div className="fre-diag-progress"><div style={{width:percent+"%"}}/></div>
+          <div className="fre-diag-stats"><span>ЕТАП: {stages[progress.stage]??progress.stage.toUpperCase()}</span><strong>{progress.current} / {progress.total}</strong><b>{percent}%</b></div></>:<p>Немає активних завантажень. Обери версію Minecraft, щоб встановити її.</p>}
+          <button className="fre-inline-btn" onClick={()=>{void loadDiagnostics();setPage("Logs");}}><Terminal size={17}/> ДІАГНОСТИКА <ArrowRight size={16}/></button>
+        </section>}
+
+        {page==="Logs"&&<section className="fre-diag-sheet">
+          <div className="fre-module-label"><span>CRASH REPORT / LOCAL ONLY</span><ShieldCheck size={19}/></div>
+          <h2>ЖУРНАЛ ЗАПУСКУ.</h2><p>Тут можна знайти помилку, навіть якщо встановлення зупинилося. Журнал зберігається лише на комп'ютері.</p>
+          <div className="fre-log-toolbar"><button onClick={()=>void loadDiagnostics()}><RefreshCw size={16}/> ЧИТАТИ ЖУРНАЛ</button>
+            <button disabled={!diagnostics?.contents} onClick={()=>void copyText(diagnostics?.contents??"")}><Copy size={16}/> КОПІЮВАТИ ПОМИЛКИ</button>
+            <button disabled={!logs.length} onClick={()=>void copyText(logs.join("\n"))}><Copy size={16}/> КОПІЮВАТИ ЛОГ ГРИ</button>
+            <button onClick={()=>setLogs([])}><X size={16}/> ОЧИСТИТИ ЕКРАН</button></div>
+          {diagnostics&&<div className="fre-diagnostic-location"><FolderOpen size={16}/><span>{diagnostics.logPath}</span></div>}
+          <div className="fre-log-label">FRE / INSTALL DIAGNOSTICS</div>
+          <pre className="fre-log-output">{diagnostics?.contents||"Натисни «Читати журнал», щоб показати історію встановлень."}</pre>
+          <div className="fre-log-label">MINECRAFT / LIVE OUTPUT</div>
+          <pre className="fre-log-output">{logs.length?logs.join("\n"):"Minecraft ще не надсилав повідомлень."}</pre>
+          <p>Якщо програма закрилася під час встановлення, після повторного запуску відкрий цю сторінку та скопіюй журнал.</p>
+        </section>}
+
+        <footer className="fre-footer"><span>FRE LAUNCH © ALPHA 0.5</span><span>YOUR MINECRAFT / YOUR RULES</span><button onClick={()=>{setShowMore(v=>!v);}}>ПРО ПРОЄКТ <CircleHelp size={14}/></button></footer>
+        {showMore&&<div className="fre-disclaimer"><button onClick={()=>setShowMore(false)}><X size={16}/></button>FRE LAUNCH — неофіційний Minecraft Java лаунчер. Не пов'язаний з Mojang чи Microsoft. Перевірка реального запуску на всіх Windows-конфігураціях ще триває.</div>}
+      </main>
+    </div>
   </div>;
 }
