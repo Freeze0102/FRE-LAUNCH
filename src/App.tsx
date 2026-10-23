@@ -12,6 +12,7 @@ import {
   Wrench, X, Zap, Archive, ScrollText
 } from "lucide-react";
 import WorldArt from "./WorldArt";
+import InstallDeck from "./InstallDeck";
 import { LAST_UI_CRASH } from "./ErrorBoundary";
 import { InstancesPanel } from "./Features";
 import ModsPanel from "./ModsPanel";
@@ -356,18 +357,15 @@ export default function App() {
           <section className="fre-control-paper"><div className="fre-module-label"><span>03 / JAVA</span><Coffee size={18}/></div><JavaPanel instanceId={activeInstanceId}/></section>
         </div>}
 
-        {page==="Downloads"&&<section className="fre-diag-sheet">
-          <div className="fre-module-label"><span>INSTALL MONITOR / LIVE</span><MonitorDot size={19}/></div>
-          <h2>{task==="installing"?"ЙДЕ ВСТАНОВЛЕННЯ":"МОНІТОР ЗАВАНТАЖЕНЬ"}</h2>
-          {preflight&&<div className={"fre-install-preflight"+(preflight.ready?" is-ready":" is-error")}>
-            <strong>{preflight.ready?"ДИСК ДОСТУПНИЙ":"ПОМИЛКА ДОСТУПУ ДО ДИСКА"}</strong>
-            <span>{preflight.detail}</span>
-            {preflight.path&&<code>{preflight.path}</code>}
-          </div>}
-          {progress?<><p>{progress.message}</p><div className="fre-diag-progress"><div style={{width:percent+"%"}}/></div>
-          <div className="fre-diag-stats"><span>ЕТАП: {stages[progress.stage]??progress.stage.toUpperCase()}</span><strong>{progress.current} / {progress.total}</strong><b>{percent}%</b></div></>:<p>Немає активних завантажень. Обери версію Minecraft, щоб встановити її.</p>}
-          <button className="fre-inline-btn" onClick={()=>{void loadDiagnostics();setPage("Logs");}}><Terminal size={17}/> ДІАГНОСТИКА <ArrowRight size={16}/></button>
-        </section>}
+        {page==="Downloads"&&<InstallDeck
+          version={selected}
+          progress={progress}
+          preflight={preflight}
+          isInstalling={task==="installing"}
+          onCheck={()=>{void invoke<InstallPreflight>("install_preflight")
+            .then(setPreflight).catch(e=>setPreflight({path:"",ready:false,detail:humanError(e)}));}}
+          onLogs={()=>{void loadDiagnostics();setPage("Logs");}}
+        />}
 
         {page==="Logs"&&<section className="fre-diag-sheet">
           <div className="fre-module-label"><span>CRASH REPORT / LOCAL ONLY</span><ShieldCheck size={19}/></div>
