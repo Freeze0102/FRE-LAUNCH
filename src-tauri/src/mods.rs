@@ -2,6 +2,7 @@
 //! Third-party code is never executed by FRE LAUNCH; the user chooses to launch
 //! Minecraft with selected JARs, so mod downloads must be explicitly initiated.
 use reqwest::Client;
+use futures::StreamExt;
 use serde::Serialize;
 use serde_json::Value;
 use sha2::{Digest, Sha512};
@@ -121,8 +122,19 @@ async fn verified_jar(client: &Client, version: &Value, dir: &Path) -> Result<St
     if response.content_length().is_some_and(|n|n>MAX_MOD_BYTES) {
         return Err("Mod download exceeds size limit".into());
     }
-    let bytes=response.bytes().await.map_err(|e|e.to_string())?;
-    if bytes.len() as u64!=expected_size {
+    // Stream under the declared size limit; never buffer unbounded HTTP replies.
+    let mut bytes=Vec::new();
+    let mut received=0u64;
+    let mut chunks=response.bytes_stream();
+    while let Some(chunk)=chunks.next().await {
+        let chunk=chunk.map_err(|e|format!("Mod stream interrupted: {e}"))?;
+        received=received.checked_add(chunk.len() as u64).ok_or("Mod size overflow")?;
+        if received>expected_size || received>MAX_MOD_BYTES {
+            return Err("Mod download exceeded declared size".into());
+        }
+        bytes.extend_from_slice(&chunk);
+    }
+    if received!=expected_size {
         return Err("Mod file size does not match Modrinth metadata".into());
     }
     if !format!("{:x}",Sha512::digest(&bytes)).eq_ignore_ascii_case(digest){

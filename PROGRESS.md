@@ -54,3 +54,4 @@
 - Launch now verifies cached client JAR, hashed libraries and asset index, and repairs missing/corrupt files instead of launching a broken game.
 - Checksum-free Maven artifacts must have a valid JAR header before reuse or installation; cached HTTP error pages are rejected.
 - 0.5.2: Full official Mojang client JAR and Maven library download/hash smoke tests, cached-client integrity in version status, dark WebView startup background and upgraded GitHub Actions runtime.
+- Modrinth Fabric mods and ZIP resource-pack downloads now enforce streaming byte limits, even if the remote server omits Content-Length, avoiding uncontrolled in-memory buffering.

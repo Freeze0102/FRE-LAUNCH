@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use futures::StreamExt;
 use serde_json::Value;
 use sha2::{Digest, Sha512};
 use std::{fs, path::PathBuf};
@@ -89,11 +90,22 @@ pub async fn install_resourcepack(app: AppHandle, instance_id: String, project_i
     }
     let expected = file["hashes"]["sha512"].as_str().ok_or("Missing SHA-512 hash")?;
     let size = file["size"].as_u64().ok_or("Missing resource pack size")?;
-    if size > 256 * 1024 * 1024 { return Err("Resource pack exceeds 256 MB safety limit".into()); }
+    if size == 0 || size > 256 * 1024 * 1024 { return Err("Resource pack exceeds the 256 MB safety limit or is empty".into()); }
     let res = http.get(url).send().await.map_err(|e| e.to_string())?
         .error_for_status().map_err(|e| e.to_string())?;
-    let bytes = res.bytes().await.map_err(|e| e.to_string())?;
-    if bytes.len() as u64 != size { return Err("Downloaded size does not match Modrinth metadata".into()); }
+    // A missing Content-Length must not allow unlimited allocations.
+    let mut bytes = Vec::new();
+    let mut received = 0u64;
+    let mut chunks = res.bytes_stream();
+    while let Some(chunk) = chunks.next().await {
+        let chunk=chunk.map_err(|e|format!("Resource pack stream interrupted: {e}"))?;
+        received=received.checked_add(chunk.len() as u64).ok_or("Resource pack size overflow")?;
+        if received>size {
+            return Err("Resource pack download exceeded the declared size".into());
+        }
+        bytes.extend_from_slice(&chunk);
+    }
+    if received!=size {return Err("Downloaded size does not match Modrinth metadata".into());}
     if format!("{:x}", Sha512::digest(&bytes)) != expected.to_ascii_lowercase() {
         return Err("Resource pack hash validation failed".into());
     }
