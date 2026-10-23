@@ -52,7 +52,7 @@ fn valid_filename(name: &str, suffix: &str) -> bool {
     // Local mods may be renamed with Ukrainian or other Unicode letters.
     // Still reject separators, control characters, and traversal components.
     && name.chars().all(|c|c.is_alphanumeric() || matches!(c,'.'|'-'|'_'|'+'|'('|')'|' '))
-    && !name.starts_with('.') && !name.contains("..") && !name.ends_with(['.',' '])
+    && !name.starts_with('.') && !name.contains("..") && !name.ends_with('.') && !name.ends_with(' ')
 }
 async fn fetch_json(client: &Client, url: &str) -> Result<Value, String> {
     client.get(url).send().await.map_err(|e|e.to_string())?
