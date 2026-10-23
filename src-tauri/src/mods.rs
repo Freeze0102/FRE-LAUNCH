@@ -239,6 +239,19 @@ pub async fn remove_installed_mod(app: AppHandle, instance_id: String, filename:
     fs::remove_file(directory.join(filename)).await.map_err(|e|e.to_string())
 }
 
+/// Scan enabled JARs before Minecraft starts. Files manually copied to
+/// the instance's mods folder are covered by the same launch gate.
+pub async fn scan_instance_mods(app: &AppHandle, instance_id: &str) -> Result<(), String> {
+    let directory = mods_dir(app, instance_id)?;
+    if !fs::try_exists(&directory).await.map_err(|e|e.to_string())? { return Ok(()); }
+    let mods = list_installed_mods(app.clone(), instance_id.to_owned()).await?;
+    for item in mods.into_iter().filter(|m|m.enabled) {
+        scan_installed_mod(app.clone(), instance_id.to_owned(), item.filename.clone()).await
+            .map_err(|e|format!("Мод {} не пройшов антивірусну перевірку: {e}",item.filename))?;
+    }
+    Ok(())
+}
+
 /// On-demand malware scan using the Windows Defender command-line scanner.
 /// This supplements, but cannot replace, Modrinth integrity verification.
 #[tauri::command]
