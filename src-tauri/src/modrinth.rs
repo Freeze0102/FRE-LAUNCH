@@ -49,7 +49,7 @@ fn validate_project_id(id: &str) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn search_modrinth(query: String, version: Option<String>, project_type: String, offset: Option<u32>) -> Result<Vec<ModrinthHit>, String> {
+pub async fn search_modrinth(query: String, version: Option<String>, project_type: String, offset: Option<u32>, loader: Option<String>, sort: Option<String>) -> Result<Vec<ModrinthHit>, String> {
     if query.chars().count() > 100 { return Err("Search is too long".into()); }
     if !["mod", "resourcepack", "shader", "modpack"].contains(&project_type.as_str()) {
         return Err("Invalid Modrinth search category".into());
@@ -61,10 +61,23 @@ pub async fn search_modrinth(query: String, version: Option<String>, project_typ
         super::minecraft::validate_version(&version)?;
         facets.push(vec![format!("versions:{version}")]);
     }
+    if project_type=="mod" {
+        if let Some(loader) = loader.filter(|s|!s.is_empty()) {
+            if !matches!(loader.as_str(),"fabric"|"quilt"|"forge"|"neoforge") {
+                return Err("Unsupported mod loader filter".into());
+            }
+            facets.push(vec![format!("categories:{loader}")]);
+        }
+    }
+    let sort = sort.unwrap_or_else(|| "relevance".into());
+    if !matches!(sort.as_str(),"relevance"|"downloads"|"follows"|"newest"|"updated") {
+        return Err("Invalid search sort".into());
+    }
     let facets = serde_json::to_string(&facets).map_err(|e| e.to_string())?;
     let offset_text = offset.to_string();
     let res = http()?.get("https://api.modrinth.com/v2/search")
-        .query(&[("query", query.as_str()),("facets", facets.as_str()),("limit", "24"),("offset",offset_text.as_str())])
+        .query(&[("query", query.as_str()),("facets", facets.as_str()),("limit", "24"),
+                  ("offset",offset_text.as_str()),("index",sort.as_str())])
         .send().await.map_err(|e| e.to_string())?
         .error_for_status().map_err(|e| e.to_string())?
         .json::<SearchResults>().await.map_err(|e| e.to_string())?;
