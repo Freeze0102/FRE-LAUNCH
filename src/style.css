@@ -533,3 +533,11 @@ body{margin:0}
 @media(max-width:1370px){.fre-feature-content h2{font-size:clamp(38px,4.2vw,61px)}}
 @media(max-width:880px){.fre-feature-content h2{font-size:clamp(44px,6.8vw,69px)}}
 @media(max-width:630px){.fre-feature-content h2{font-size:clamp(37px,9vw,47px)}.fre-feature-content p{max-width:75%}}
+
+
+/* Storage health — inline status, never a fake installation progress bar */
+.fre-install-preflight{display:grid;gap:7px;margin:12px 0 19px;padding:16px 17px;border-radius:3px;border-left:3px solid #bed978;background:rgba(193,228,123,.08)}
+.fre-install-preflight.is-error{border-left-color:#f3a199;background:rgba(205,83,69,.09)}
+.fre-install-preflight strong{font-size:11px;letter-spacing:.13em;font-weight:850}
+.fre-install-preflight span{font-size:12px;line-height:1.6;opacity:.84}
+.fre-install-preflight code{font-size:11px;overflow-wrap:anywhere;white-space:pre-wrap;opacity:.7}
