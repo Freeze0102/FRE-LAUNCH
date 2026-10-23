@@ -47,7 +47,7 @@ fn game_root(app:&AppHandle, instance_id:Option<&str>, version:&str)->Result<Pat
     }
 }
 
-fn prepare_folders(base:&Path)->Result<(),String>{
+pub(super) fn prepare_folders(base:&Path)->Result<(),String>{
     let parent=base.parent().ok_or("Invalid game data folder")?;
     // Reject reparse-point root and instance folders before opening Explorer.
     if !parent.exists(){fs::create_dir_all(parent).map_err(|e|e.to_string())?;}
