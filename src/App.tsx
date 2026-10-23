@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import WorldArt from "./WorldArt";
 import InstallDeck from "./InstallDeck";
+import UpdateCenter from "./UpdateCenter";
 import { LAST_UI_CRASH } from "./ErrorBoundary";
 import { InstancesPanel } from "./Features";
 import ModsPanel from "./ModsPanel";
@@ -307,9 +308,10 @@ export default function App() {
           {page===name&&<ChevronRight size={15} strokeWidth={2}/>}
         </button>)}
       </nav>
+      <UpdateCenter/>
       <div className="fre-rail-foot">
         <span className="fre-status-live"><i/> FRE LAUNCH / JAVA</span>
-        <div className="fre-build-status"><strong>0.5.2 <span>ALPHA</span></strong><small>ТЕСТОВА ВЕРСІЯ</small></div>
+        <div className="fre-build-status"><strong>0.5.3 <span>ALPHA</span></strong><small>ТЕСТОВА ВЕРСІЯ</small></div>
       </div>
     </aside>
     <div className="fre-workspace">
@@ -445,7 +447,7 @@ export default function App() {
           <div className="fre-log-toolbar">
             <button disabled={diagnosticsBusy} onClick={()=>void loadDiagnostics()}><RefreshCw size={16}/> {diagnosticsBusy?"ЧИТАЄМО...":"ОНОВИТИ ЖУРНАЛ"}</button>
             <button onClick={()=>void copyText([
-              "FRE LAUNCH / 0.5.2 ALPHA",
+              "FRE LAUNCH / 0.5.3 ALPHA",
               "Last attempt: "+(lastAttempt?JSON.stringify(lastAttempt):"none"),
               "Java: "+java,
               "Log path: "+(diagnostics?.logPath||"unknown"),
@@ -474,7 +476,7 @@ export default function App() {
           <div className="fre-log-mini-empty">Гра ще не надсилала повідомлень у цьому сеансі.</div>}
         </section>}
 
-        <footer className="fre-footer"><span>FRE LAUNCH © ALPHA 0.5.2</span><span>YOUR MINECRAFT / YOUR RULES</span><button onClick={()=>{setShowMore(v=>!v);}}>ПРО ПРОЄКТ <CircleHelp size={14}/></button></footer>
+        <footer className="fre-footer"><span>FRE LAUNCH © ALPHA 0.5.3</span><span>YOUR MINECRAFT / YOUR RULES</span><button onClick={()=>{setShowMore(v=>!v);}}>ПРО ПРОЄКТ <CircleHelp size={14}/></button></footer>
         {showMore&&<div className="fre-disclaimer"><button onClick={()=>setShowMore(false)}><X size={16}/></button>FRE LAUNCH — неофіційний Minecraft Java лаунчер. Не пов'язаний з Mojang чи Microsoft. Перевірка реального запуску на всіх Windows-конфігураціях ще триває.</div>}
       </main>
     </div>

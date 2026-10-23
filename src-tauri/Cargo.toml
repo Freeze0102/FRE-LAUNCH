@@ -1,6 +1,6 @@
 [package]
 name = "fre-launch"
-version = "0.5.2"
+version = "0.5.3"
 edition = "2021"
 
 [lib]
@@ -25,3 +25,4 @@ sha2 = "0.10"
 md5 = "0.7"
 base64 = "0.22"
 fs2 = "0.4"
+semver = "1"
