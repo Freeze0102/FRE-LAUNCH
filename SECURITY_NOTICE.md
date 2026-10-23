@@ -41,3 +41,7 @@ The publisher can submit the original trusted-source build for Microsoft's suspe
 - Windows CI run `39999387669` completed successfully: compiled the executable, checked an 8 MiB Windows main-thread stack reserve, tested installation plus 12-second normal and recovery startup, and scanned both installer flavors with Microsoft Defender.
 - Its installer artifacts were absent only because all uploads were explicitly gated by the security-approval variable. A new CI artifact is restricted to the **private** GitHub source repository, clearly labelled `SECURITY-REVIEW-ONLY`, and includes SHA-256 hashes and warning text. **This is not clearance to install it**.
 - Public GitHub Release publication is still blocked. Do not change `FRE_LAUNCH_SECURITY_APPROVED` until the incident has been investigated and a distribution decision is documented.
+
+### v0.5.7 status
+
+- Private GitHub Actions security-review ZIPs for v0.5.7 are explicitly labeled `SECURITY-REVIEW-ONLY` and are **not installation approval**. The v0.5.5 malware alert has not been independently classified. Public release and silent self-update publication remain on hold.

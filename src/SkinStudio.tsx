@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { SkinViewer, WalkingAnimation, RunningAnimation } from "skinview3d";
 import { ImagePlus, RotateCcw, Footprints, Pause, Play, Upload } from "lucide-react";
 import SkinPixelEditor from "./SkinPixelEditor";
+import {builtInSkin} from "./defaultSkin";
 
 type Animate = "idle" | "walk" | "run";
 const STORAGE_SKIN = "fre-launch:skin-preview";
@@ -9,7 +10,8 @@ const STORAGE_SKIN = "fre-launch:skin-preview";
 export default function SkinStudio() {
   const canvas = useRef<HTMLCanvasElement>(null);
   const viewer = useRef<SkinViewer | null>(null);
-  const [skin, setSkin] = useState<string>(() => localStorage.getItem(STORAGE_SKIN) ?? "");
+  const [skin, setSkin] = useState<string>(() => localStorage.getItem(STORAGE_SKIN) || builtInSkin());
+  const [custom, setCustom] = useState<boolean>(() => !!localStorage.getItem(STORAGE_SKIN));
   const [cape, setCape] = useState<string>("");
   const [animation, setAnimation] = useState<Animate>("walk");
   const [spin, setSpin] = useState(true);
@@ -17,15 +19,21 @@ export default function SkinStudio() {
 
   useEffect(() => {
     if (!canvas.current) return;
-    const current = new SkinViewer({
-      canvas: canvas.current,
-      width: 340,
-      height: 440,
-      ...(skin ? {skin} : {})
-    });
-    current.autoRotate = true;
-    current.animation = new WalkingAnimation();
-    viewer.current = current;
+    let current: SkinViewer;
+    try {
+      current = new SkinViewer({
+        canvas: canvas.current,
+        width: 340,
+        height: 440,
+        skin: skin || builtInSkin()
+      });
+      current.autoRotate = true;
+      current.animation = new WalkingAnimation();
+      viewer.current = current;
+    } catch {
+      setError("3D-перегляд недоступний у поточному WebView2. Можна відкрити або завантажити PNG-скін.");
+      return;
+    }
     return () => {
       current.dispose();
       viewer.current = null;
@@ -72,6 +80,7 @@ export default function SkinStudio() {
         if (kind === "skin") {
           try {localStorage.setItem(STORAGE_SKIN, encoded);} catch {setError("Недостатньо місця для збереження скіна.");}
           setSkin(encoded);
+          setCustom(true);
         } else setCape(encoded);
       };
       reader.onerror = () => setError("Не вдалося прочитати PNG.");
@@ -82,17 +91,24 @@ export default function SkinStudio() {
   }
 
   function applySkin(dataUrl:string){
-    try {localStorage.setItem(STORAGE_SKIN,dataUrl);setSkin(dataUrl);}
+    try {localStorage.setItem(STORAGE_SKIN,dataUrl);setSkin(dataUrl);setCustom(true);}
     catch {setError("Не вдалося зберегти відредагований скін.");}
+  }
+  function restoreDefault(){
+    localStorage.removeItem(STORAGE_SKIN);
+    setSkin(builtInSkin());
+    setCustom(false);
+    setError("");
   }
   return <><div className="studio-grid">
     <section className="panel skin-stage">
       <div className="panel-heading"><h3>FRE SKIN STUDIO</h3><ImagePlus size={19}/></div>
-      <div className="skin-canvas"><canvas ref={canvas} aria-label="3D-попередній перегляд скіна Minecraft"/></div>
+      <div className="skin-canvas"><canvas ref={canvas} aria-label="3D-попередній перегляд скіна Minecraft"/>{error.includes("3D-перегляд недоступний")&&<img className="fre-skin-fallback" src={skin} alt="PNG-скін персонажа"/>}</div>
       <p className="muted">Крути персонажа мишкою, змінюй масштаб коліщатком.</p>
     </section>
     <section className="panel skin-tools">
       <h3>Мій персонаж</h3>
+      <div className="fre-skin-status">{custom?"Власний скін":"Стандартний Стів — завантажений локально"}</div>
       <p>Завантаж власний PNG-скін або плащ. Скін зберігається локально для наступного перегляду.</p>
       <label className="file-action"><Upload size={18}/> Завантажити скін<input type="file" accept="image/png" onChange={(e) => importImage(e.target.files?.[0],"skin")}/></label>
       <label className="file-action alt"><Upload size={18}/> Завантажити плащ<input type="file" accept="image/png" onChange={(e) => importImage(e.target.files?.[0],"cape")}/></label>
@@ -103,8 +119,9 @@ export default function SkinStudio() {
         <button className={animation === "run" ? "selected" : ""} onClick={() => setAnimation("run")}><Play size={15}/> Біжить</button>
       </div>
       <button className="secondary" onClick={() => setSpin(!spin)}><RotateCcw size={16}/> {spin ? "Зупинити обертання" : "Увімкнути обертання"}</button>
+      <button className="secondary" disabled={!custom} onClick={restoreDefault}><RotateCcw size={16}/> Повернути стандартний скін</button>
       {error && <p className="error">{error}</p>}
       <p className="muted">Це локальний 3D-перегляд. Застосування скінів до Microsoft-акаунта поки не підтримується.</p>
     </section>
-  </div>{skin && <SkinPixelEditor source={skin} onEdit={applySkin}/>}</>;
+  </div>{custom && skin && <SkinPixelEditor source={skin} onEdit={applySkin}/>}</>;
 }

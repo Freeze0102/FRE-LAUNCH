@@ -386,7 +386,14 @@ pub async fn java_info() -> Result<String, String> {
 }
 
 fn detect_java_version() -> Result<String, String> {
-    let output = std::process::Command::new("java").arg("-version").output()
+    let mut cmd = std::process::Command::new("java");
+    cmd.arg("-version");
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000);
+    }
+    let output = cmd.output()
         .map_err(|e| format!("Java не знайдено в PATH: {e}"))?;
     if !output.status.success() { return Err("Java завершила перевірку з помилкою".into()); }
     let text = String::from_utf8_lossy(&output.stderr);
@@ -491,21 +498,24 @@ async fn launch_inner(app: AppHandle, version: String, nickname: String, memory_
         if profile.version != version { return Err("Instance version mismatch".into()); }
     }
     if let Some(instance) = &profile {
-        if instance.loader == "fabric" {
+        if instance.loader == "fabric" || instance.loader == "quilt" {
             let loader_version = instance.loader_version.as_deref()
-                .ok_or("Fabric instance has no loader version")?;
-            progress(&app, "fabric", 0, 1, format!("Preparing Fabric {loader_version}"));
-            let fabric_profile = super::fabric::load_profile(&base, &version, loader_version).await?;
-            super::fabric::merge_profile(&mut meta, &fabric_profile)?;
-            // Fabric libraries come from the official Maven repository and
-            // are cached alongside Mojang dependencies. No installer JAR is executed.
+                .ok_or("Selected instance has no modloader version")?;
+            progress(&app, "fabric", 0, 1, format!("Preparing {} {loader_version}", instance.loader));
+            let loader_profile = if instance.loader=="fabric" {
+                super::fabric::load_profile(&base, &version, loader_version).await?
+            } else {
+                super::quilt::load_profile(&base, &version, loader_version).await?
+            };
+            super::fabric::merge_profile(&mut meta, &loader_profile)?;
+            // Load official Maven dependencies as data, never execute installer JARs.
             let http = client()?;
-            let fabric_libraries = libraries(&fabric_profile, &base)?;
-            let total = fabric_libraries.len();
-            for (index, (url, dest, hash, _)) in fabric_libraries.iter().enumerate() {
+            let extra_libraries = libraries(&loader_profile, &base)?;
+            let total = extra_libraries.len();
+            for (index, (url, dest, hash, _)) in extra_libraries.iter().enumerate() {
                 download_one(&http, url, dest, hash.as_deref()).await?;
                 progress(&app, "fabric", index + 1, total,
-                    format!("Fabric libraries: {}/{}", index + 1, total));
+                    format!("{} libraries: {}/{}", instance.loader, index + 1, total));
             }
         } else if instance.loader != "vanilla" {
             return Err("Selected modloader is not yet supported".into());

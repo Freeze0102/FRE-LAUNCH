@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import FabricOptions from "./FabricOptions";
+import GameFolders from "./GameFolders";
 import { Boxes, Plus, Star, Trash2, RefreshCw, DownloadCloud, Search, Package, ShieldCheck, Pencil } from "lucide-react";
 
 export type Instance = {
@@ -37,6 +38,7 @@ export function InstancesPanel({version, active, setActive, setVersion, setMemor
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
+  const [folderFor, setFolderFor] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editJava, setEditJava] = useState("");
   const [editMemory, setEditMemory] = useState(4096);
@@ -112,11 +114,13 @@ export function InstancesPanel({version, active, setActive, setVersion, setMemor
     <div className="instance-grid">
       {instances.map((instance) => <div key={instance.id} className={"instance-card" + (active === instance.id ? " chosen" : "")}>
         <div className="instance-icon"><Boxes size={24}/></div>
-        <div className="instance-info"><b>{instance.name}</b><span>{instance.version} · {instance.loader === "fabric" ? `Fabric ${instance.loaderVersion ?? "?"}` : "Vanilla"} · {instance.memoryMb} MB RAM</span></div>
+        <div className="instance-info"><b>{instance.name}</b><span>{instance.version} · {instance.loader==="fabric"||instance.loader==="quilt"?`${instance.loader==="fabric"?"Fabric":"Quilt"} ${instance.loaderVersion??"?"}`:"Vanilla"} · {instance.memoryMb} MB RAM</span></div>
         <button className={"icon-button" + (instance.favorite ? " starred" : "")} title="Обране" onClick={() => void favorite(instance)}><Star size={17} fill={instance.favorite ? "currentColor" : "none"}/></button>
         <button className="icon-button" title="Редагувати" onClick={() => editing === instance.id ? setEditing(null) : beginEdit(instance)}><Pencil size={17}/></button>
+        <button className="secondary" onClick={()=>setFolderFor(folderFor===instance.id?null:instance.id)}>{folderFor===instance.id?"Сховати папки":"Папки гри"}</button>
         <button className="secondary" onClick={() => {setActive(instance.id); setVersion(instance.version); setMemory(instance.memoryMb); navigateHome();}}>Обрати</button>
         <button className="icon-button danger" title="Прибрати (без видалення світів)" onClick={() => void remove(instance)}><Trash2 size={17}/></button>
+        {folderFor===instance.id&&<div className="instance-editor"><GameFolders instanceId={instance.id} version={instance.version}/></div>}
         {editing === instance.id && <div className="instance-editor">
           <label className="field-label">Назва</label>
           <input className="input" value={editName} onChange={(e) => setEditName(e.target.value)} maxLength={48}/>

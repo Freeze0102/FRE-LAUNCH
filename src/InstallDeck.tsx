@@ -1,4 +1,5 @@
-import { Activity, ArrowRight, CircleCheck, CircleDashed, Database, Folder, HardDrive, ShieldAlert, Terminal, Wifi } from "lucide-react";
+import { Activity, ArrowRight, CircleCheck, CircleDashed, Database, Folder, HardDrive, ShieldAlert, Terminal, Wifi, RefreshCw } from "lucide-react";
+import { useState } from "react";
 
 export type Preflight = {path:string;ready:boolean;detail:string};
 export type InstallProgress = {stage:string;current:number;total:number;message:string};
@@ -15,16 +16,28 @@ const timeline=[
 const stageIndex:Record<string,number>={preflight:0,metadata:1,client:2,libraries:3,assets:4,natives:5,complete:6};
 
 export default function InstallDeck({version,progress,preflight,isInstalling,onCheck,onLogs}:{
-  version:string;progress:InstallProgress|null;preflight:Preflight|null;isInstalling:boolean;onCheck:()=>void;onLogs:()=>void
+  version:string;progress:InstallProgress|null;preflight:Preflight|null;isInstalling:boolean;onCheck:()=>Promise<Preflight>;onLogs:()=>void
 }){
+  const [checking,setChecking]=useState(false);
+  const [checkedAt,setCheckedAt]=useState("");
+  const [checkMessage,setCheckMessage]=useState("");
+  async function checkDisk(){
+    setChecking(true);setCheckMessage("");
+    try{
+      const result=await onCheck();
+      setCheckedAt(new Date().toLocaleTimeString("uk-UA"));
+      setCheckMessage(result.ready?"Диск перевірено повторно — усе гаразд.":result.detail);
+    }catch(e){setCheckMessage(String(e));}
+    finally{setChecking(false);}
+  }
   const index=progress?stageIndex[progress.stage]??0:0;
   const percent=progress?.stage==="complete"?100:progress&&progress.total>0
     ?Math.min(100,Math.floor(progress.current/progress.total*100)):0;
   return <section className="install-deck">
     <div className="install-deck-head">
       <div><span className="install-eyebrow"><Activity size={15}/> FRE / DOWNLOAD ENGINE</span>
-        <h2>МІСІЯ: <em>ВСТАНОВИТИ.</em></h2>
-        <p>Живі етапи, фактичний прогрес і перевірка диска. Без намальованих відсотків.</p>
+        <h2>Завантаження Minecraft</h2>
+        <p>Файли гри, стан встановлення та перевірка диска — в одному місці.</p>
       </div>
       <span className={"install-beacon"+(isInstalling?" is-active":"")}>{isInstalling?"У ПРОЦЕСІ":"ОЧІКУВАННЯ"}</span>
     </div>
@@ -37,9 +50,11 @@ export default function InstallDeck({version,progress,preflight,isInstalling,onC
             {preflight?.ready?<CircleCheck size={15}/>:<ShieldAlert size={15}/>}
             {preflight?preflight.detail:"Спочатку перевіримо доступ до запису"}
           </span>
-          <button onClick={onCheck} disabled={isInstalling}><HardDrive size={15}/> ПЕРЕВІРИТИ ДИСК</button>
+          <button onClick={()=>void checkDisk()} disabled={isInstalling||checking}><HardDrive size={15}/> {checking?"ПЕРЕВІРЯЄМО…":"ПЕРЕВІРИТИ ДИСК"}</button>
         </div>
         <small>Папка гри відрізняється від місця встановлення самого FRE LAUNCH.</small>
+        {!!checkedAt && <p className="fre-disk-result"><CircleCheck size={15}/> {checkMessage} <span>· {checkedAt}</span></p>}
+        {!!checkMessage&&!checkedAt&&<p role="status" className="fre-disk-result">{checkMessage}</p>}
       </div>
       <div className="install-deck-sequence">
         <div className="install-sequence-heading"><span>ТЕХНІЧНИЙ МАРШРУТ / 07</span><span>НЕЗАЛЕЖНІ ЕТАПИ</span></div>

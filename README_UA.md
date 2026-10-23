@@ -1,7 +1,7 @@
 > [!CAUTION]
 > **УВАГА: ЗБІРКА 0.5.5 ТИМЧАСОВО ЗАБЛОКОВАНА.** Microsoft Defender виявив `Trojan:Win32/Bearfoos.B!ml` у адміністраторському інсталяторі. Не завантажуй, не запускай, не відновлюй із карантину й не додавай її у винятки. [Причини й заходи безпеки](SECURITY_NOTICE.md).
 
-# FRE LAUNCH 0.5.2 Alpha — NIGHT CONTROL
+# FRE LAUNCH 0.5.7 Alpha — Minecraft Launcher
 
 **Your Minecraft. Your Rules.** Неофіційний лаунчер Minecraft Java Edition для Windows 10/11 x64. Стек: Tauri 2, Rust, React, TypeScript.
 

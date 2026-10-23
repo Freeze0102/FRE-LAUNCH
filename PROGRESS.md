@@ -102,3 +102,14 @@
 - Full Windows CI run `39999387669` passed Rust, TypeScript, React, npm audit, executable PE /STACK reserve check, Microsoft Defender custom scans for current-user/administrator installer and executable, Windows NSIS installation, and normal+recovery 12-second startup. This resolves the previously reproduced startup crash **on the CI runner only**, not necessarily every user PC.
 - CI Artifacts were missing because `FRE_LAUNCH_SECURITY_APPROVED` intentionally blocked uploads and public Release publishing; no build error occurred.
 - GitHub Actions now packages private review-only v0.5.6 binaries, SHA256SUMS and an explicit risk warning after all executable and Defender CI checks. No public release or auto-update publication until security approval. v0.5.5 stays quarantined as a private draft.
+
+## 0.5.7 — user-requested launcher refinements
+
+- The user confirms FRE LAUNCH 0.5.6 launched real Minecraft successfully. No system-wide safety guarantee is implied by this report.
+- Repair the disc check feedback: show a fresh success/error message and last-check time on every click, including unchanged successful scans.
+- Support familiar profile-scoped directories (mods, saves, resourcepacks, shaderpacks, screenshots, config, logs, datapacks) via a safe native Windows Explorer command and a visible in-app folder manager. No migration/deletion of existing worlds.
+- Prevent Java console windows using Windows CREATE_NO_WINDOW when running the Minecraft client, checking Java versions, and validating downloaded runtimes. Minecraft logs continue streaming to the in-app Logs panel.
+- Enable the existing Quilt Meta client in the per-instance loader choices and launching path alongside Fabric. Forge/OptiFine installers are deliberately NOT automatically executed. Their automatic installers remain unsupported; links point only to official project sites.
+- Skin Studio now loads a local Steve-style 64x64 default PNG atlas without network requests or saved settings. Custom skins still override it; default can be restored. Include a PNG fallback if WebGL is unavailable.
+- The Home view is now a redesigned game-stage + actual-instance library launcher workspace with quick account/RAM/Java/file tools and release selection. Downloads view provides the game folder manager.
+- All security holds remain enforced: Windows Defender checking, security-review-only private GitHub Action ZIP, no signed/public installer yet, no automatic releases until manually authorized following the past Trojan:Win32/Bearfoos.B!ml alert.

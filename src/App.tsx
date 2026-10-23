@@ -308,7 +308,7 @@ export default function App() {
       <UpdateCenter/>
       <div className="fre-rail-foot">
         <span className="fre-status-live"><i/> Minecraft Java Edition</span>
-        <div className="fre-build-status"><strong>0.5.6 <span>ALPHA</span></strong><small>ТЕСТОВА ВЕРСІЯ</small></div>
+        <div className="fre-build-status"><strong>0.5.7 <span>ALPHA</span></strong><small>ТЕСТОВА ВЕРСІЯ</small></div>
       </div>
     </aside>
     <div className="fre-workspace">
@@ -429,7 +429,7 @@ export default function App() {
           <div className="fre-log-toolbar">
             <button disabled={diagnosticsBusy} onClick={()=>void loadDiagnostics()}><RefreshCw size={16}/> {diagnosticsBusy?"ЧИТАЄМО...":"ОНОВИТИ ЖУРНАЛ"}</button>
             <button onClick={()=>void copyText([
-              "FRE LAUNCH / 0.5.6 ALPHA",
+              "FRE LAUNCH / 0.5.7 ALPHA",
               "Last attempt: "+(lastAttempt?JSON.stringify(lastAttempt):"none"),
               "Java: "+java,
               "Log path: "+(diagnostics?.logPath||"unknown"),

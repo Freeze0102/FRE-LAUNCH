@@ -152,8 +152,14 @@ pub async fn install_managed_java(app: AppHandle, major: u32) -> Result<String, 
         tokio::task::spawn_blocking(move ||safe_extract(&archive_for_extract,&extracted_for_task))
             .await.map_err(|e|e.to_string())??;
         let executable=java_path(&extracted);
-        let test=std::process::Command::new(&executable).arg("-version")
-            .output().map_err(|e|format!("Cannot validate downloaded Java: {e}"))?;
+        let mut check=std::process::Command::new(&executable);
+        check.arg("-version");
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            check.creation_flags(0x08000000);
+        }
+        let test=check.output().map_err(|e|format!("Cannot validate downloaded Java: {e}"))?;
         if !test.status.success(){return Err("Downloaded Java could not start".into());}
         let info=String::from_utf8_lossy(&test.stderr);
         let detected=info.lines().next().unwrap_or("");

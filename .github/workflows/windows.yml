@@ -336,8 +336,8 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $version = (Get-Content 'src-tauri/tauri.conf.json' -Raw | ConvertFrom-Json).version
-          if ($version -ne '0.5.6') {
-            throw "This security-review workflow is pinned to v0.5.6, not $version. Reassess before changing versions."
+          if ($version -ne '0.5.7') {
+            throw "This security-review workflow is pinned to v0.5.7, not $version. Reassess before changing versions."
           }
           $root = 'src-tauri/target/release/security-review'
           New-Item -Path $root -ItemType Directory -Force | Out-Null
@@ -359,7 +359,7 @@ jobs:
           Copy-Item -LiteralPath 'SECURITY_NOTICE.md' -Destination (Join-Path $root 'SECURITY_NOTICE.md')
           $warning = @(
             'SECURITY REVIEW ONLY — NOT CLEARED FOR INSTALLATION',
-            'FRE LAUNCH v0.5.6, Windows x64.',
+            'FRE LAUNCH v0.5.7, Windows x64.',
             'These binaries were built and checked with Microsoft Defender on the GitHub Actions runner.',
             'This does not establish that they are malware-free.',
             'The v0.5.5 administrator installer triggered Trojan:Win32/Bearfoos.B!ml on a user computer.',
@@ -372,7 +372,7 @@ jobs:
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@v6
         with:
-          name: FRE-LAUNCH-0.5.6-SECURITY-REVIEW-ONLY
+          name: FRE-LAUNCH-0.5.7-SECURITY-REVIEW-ONLY
           path: src-tauri/target/release/security-review/
           if-no-files-found: error
           retention-days: 7

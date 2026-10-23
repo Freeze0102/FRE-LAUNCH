@@ -18,10 +18,10 @@ export default function FabricOptions({instance, onSaved}: {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    if (kind !== "fabric") return;
+    if (kind !== "fabric" && kind !== "quilt") return;
     let alive = true;
     setFetching(true);
-    void invoke<FabricLoader[]>("list_fabric_loaders", {gameVersion: instance.version})
+    void invoke<FabricLoader[]>(kind==="quilt"?"list_quilt_loaders":"list_fabric_loaders", {gameVersion: instance.version})
       .then((available) => {
         if (!alive) return;
         setLoaders(available);
@@ -36,7 +36,7 @@ export default function FabricOptions({instance, onSaved}: {
   }, [kind, instance.version]);
 
   async function save() {
-    if (kind === "fabric" && !version) return;
+    if ((kind === "fabric" || kind === "quilt") && !version) return;
     setBusy(true);
     setError("");
     setMessage("");
@@ -44,10 +44,10 @@ export default function FabricOptions({instance, onSaved}: {
       await invoke<Instance>("set_instance_loader", {
         id: instance.id,
         loader: kind,
-        loaderVersion: kind === "fabric" ? version : null,
+        loaderVersion: kind === "fabric" || kind === "quilt" ? version : null,
       });
-      setMessage(kind === "fabric"
-        ? `Fabric Loader ${version} обраний. Його бібліотеки завантажаться під час запуску.`
+      setMessage(kind === "fabric" || kind === "quilt"
+        ? `${kind==="fabric"?"Fabric":"Quilt"} Loader ${version} обраний. Бібліотеки завантажаться під час запуску.`
         : "Vanilla режим обрано.");
       await onSaved();
     } catch (err) {setError(String(err));}
@@ -59,22 +59,25 @@ export default function FabricOptions({instance, onSaved}: {
     <select id={"loader-"+instance.id} value={kind} onChange={(e)=>{setKind(e.target.value);setError("");}}>
       <option value="vanilla">Vanilla — без модлоадера</option>
       <option value="fabric">Fabric — підтримується</option>
+      <option value="quilt">Quilt — підтримується</option>
+      <option value="forge" disabled>Forge — готуємо підтримку</option>
+      <option value="optifine" disabled>OptiFine — окреме встановлення</option>
     </select>
-    {kind === "fabric" && <>
-      <label className="field-label" htmlFor={"fabric-version-"+instance.id}>Версія Fabric Loader</label>
+    {(kind === "fabric" || kind === "quilt") && <>
+      <label className="field-label" htmlFor={"fabric-version-"+instance.id}>Версія модлоадера</label>
       {fetching
-        ? <span className="muted"><LoaderCircle size={14}/> Завантаження сумісних версій з Fabric API...</span>
+        ? <span className="muted"><LoaderCircle size={14}/> Завантаження сумісних версій з офіційного API...</span>
         : <select id={"fabric-version-"+instance.id} value={version} onChange={(e)=>setVersion(e.target.value)}>
             {loaders.length===0 && <option value="">Немає сумісних версій</option>}
             {loaders.map((item)=><option key={item.version} value={item.version}>{item.version}{item.stable?" · stable":""}</option>)}
           </select>}
-      <p className="muted">Для Fabric потрібна сумісна Java. Залежності завантажуються з офіційного Fabric Maven.</p>
+      <p className="muted">Потрібна сумісна Java. Залежності завантажуються з офіційних репозиторіїв Fabric або Quilt.</p>
     </>}
     {error && <p className="error">{error}</p>}
     {message && <p className="notice">{message}</p>}
-    <button className="primary" disabled={busy || fetching || (kind === "fabric" && !version)} onClick={()=>void save()}>
+    <button className="primary" disabled={busy || fetching || ((kind === "fabric" || kind === "quilt") && !version)} onClick={()=>void save()}>
       Зберегти модлоадер
     </button>
-    <p className="muted">Forge, NeoForge та Quilt будуть додані окремо після перевірки механізмів встановлення.</p>
+    <div className="fre-loader-guidance"><strong>Forge та OptiFine</strong><p>Автоматичне встановлення Forge і OptiFine поки не реалізоване. Ми не запускаємо сторонні інсталятори у фоні.</p><div><a href="https://files.minecraftforge.net/" target="_blank" rel="noopener noreferrer">Офіційний Forge ↗</a><a href="https://optifine.net/downloads" target="_blank" rel="noopener noreferrer">Офіційний OptiFine ↗</a></div></div>
   </div>;
 }

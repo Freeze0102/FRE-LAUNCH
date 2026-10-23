@@ -152,8 +152,8 @@ pub fn set_instance_loader(app: AppHandle, id: String, loader: String, loader_ve
     validate_id(&id)?;
     let version = match loader.as_str() {
         "vanilla" => None,
-        "fabric" => {
-            let selected = loader_version.as_deref().ok_or("Choose a Fabric loader version")?;
+        "fabric" | "quilt" => {
+            let selected = loader_version.as_deref().ok_or("Choose a loader version")?;
             super::minecraft::validate_version(selected)?;
             Some(selected.to_owned())
         }
