@@ -53,6 +53,9 @@ pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
             let handle = app.handle().clone();
+            // Ensure the diagnostics page has a real startup breadcrumb even when a
+            // previous installation stopped before the Rust install command began.
+            diagnostics::write(&handle, "APP_START", "FRE LAUNCH process started");
             let previous_hook = std::panic::take_hook();
             std::panic::set_hook(Box::new(move |panic| {
                 // Log Rust panics that happen outside the Minecraft installer too.
