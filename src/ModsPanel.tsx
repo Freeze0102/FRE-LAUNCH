@@ -93,6 +93,10 @@ export default function ModsPanel({version, instanceId}: {version: string; insta
     try {
       if(opened.project_type==="mod") {
         if(selectedInstance.loader!=="fabric")throw Error("Зараз автоматичне встановлення модів підтримує Fabric. Обери Fabric-збірку.");
+        const update=modUpdates.find(u=>u.projectId===opened.project_id && u.versionId===chosenVersion);
+        if(update && installed.some(m=>m.filename===update.filename && m.enabled)){
+          throw Error(`Спочатку вимкни старий мод «${update.filename}» у вкладці «Моя бібліотека», потім встановлюй новий.`);
+        }
         const added=await invoke<string[]>("install_fabric_mod",{instanceId,projectId:opened.project_id,versionId:chosenVersion});
         setMessage(`Встановлено: ${added.join(", ")}`);
         await refreshMods();
