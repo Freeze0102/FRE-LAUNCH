@@ -74,3 +74,12 @@
 - Stage current-user and all-user installers separately by removing the first NSIS output before building the administrator variant.
 - For anonymous, in-app updates while the source repository stays private, create an existing **public Releases-only repository** with a main branch, set Actions variable `FRE_LAUNCH_RELEASE_REPO` to `owner/repo` and Actions secret `FRE_RELEASE_TOKEN` with Contents write permission on that public repository. The token is never shipped inside the application.
 - Without the public distribution repository, update checks report the private/missing release feed clearly instead of incorrectly saying the client is current. Existing installed versions without an updater still require one manual installation.
+
+## 0.5.5 / Build repair + launcher-style UI
+
+- Fix Rust compile error E0425 in `src-tauri/src/lib.rs`: bind Tauri's event-loop result before logging its exit.
+- Replace oversized Home marketing hero and heavy WorldArt import with a focused Play dashboard: selected Minecraft version, active instance, launch button, Java/RAM/account controls, recent official releases, and useful library shortcuts.
+- Simplify Ukrainian sidebar navigation, typography, rounded card surfaces and Modrinth-inspired dark/green layout without copying third-party assets.
+- Remove empty motivational slogans, including the crash-screen headline; use functional error/help messages instead.
+- Maintain existing install, logs, Java manager, update center, skins, backups and instance functionality; version bumped to 0.5.5 for a fresh release.
+- CI and Windows executable survival test required before declaring the new build stable. Private GitHub Releases still cannot serve anonymous in-app updates unless public release distribution is configured.

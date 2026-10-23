@@ -717,3 +717,177 @@ html{color-scheme:dark}
 @media(max-width:1100px){.fre-updates-body{left:228px}}
 @media(max-width:1050px){.fre-updates-body{left:87px;width:min(350px,calc(100vw - 110px))}}
 @media(max-width:630px){.fre-updates-body{left:12px;bottom:70px;width:calc(100vw - 24px)}}
+
+/* FRE 0.5.5 — focused game-library layout inspired by modern launcher UX.
+   Original FRE components and branding, no copied Modrinth assets. */
+:root,[data-theme="midnight"]{
+  --fre-paper:#141519;--fre-card:#1c1e23;--fre-ink:#f1f2f4;
+  --fre-line:#34363d;--fre-muted:#a7a9b2;--fre-accent:#30d46d;
+  --fre-accent-text:#102117;--fre-cover:#202b25;--fre-dark:#1b1e23;
+  --fre-side:#191b20;--fre-side-text:#edf0ef;--fre-secondary:#26292f;
+}
+.fre-app{font-family:"Segoe UI Variable","Segoe UI",Arial,sans-serif;letter-spacing:0}
+.fre-app :where(h1,h2,h3){font-family:"Segoe UI Variable","Segoe UI",Arial,sans-serif;font-stretch:normal;letter-spacing:-.025em}
+.fre-app :where(button,input,select){border-radius:8px}
+.fre-app :where(button,a):focus-visible{outline:2px solid var(--fre-accent);outline-offset:3px}
+.fre-workspace{background:var(--fre-paper);min-height:100vh}
+.fre-main{max-width:1440px;padding:29px 35px 24px}
+.fre-rail{width:235px;min-width:235px;border-right:1px solid #34363c;box-shadow:none;background:var(--fre-side)}
+.fre-identity{padding:20px 18px;min-height:80px;gap:11px}
+.fre-identity-mark{width:42px;height:42px;min-width:42px;border-radius:12px;background:var(--fre-accent);font:900 27px/1 "Segoe UI",sans-serif;letter-spacing:-2px;color:#102117}
+.fre-identity-word b{font:800 17px/1.2 "Segoe UI",Arial,sans-serif;letter-spacing:-.45px;color:var(--fre-side-text)}
+.fre-identity-word small{font:11px/1.2 "Segoe UI",sans-serif;letter-spacing:0;color:#9b9ea7;opacity:1}
+.fre-rail-divider{margin:5px 16px 6px;padding:12px 6px 5px;border:0;font:700 10px/1 "Segoe UI",sans-serif;letter-spacing:1px;color:#888d96}
+.fre-nav{gap:4px;padding:0 11px 12px}
+.fre-nav-link{min-height:42px;padding:10px 12px;gap:12px;border:0;border-radius:8px;color:#aeb2ba}
+.fre-nav-link:hover{background:#2b2e35;color:#fff}
+.fre-nav-link.is-active{background:#194b30;color:#50ea86;border:0}
+.fre-nav-link.is-active::before{display:none}
+.fre-nav-link.is-active svg{stroke-width:2.25}
+.fre-nav-index{display:none}
+.fre-nav-label{font-size:13px;letter-spacing:-.08px;font-weight:600}
+.fre-nav-link>svg:last-child:not(:first-of-type){opacity:.8}
+.fre-nav::-webkit-scrollbar-thumb{background:#44474d}
+.fre-rail-foot{background:transparent;padding:15px 17px 17px;border-color:#393c42}
+.fre-status-live{font:11px "Segoe UI",sans-serif;letter-spacing:0;color:#adb8af}
+.fre-status-live i{height:8px;width:8px;background:var(--fre-accent);border:0;border-radius:50%;box-shadow:none}
+.fre-build-status strong{font:700 12px "Segoe UI",sans-serif;letter-spacing:0}
+.fre-build-status strong span{font:700 9px "Segoe UI",sans-serif;letter-spacing:.25px;color:var(--fre-accent)}
+.fre-build-status small{font:10px "Segoe UI",sans-serif;letter-spacing:0}
+.fre-commandbar{height:58px;min-height:58px;background:var(--fre-paper);padding:0 35px;border-bottom:1px solid var(--fre-line)}
+.fre-command-left{font:12px "Segoe UI",sans-serif;letter-spacing:0}
+.fre-command-left b{font-weight:650}
+.fre-command-square{border-radius:8px;height:30px;width:30px;background:var(--fre-secondary);color:var(--fre-accent)}
+.fre-command-slash{color:#65676f}
+.fre-command-right>button{background:var(--fre-card);border-radius:8px;border:1px solid var(--fre-line)}
+.fre-command-java{font:600 11px "Segoe UI",sans-serif!important;letter-spacing:0}
+.fre-command-account{font-size:12px!important}
+.fre-avatar{border-radius:7px;background:#305b41;color:#b9f8cb;font:700 13px "Segoe UI",sans-serif}
+.fre-kicker{font:600 10px "Segoe UI",sans-serif;letter-spacing:1px;color:var(--fre-muted);gap:9px}
+.fre-small-line{width:8px;height:8px;border-radius:50%;background:var(--fre-accent)}
+.fre-kicker-dot{color:var(--fre-muted)}
+.fre-heading-row{margin-top:9px;align-items:center}
+.fre-heading-row h1{font:750 clamp(26px,2.4vw,34px)/1.15 "Segoe UI",sans-serif;letter-spacing:-.85px}
+.fre-heading-row p{font-size:13px;line-height:1.45;margin-top:7px}
+.fre-page-intro{margin-bottom:24px}
+.fre-return{background:var(--fre-card);font:600 12px "Segoe UI",sans-serif!important;padding:10px 13px;letter-spacing:0;border-radius:8px}
+.fre-return:hover{background:var(--fre-secondary);border-color:var(--fre-accent)}
+.fre-play-home{display:flex;flex-direction:column;gap:26px;min-width:0}
+.fre-play-dashboard{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(265px,.95fr);gap:15px;align-items:stretch}
+.fre-play-primary{background:radial-gradient(circle at 90% -35%,#25764145,transparent 55%),linear-gradient(145deg,#202b25,#1c2021 75%);color:#ecf3ed;border:1px solid #3a4a40;border-radius:13px;padding:28px 28px 25px;min-height:338px;display:flex;flex-direction:column;min-width:0}
+.fre-play-eyebrow{display:flex;align-items:center;gap:9px;color:#acd2b5;font-size:10px;font-weight:700;letter-spacing:1.1px}
+.fre-play-pulse{width:8px;height:8px;background:#35d76e;border-radius:50%;box-shadow:0 0 0 4px #2cca6630}
+.fre-play-type{margin-left:auto;color:#90a597;font-weight:650;letter-spacing:.6px}
+.fre-play-welcome{display:flex;justify-content:space-between;align-items:flex-start;gap:15px;margin:25px 0 23px}
+.fre-play-welcome h2{font:750 clamp(26px,3vw,36px)/1.15 "Segoe UI",sans-serif;letter-spacing:-1px;margin:0 0 8px}
+.fre-play-welcome p{font-size:13px;line-height:1.55;color:#b1bfb5;margin:0;max-width:460px}
+.fre-play-version-badge{flex-shrink:0;padding:7px 9px;border-radius:6px;border:1px solid #50755c;background:#31503a;color:#a6e6b6;font:800 10px "Segoe UI",sans-serif;letter-spacing:1px}
+.fre-play-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
+.fre-play-choice{display:flex;align-items:center;gap:11px;min-height:77px;text-align:left;padding:12px;border:1px solid #45534b;background:#272f2a;color:#eaf3ed;border-radius:9px;min-width:0}
+.fre-play-choice:hover{background:#334038;border-color:#61a377}
+.fre-play-choice-icon{display:grid;place-items:center;flex-shrink:0;width:41px;height:41px;border-radius:9px;background:#354e3c;color:#65e992}
+.fre-play-choice>span:nth-child(2){display:flex;flex:1;min-width:0;flex-direction:column;gap:3px}
+.fre-play-choice small{color:#a1b5a6;font:11px "Segoe UI",sans-serif}
+.fre-play-choice strong{font:700 15px "Segoe UI",sans-serif;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
+.fre-play-choice em{font:10px "Segoe UI",sans-serif;color:#a1b5a6;font-style:normal;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
+.fre-play-choice>svg:last-child{flex-shrink:0;color:#a6c4ae}
+.fre-play-actions{display:flex;align-items:center;flex-wrap:wrap;gap:15px;margin-top:auto;padding-top:21px}
+.fre-play-button{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-width:185px;padding:13px 22px;border:0;background:#31d86e;color:#102319;font:800 14px "Segoe UI",sans-serif!important;border-radius:9px}
+.fre-play-button:hover:not(:disabled){background:#57ee8d}
+.fre-play-button:disabled{opacity:.48}
+.fre-play-action-hint{font-size:11px;color:#aabbb0;line-height:1.5;max-width:230px}
+.fre-play-status{min-width:0;border-radius:13px;background:var(--fre-card);border:1px solid var(--fre-line);padding:19px 18px 15px;display:flex;flex-direction:column}
+.fre-play-status-title{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:7px;color:var(--fre-ink);font-size:14px;font-weight:750}
+.fre-play-status-title button{display:grid;place-items:center;border:0;background:var(--fre-secondary);color:var(--fre-muted);padding:8px}
+.fre-play-status-item{display:flex;align-items:center;gap:11px;min-height:68px;padding:11px 0;border-bottom:1px solid var(--fre-line)}
+.fre-play-status-item>svg{flex-shrink:0;color:var(--fre-accent)}
+.fre-play-status-item>span{display:flex;min-width:0;flex:1;flex-direction:column;gap:5px}
+.fre-play-status-item small{font-size:11px;color:var(--fre-muted)}
+.fre-play-status-item strong{font:650 13px "Segoe UI",sans-serif;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fre-play-status-item button{background:transparent;color:var(--fre-muted);border:0;padding:7px 0;display:flex;align-items:center;gap:2px;font-size:11px}
+.fre-play-status-item button:hover{color:var(--fre-accent)}
+.fre-play-status-note{display:flex;align-items:center;gap:9px;margin-top:auto;padding:17px 0 0;color:var(--fre-muted);font-size:11px;line-height:1.4}
+.fre-play-status-note svg{flex-shrink:0;color:var(--fre-accent)}
+.fre-play-section{display:flex;flex-direction:column;gap:13px}
+.fre-play-section-heading{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.fre-play-section-heading h3{font:750 20px/1.2 "Segoe UI",sans-serif;letter-spacing:-.5px;margin:0 0 5px}
+.fre-play-section-heading p{font:12px/1.4 "Segoe UI",sans-serif;color:var(--fre-muted);margin:0}
+.fre-play-section-heading button{display:flex;align-items:center;gap:6px;border:0;background:none;color:var(--fre-accent);font-size:12px;font-weight:650;padding:9px}
+.fre-play-section-heading button:hover{text-decoration:underline}
+.fre-play-releases{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.fre-play-release{min-width:0;min-height:83px;display:flex;align-items:center;gap:11px;text-align:left;padding:13px;background:var(--fre-card);border:1px solid var(--fre-line);color:var(--fre-ink);border-radius:11px}
+.fre-play-release:hover,.fre-play-shortcuts>button:hover{border-color:var(--fre-accent);background:var(--fre-secondary)}
+.fre-play-release.is-selected{border-color:var(--fre-accent);background:#17452c;color:#effff2}
+.fre-play-release-icon{flex-shrink:0;width:36px;height:36px;background:var(--fre-secondary);border-radius:9px;display:grid;place-items:center;color:var(--fre-accent)}
+.fre-play-release>span:nth-child(2){display:flex;flex-direction:column;flex:1;gap:5px;min-width:0}
+.fre-play-release b{font:750 14px "Segoe UI",sans-serif;overflow:hidden;text-overflow:ellipsis}
+.fre-play-release small{font:11px "Segoe UI",sans-serif;color:var(--fre-muted)}
+.fre-play-release>svg:last-child{flex-shrink:0;color:var(--fre-accent)}
+.fre-play-release-empty{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:15px;padding:16px;background:var(--fre-card);border:1px solid var(--fre-line);color:var(--fre-muted);font-size:12px;border-radius:10px}
+.fre-play-release-empty button{display:flex;align-items:center;gap:6px;background:var(--fre-secondary);color:var(--fre-ink);border:1px solid var(--fre-line);padding:8px 10px;font-size:11px}
+.fre-play-shortcuts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px}
+.fre-play-shortcuts>button{position:relative;display:flex;align-items:flex-start;flex-direction:column;gap:8px;min-height:151px;text-align:left;padding:18px;border:1px solid var(--fre-line);border-radius:11px;background:var(--fre-card);color:var(--fre-ink)}
+.fre-play-shortcut-icon{width:40px;height:40px;border-radius:9px;background:var(--fre-secondary);color:var(--fre-accent);display:grid;place-items:center;margin-bottom:7px}
+.fre-play-shortcuts strong{font:700 15px "Segoe UI",sans-serif}
+.fre-play-shortcuts small{font-size:12px;color:var(--fre-muted);line-height:1.45}
+.fre-play-shortcuts>button>svg:last-child{position:absolute;right:16px;top:21px;color:var(--fre-muted)}
+.fre-app .panel,.fre-app .fre-control-paper,.fre-app .fre-diag-sheet,.fre-app .fre-version-catalog{border-radius:11px;background:var(--fre-card);border:1px solid var(--fre-line);box-shadow:none}
+.fre-app .panel-heading h3,.fre-app .fre-control-paper>h2{font-family:"Segoe UI",Arial,sans-serif;letter-spacing:-.4px;font-weight:750}
+.fre-app .fre-catalog-pills button,.fre-app .fre-catalog-refresh,.fre-app .fre-install-cta,.fre-app .primary,.fre-app .secondary{border-radius:8px}
+.fre-app .fre-version-row{border-radius:5px}
+.fre-app .fre-theme-choice{border-radius:9px}
+.fre-app .fre-theme-choice.is-selected{outline:2px solid var(--fre-accent)}
+.fre-app .fre-crash-inner h1{font-family:"Segoe UI",sans-serif}
+@media(min-width:961px) and (max-width:1100px){
+  .fre-rail{width:214px;min-width:214px}
+  .fre-identity{padding:18px 13px;justify-content:flex-start}
+  .fre-identity-word{display:flex}
+  .fre-rail-divider{display:flex}
+  .fre-nav{padding:0 8px 12px}
+  .fre-nav-link{justify-content:flex-start;padding:10px;min-height:41px}
+  .fre-nav-label{display:inline}
+  .fre-main{padding:26px 22px}
+  .fre-commandbar{padding:0 22px}
+}
+@media(max-width:1200px){
+  .fre-play-dashboard{grid-template-columns:minmax(0,1.4fr) minmax(246px,1fr)}
+  .fre-play-choices{grid-template-columns:1fr}
+  .fre-play-primary{padding:24px;min-height:390px}
+  .fre-play-releases{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:960px){
+  .fre-rail{width:70px;min-width:70px}
+  .fre-identity{padding:14px;justify-content:center;min-height:72px}
+  .fre-identity-word,.fre-rail-divider,.fre-nav-label,.fre-rail-foot .fre-build-status{display:none}
+  .fre-nav{padding:7px}
+  .fre-nav-link{justify-content:center;padding:11px;min-height:45px}
+  .fre-play-dashboard{grid-template-columns:1fr}
+  .fre-play-primary{min-height:345px}
+  .fre-play-choices{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .fre-play-status{min-height:260px}
+}
+@media(max-width:730px){
+  .fre-main{padding:23px 16px}
+  .fre-commandbar{padding:0 16px}
+  .fre-play-choices,.fre-play-shortcuts{grid-template-columns:1fr}
+  .fre-play-primary{min-height:auto}
+  .fre-play-shortcuts>button{min-height:100px}
+  .fre-play-releases{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .fre-play-welcome{margin:18px 0}
+}
+@media(max-width:630px){
+  .fre-rail{position:static;width:100%;min-width:0;min-height:0;height:auto;flex-direction:row;border:0;border-bottom:1px solid var(--fre-line)}
+  .fre-identity{min-width:65px;width:65px;padding:8px}
+  .fre-identity-mark{width:37px;height:37px;min-width:37px}
+  .fre-nav{flex-direction:row;overflow-x:auto;gap:3px;padding:7px}
+  .fre-nav-link{min-height:42px;min-width:42px;padding:10px}
+  .fre-nav-link.is-active:before{display:none}
+  .fre-rail-foot{display:none}
+  .fre-commandbar{min-height:50px;height:50px}
+  .fre-command-left>span:nth-child(2),.fre-command-slash{display:none}
+  .fre-heading-row h1{font-size:26px}
+  .fre-play-welcome h2{font-size:28px}
+  .fre-play-releases{grid-template-columns:1fr}
+  .fre-play-section-heading{align-items:flex-start}
+  .fre-play-version-badge{display:none}
+}

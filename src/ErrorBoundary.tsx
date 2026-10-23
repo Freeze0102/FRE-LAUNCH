@@ -22,9 +22,9 @@ export default class ErrorBoundary extends Component<Props,State> {
       return <main className="fre-crash-screen">
         <div className="fre-crash-inner">
           <div className="fre-crash-symbol"><AlertTriangle size={34}/></div>
-          <div className="fre-crash-index">FRE / SAFE MODE — UI FAILURE</div>
-          <h1>МИ НЕ ЗАГУБИЛИ<br/><em>ТВІЙ СВІТ.</em></h1>
-          <p>Інтерфейс зіткнувся з помилкою. Світи Minecraft не видаляються. Скопіюй діагностику й перезапусти вікно.</p>
+          <div className="fre-crash-index">FRE LAUNCH · ДІАГНОСТИКА</div>
+          <h1>Помилка інтерфейсу</h1>
+          <p>Не вдалося показати вікно лаунчера. Файли Minecraft залишилися без змін. Скопіюй текст помилки для діагностики або перезапусти інтерфейс.</p>
           <pre>{this.state.details||this.state.error}</pre>
           <div className="fre-crash-actions">
             <button onClick={()=>window.location.reload()}><RotateCcw size={19}/> ПЕРЕЗАПУСТИТИ ІНТЕРФЕЙС</button>

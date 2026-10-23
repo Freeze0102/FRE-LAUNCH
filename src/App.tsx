@@ -1,19 +1,14 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { motion } from "motion/react";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import {
-  ArrowDownToLine, ArrowRight, AlertTriangle, Boxes, Check, ChevronRight, CircleHelp,
-  Coffee, Copy, Download, FolderOpen, HardDriveDownload, House, Images, Layers3,
-  ListFilter, MonitorDot, Orbit, PauseCircle, Play, Puzzle, RefreshCw, Search,
-  Server, Settings2, ShieldCheck, Shirt, SlidersHorizontal, Terminal, UserRound,
-  Wrench, X, Zap, Archive, ScrollText
+  ArrowRight, AlertTriangle, Boxes, Check, ChevronRight, CircleHelp, Coffee, Copy, Download, FolderOpen, HardDriveDownload, House, Images, Layers3, ListFilter, Orbit, Play, Puzzle, RefreshCw, Search, Server, Settings2, ShieldCheck, Shirt, SlidersHorizontal, Terminal, UserRound, Wrench, X, Archive, ScrollText
 } from "lucide-react";
-import WorldArt from "./WorldArt";
 import InstallDeck from "./InstallDeck";
 import UpdateCenter from "./UpdateCenter";
+import HomeDashboard from "./HomeDashboard";
 import { LAST_UI_CRASH } from "./ErrorBoundary";
 import { InstancesPanel } from "./Features";
 import ModsPanel from "./ModsPanel";
@@ -79,39 +74,40 @@ function themesafe(theme:unknown):string {
 }
 
 const menus = [
-  {name:"Home",label:"Пункт запуску",icon:House,index:"01"},
-  {name:"Versions",label:"Версії Minecraft",icon:Layers3,index:"02"},
-  {name:"Instances",label:"Мої збірки",icon:Boxes,index:"03"},
-  {name:"Mods",label:"Моди / ресурси",icon:Puzzle,index:"04"},
-  {name:"Skins",label:"Скін-студія",icon:Shirt,index:"05"},
-  {name:"Servers",label:"Мережа серверів",icon:Server,index:"06"},
-  {name:"Screenshots",label:"Кадри зі світів",icon:Images,index:"07"},
-  {name:"Backups",label:"Архів світів",icon:Archive,index:"08"},
-  {name:"Accounts",label:"Профілі",icon:UserRound,index:"09"},
+  {name:"Home",label:"Грати",icon:Play,index:"01"},
+  {name:"Instances",label:"Бібліотека",icon:Boxes,index:"02"},
+  {name:"Mods",label:"Моди та ресурси",icon:Puzzle,index:"03"},
+  {name:"Versions",label:"Версії Minecraft",icon:Layers3,index:"04"},
+  {name:"Skins",label:"Скіни",icon:Shirt,index:"05"},
+  {name:"Servers",label:"Сервери",icon:Server,index:"06"},
+  {name:"Screenshots",label:"Скріншоти",icon:Images,index:"07"},
+  {name:"Backups",label:"Резервні копії",icon:Archive,index:"08"},
+  {name:"Accounts",label:"Облікові записи",icon:UserRound,index:"09"},
   {name:"Downloads",label:"Завантаження",icon:Download,index:"10"},
   {name:"Logs",label:"Діагностика",icon:ScrollText,index:"11"},
-  {name:"Settings",label:"Параметри",icon:Settings2,index:"12"}
+  {name:"Settings",label:"Налаштування",icon:Settings2,index:"12"}
 ] as const;
 const titles:Record<Page,string>={
-  Home:"ПУНКТ ЗАПУСКУ",Versions:"КАТАЛОГ ВЕРСІЙ",Instances:"МОЇ ЗБІРКИ",
-  Mods:"МАЙСТЕРНЯ МОДІВ",Skins:"СКІН-СТУДІЯ",Servers:"СЕРВЕРНА МЕРЕЖА",
-  Screenshots:"СКРИНШОТИ",Backups:"АРХІВ СВІТІВ",Accounts:"МОЇ ПРОФІЛІ",
-  Downloads:"ЗАВАНТАЖЕННЯ",Logs:"ЖУРНАЛ ПОДІЙ",Settings:"ПАРАМЕТРИ"
+  Home:"Грати",Versions:"Версії Minecraft",Instances:"Бібліотека",
+  Mods:"Моди та ресурси",Skins:"Скіни",Servers:"Сервери",
+  Screenshots:"Скріншоти",Backups:"Резервні копії",Accounts:"Облікові записи",
+  Downloads:"Завантаження",Logs:"Діагностика",Settings:"Налаштування"
 };
 const taglines:Record<Page,string>={
-  Home:"Твій наступний світ починається звідси.",
-  Versions:"Від старої класики до найновіших пригод.",
-  Instances:"Кожному світові — власне місце.",
-  Mods:"Збирай гру під себе, не навпаки.",
-  Skins:"Намалюй героя своєї наступної історії.",
-  Servers:"Знайди, де зараз твої друзі.",
-  Screenshots:"Збережені миті зі своїх пригод.",
-  Backups:"Твій світ заслуговує на запасну копію.",
-  Accounts:"Обери, ким ти заходиш у гру.",
-  Downloads:"Жодного удаваного прогресу. Лише справжні файли.",
-  Logs:"Тут видно, що насправді робить лаунчер.",
-  Settings:"Налаштуй свій простір так, як хочеш."
+  Home:"Minecraft Java Edition — швидкий запуск і керування збірками.",
+  Versions:"Обери офіційний реліз або snapshot від Mojang.",
+  Instances:"Твої збережені збірки Minecraft.",
+  Mods:"Знайди та встанови вміст для обраної збірки.",
+  Skins:"Переглядай і редагуй скіни персонажа.",
+  Servers:"Збережені сервери та перевірка підключення.",
+  Screenshots:"Знімки екрана з обраної збірки.",
+  Backups:"Створення та відновлення резервних копій світів.",
+  Accounts:"Локальні профілі гравців.",
+  Downloads:"Стан встановлення та завантаження файлів.",
+  Logs:"Журнал роботи, помилки та діагностика Windows.",
+  Settings:"Зовнішній вигляд, Java та оперативна пам'ять."
 };
+
 const LAST_INSTALL_KEY = "fre-launch-last-install";
 function rememberInstall(version:string,status:"installing"|"complete"|"error"|"interrupted",message="") {
   try {localStorage.setItem(LAST_INSTALL_KEY,JSON.stringify({version,status,message,time:new Date().toISOString()}));}
@@ -122,11 +118,11 @@ const stages:Record<string,string>={
   assets:"РЕСУРСИ",natives:"РОЗПАКУВАННЯ",fabric:"FABRIC",quilt:"QUILT",complete:"ГОТОВО"
 };
 const themes=[
-  {id:"midnight",label:"NIGHT CONTROL · ОСНОВНА",color:"#c9f079"},
-  {id:"neon",label:"AFTER DARK",color:"#ed9275"},
-  {id:"ocean",label:"DEEP WATER",color:"#79d9db"},
-  {id:"emerald",label:"WILDERNESS",color:"#98d885"},
-  {id:"light",label:"PAPER TRAIL",color:"#f5f1e5"}
+  {id:"midnight",label:"Темна",color:"#c9f079"},
+  {id:"neon",label:"Контрастна",color:"#ed9275"},
+  {id:"ocean",label:"Океан",color:"#79d9db"},
+  {id:"emerald",label:"Зелена",color:"#98d885"},
+  {id:"light",label:"Світла",color:"#f5f1e5"}
 ];
 
 function truncate(text:string, max=55) {return text.length>max?text.slice(0,max-1)+"…":text;}
@@ -293,10 +289,10 @@ export default function App() {
   return <div className="fre-app">
     <aside className="fre-rail">
       <button className="fre-identity" onClick={()=>setPage("Home")} title="На головну">
-        <span className="fre-identity-mark">F<span>↗</span></span>
-        <span className="fre-identity-word"><b>FRE.</b><small>LAUNCH / JAVA EDITION</small></span>
+        <span className="fre-identity-mark">F</span>
+        <span className="fre-identity-word"><b>FRE LAUNCH</b><small>Minecraft Java Edition</small></span>
       </button>
-      <div className="fre-rail-divider"><span>НАВІГАЦІЯ / 12</span><span>•••</span></div>
+      <div className="fre-rail-divider"><span>НАВІГАЦІЯ</span></div>
       <nav className="fre-nav" aria-label="Розділи лаунчера">
         {menus.map(({name,label,icon:Icon,index})=><button key={name}
           className={"fre-nav-link"+(page===name?" is-active":"")}
@@ -310,14 +306,14 @@ export default function App() {
       </nav>
       <UpdateCenter/>
       <div className="fre-rail-foot">
-        <span className="fre-status-live"><i/> FRE LAUNCH / JAVA</span>
-        <div className="fre-build-status"><strong>0.5.4 <span>ALPHA</span></strong><small>ТЕСТОВА ВЕРСІЯ</small></div>
+        <span className="fre-status-live"><i/> Minecraft Java Edition</span>
+        <div className="fre-build-status"><strong>0.5.5 <span>ALPHA</span></strong><small>ТЕСТОВА ВЕРСІЯ</small></div>
       </div>
     </aside>
     <div className="fre-workspace">
       <header className="fre-commandbar">
         <div className="fre-command-left"><span className="fre-command-square"><Orbit size={17}/></span>
-          <span>FRE / CONTROL ROOM</span><span className="fre-command-slash">/</span><b>{titles[page]}</b>
+          <span>FRE LAUNCH</span><span className="fre-command-slash">/</span><b>{titles[page]}</b>
         </div>
         <div className="fre-command-right">
           {recoveryMode&&<span title="Відновлення після аварійного завершення: WebView2 без GPU-прискорення" className="fre-safe-mode-tag">RECOVERY</span>}
@@ -329,48 +325,32 @@ export default function App() {
       </header>
       <main className="fre-main">
         <div className="fre-page-intro">
-          <div className="fre-kicker"><span className="fre-small-line"/> РОЗДІЛ {activeLabel} / 12 <span className="fre-kicker-dot">✦</span> FRE LAUNCH</div>
+          <div className="fre-kicker"><span className="fre-small-line"/> MINECRAFT JAVA <span className="fre-kicker-dot">•</span> {activeLabel} / 12</div>
           <div className="fre-heading-row"><div><h1>{titles[page]}</h1><p>{taglines[page]}</p></div>
-            {page!=="Home"&&<button className="fre-return" onClick={()=>setPage("Home")}><House size={16}/> ПУНКТ ЗАПУСКУ <ArrowRight size={15}/></button>}
+            {page!=="Home"&&<button className="fre-return" onClick={()=>setPage("Home")}><House size={16}/> Грати <ArrowRight size={15}/></button>}
           </div>
         </div>
         {error&&<div className="fre-incident" role="alert"><AlertTriangle size={16}/><span title={error}>{error}</span><button onClick={()=>setPage("Logs")}><Terminal size={14}/> ЖУРНАЛ <ArrowRight size={13}/></button><button onClick={()=>setError("")} title="Приховати повідомлення" aria-label="Приховати повідомлення"><X size={16}/></button></div>}
         {message&&<div className="fre-flash" role="status"><Check size={17}/><span>{message}</span><button onClick={()=>setMessage("")} title="Закрити"><X size={16}/></button></div>}
 
-        {page==="Home"&&<>
-          <div className="fre-home-layout">
-            <motion.section className="fre-feature" initial={{opacity:0,y:14}} animate={{opacity:1,y:0}} transition={{duration:.35}}>
-              <div className="fre-feature-top"><span><span className="fre-feature-star">✳</span> FRE / OVERWORLD COLLECTION</span><span>001 — INFINITE</span></div>
-              <div className="fre-feature-content"><div className="fre-cover-label">НЕ ПРОСТО ЛАУНЧЕР.</div>
-                <h2>ТУТ<br/>ПОЧИНАЄТЬСЯ<br/><em>ТВІЙ СВІТ<span>↗</span></em></h2>
-                <p>Вибери версію. Збери власні правила. А далі — тільки ти та нескінченний світ блоків.</p>
-              </div>
-              <div className="fre-feature-art"><WorldArt/></div>
-              <div className="fre-feature-foot"><span>NO. 001 / WORLD SELECT</span><span>CRAFT YOUR OWN WAY <ArrowRight size={14}/></span></div>
-            </motion.section>
-            <aside className="fre-console">
-              <div className="fre-console-heading"><div><span>01 // LAUNCH CONTROL</span><h3>ГОТОВИЙ<br/>ДО СТАРТУ?</h3></div><div className="fre-console-orbit"><Zap size={21}/></div></div>
-              <div className="fre-console-divider"/>
-              <span className="fre-field-label">ОБРАНА ВЕРСІЯ</span>
-              <button className="fre-version-selection" onClick={()=>setPage("Versions")}><span className="fre-version-symbol"><Layers3 size={24}/></span>
-                <span><strong>{selected||"ВИБЕРИ ВЕРСІЮ"}</strong><small>{selectedKind.toUpperCase()} · JAVA EDITION</small></span><ChevronRight size={18}/></button>
-              <div className="fre-console-mini"><span>ПРОФІЛЬ</span><button onClick={()=>setPage("Accounts")}><UserRound size={15}/> {nickname} <ChevronRight size={14}/></button></div>
-              <div className="fre-console-mini"><span>БІБЛІОТЕКА</span><button onClick={()=>setPage("Instances")}><Boxes size={15}/> {activeInstanceId?"ВИБРАНА ЗБІРКА":"ШВИДКИЙ РЕЖИМ"} <ChevronRight size={14}/></button></div>
-              <div className="fre-console-mini"><span>ПАМ'ЯТЬ</span><button onClick={()=>setPage("Settings")}><SlidersHorizontal size={15}/> {Math.round(memoryMb/1024*10)/10} GB RAM <ChevronRight size={14}/></button></div>
-              <button className="fre-launch-now" disabled={!selected||isBusy} onClick={()=>void launch()}>
-                <span>{installed?<Play size={22} fill="currentColor"/>:<ArrowDownToLine size={22}/>}</span>
-                <strong>{installAction}</strong><ArrowRight size={22}/>
-              </button>
-              <div className="fre-console-bottom">{installed?"ФАЙЛИ ГРИ ВЖЕ ВСТАНОВЛЕНО":"СПОЧАТКУ ЗАВАНТАЖИМО ОФІЦІЙНІ ФАЙЛИ"} <span>✳</span></div>
-            </aside>
-          </div>
-          <div className="fre-quick-links">
-            <button onClick={()=>setPage("Instances")}><span>01 / BUILD</span><div><Boxes size={27}/><b>ВЛАСНІ ЗБІРКИ</b><ArrowRight size={20}/></div><p>Твої світи. Твої модлоадери.</p></button>
-            <button onClick={()=>setPage("Mods")}><span>02 / EXPLORE</span><div><Puzzle size={27}/><b>МОДИ І РЕСУРСИ</b><ArrowRight size={20}/></div><p>Відкривай нові можливості.</p></button>
-            <button onClick={()=>setPage("Skins")}><span>03 / CREATE</span><div><Shirt size={27}/><b>СТУДІЯ СКІНІВ</b><ArrowRight size={20}/></div><p>Створи того, ким станеш.</p></button>
-          </div>
-          <div className="fre-system-strip"><span><i/> ЛАУНЧЕР ГОТОВИЙ</span><span>JAVA: {truncate(java,38)}</span><button onClick={()=>setPage("Logs")}>ДІАГНОСТИКА <ArrowRight size={15}/></button></div>
-        </>}
+        {page==="Home"&&<HomeDashboard
+          versions={versions}
+          loading={loading}
+          selected={selected}
+          selectedKind={selectedKind}
+          installed={installed}
+          isBusy={isBusy}
+          installAction={installAction}
+          activeInstanceId={activeInstanceId}
+          memoryMb={memoryMb}
+          nickname={nickname}
+          java={java}
+          recoveryMode={recoveryMode}
+          onPage={setPage}
+          onLaunch={()=>void launch()}
+          onVersion={id=>{setSelected(id);setActiveInstanceId("");}}
+          onRefresh={()=>void refreshVersions()}
+        />}
 
         {page==="Versions"&&<section className="fre-version-catalog">
           <div className="fre-catalog-toolbar">
@@ -400,13 +380,13 @@ export default function App() {
 
         {page==="Settings"&&<div className="fre-settings-stack">
           <section className="fre-control-paper"><div className="fre-module-label"><span>01 / ВИГЛЯД</span><Wrench size={18}/></div>
-            <h2>ТВОЯ АТМОСФЕРА.</h2><p>П'ять настроїв FRE LAUNCH. Вибери свій — усе зберігається автоматично.</p>
+            <h2>Оформлення</h2><p>Обери тему інтерфейсу. Налаштування зберігаються автоматично.</p>
             {recoveryMode&&<div className="fre-log-mini-empty">RECOVERY: захисний режим WebView2 активований після аварії. Світи Minecraft збережені. <button onClick={()=>{void invoke("disable_software_recovery").then(()=>setMessage("Повернення до GPU-прискорення заплановано. Перезапусти FRE LAUNCH; якщо знову вилетить, RECOVERY автоматично повернеться.")).catch(e=>setError(humanError(e)));}}>СПРОБУВАТИ ЗВИЧАЙНУ ГРАФІКУ НА НАСТУПНОМУ ЗАПУСКУ</button></div>}
             <div className="fre-theme-grid">{themes.map(item=><button key={item.id} className={"fre-theme-choice"+(theme===item.id?" is-selected":"")} onClick={()=>setTheme(item.id)}>
               <span style={{background:item.color}}/><b>{item.label}</b>{theme===item.id?<Check size={18}/>:<ArrowRight size={17}/>}</button>)}</div>
           </section>
           <section className="fre-control-paper"><div className="fre-module-label"><span>02 / РЕСУРСИ</span><SlidersHorizontal size={18}/></div>
-            <h2>ПОТУЖНІСТЬ ГРИ.</h2><p>Виділена RAM: <strong>{memoryMb} MB</strong></p>
+            <h2>Оперативна пам'ять</h2><p>Виділена RAM: <strong>{memoryMb} MB</strong></p>
             <input type="range" min={1024} max={16384} step={512} value={memoryMb} onChange={e=>setMemoryMb(Number(e.target.value))} className="fre-ram-range"/>
             <div className="fre-ram-ends"><span>1 GB</span><span>16 GB</span></div>
             <p>Збірки можуть мати власні Java та RAM.</p>
@@ -448,7 +428,7 @@ export default function App() {
           <div className="fre-log-toolbar">
             <button disabled={diagnosticsBusy} onClick={()=>void loadDiagnostics()}><RefreshCw size={16}/> {diagnosticsBusy?"ЧИТАЄМО...":"ОНОВИТИ ЖУРНАЛ"}</button>
             <button onClick={()=>void copyText([
-              "FRE LAUNCH / 0.5.3 ALPHA",
+              "FRE LAUNCH / 0.5.5 ALPHA",
               "Last attempt: "+(lastAttempt?JSON.stringify(lastAttempt):"none"),
               "Java: "+java,
               "Log path: "+(diagnostics?.logPath||"unknown"),
@@ -461,7 +441,7 @@ export default function App() {
           </div>
           {diagnosticsError&&<div className="fre-diag-warning"><AlertTriangle size={16}/> Не вдалося прочитати файл журналу: {diagnosticsError}</div>}
           {diagnostics?.logPath&&<div className="fre-diagnostic-location"><FolderOpen size={16}/><span>{diagnostics.logPath}</span></div>}
-          <div className="fre-log-label">01 / MINECRAFT INSTALL ENGINE</div>
+          <div className="fre-log-label">01 / STARTUP & INSTALL LOG</div>
           {diagnosticsBusy&&!diagnostics?<div className="fre-log-placeholder">Читаємо локальний журнал встановлення...</div>:
             diagnostics?.contents?.trim()?
             <pre className="fre-log-output">{diagnostics.contents}</pre>:

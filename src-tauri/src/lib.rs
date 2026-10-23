@@ -54,7 +54,7 @@ fn detect_java() -> Result<String, String> {
 }
 
 pub fn run() {
-    tauri::Builder::default()
+    let result = tauri::Builder::default()
         .setup(|app| {
             let handle = app.handle().clone();
             // Ensure the diagnostics page has a real startup breadcrumb even when a
