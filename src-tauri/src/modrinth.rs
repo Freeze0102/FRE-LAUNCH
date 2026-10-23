@@ -87,79 +87,228 @@ pub async fn modrinth_project_details(project_id: String) -> Result<Value, Strin
     Ok(serde_json::json!({"project":project,"versions":versions}))
 }
 
-/// Only install verified Modrinth ZIP resource packs, never execute third-party code.
-#[tauri::command]
-pub async fn install_resourcepack(app: AppHandle, instance_id: String, project_id: String, version_id: Option<String>) -> Result<String, String> {
-    validate_project_id(&project_id)?;
-    let instance = super::instances::read(&app, &instance_id)?;
-    let http = http()?;
-    let project_url = format!("https://api.modrinth.com/v2/project/{project_id}");
-    let project: Value = http.get(&project_url).send().await.map_err(|e| e.to_string())?
-        .error_for_status().map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
-    if project["project_type"].as_str() != Some("resourcepack") {
-        return Err("Only resource packs can be installed by this feature".into());
+/// Validate archive metadata and decompress entries to detect corruption, zip bombs
+/// and executable-bearing downloads. This is NOT a malware/Java-code scanner.
+fn inspect_pack_archive(bytes: &[u8]) -> Result<(), String> {
+    if !bytes.starts_with(b"PK\x03\x04") {
+        return Err("Downloaded pack is not a valid ZIP archive".into());
     }
-    let url = format!("https://api.modrinth.com/v2/project/{project_id}/version");
-    let compatible = serde_json::to_string(&vec![&instance.version]).map_err(|e| e.to_string())?;
-    let versions: Vec<Value> = http.get(&url)
-        .query(&[("game_versions", compatible.as_str()),("include_changelog","false")])
+    let reader = std::io::Cursor::new(bytes);
+    let mut archive = zip::ZipArchive::new(reader).map_err(|e| format!("ZIP is damaged: {e}"))?;
+    if archive.len() == 0 || archive.len() > 20_000 {
+        return Err("Unsafe number of ZIP entries".into());
+    }
+    let mut unpacked = 0u64;
+    for index in 0..archive.len() {
+        let mut file = archive.by_index(index).map_err(|e| e.to_string())?;
+        let path = file.name().replace('\\', "/");
+        if path.starts_with('/') || path.split('/').any(|part| part == "..") {
+            return Err("Unsafe path inside pack ZIP".into());
+        }
+        if file.unix_mode().is_some_and(|mode| mode & 0o170000 == 0o120000) {
+            return Err("Pack ZIP cannot contain symlinks".into());
+        }
+        unpacked = unpacked.checked_add(file.size()).ok_or("ZIP size overflow")?;
+        if unpacked > 768 * 1024 * 1024 { return Err("Pack ZIP expands beyond safety limit".into()); }
+        let lower = path.to_ascii_lowercase();
+        if [".exe", ".dll", ".bat", ".cmd", ".ps1", ".vbs", ".scr", ".jar"]
+            .iter().any(|suffix| lower.ends_with(suffix)) {
+            return Err(format!("Pack contains executable code: {path}"));
+        }
+        if !file.is_dir() {
+            std::io::copy(&mut file, &mut std::io::sink())
+                .map_err(|e| format!("Corrupt ZIP entry: {e}"))?;
+        }
+    }
+    Ok(())
+}
+
+fn safe_pack_filename(name: &str) -> bool {
+    !name.is_empty() && name.len() <= 180 && name.to_ascii_lowercase().ends_with(".zip")
+        && !name.starts_with('.') && !name.contains("..")
+        && name.chars().all(|c| c.is_alphanumeric() || matches!(c, '.' | '-' | '_' | '+' | '(' | ')' | ' '))
+}
+
+fn pack_folder(kind: &str) -> Result<&'static str, String> {
+    match kind {
+        "resourcepack" => Ok("resourcepacks"),
+        "shader" => Ok("shaderpacks"),
+        _ => Err("Unsupported content pack type".into()),
+    }
+}
+
+async fn install_pack(app: AppHandle, instance_id: String, project_id: String,
+                      version_id: Option<String>, kind: &'static str) -> Result<String, String> {
+    validate_project_id(&project_id)?;
+    if let Some(ref id) = version_id { validate_project_id(id)?; }
+    let instance = super::instances::read(&app, &instance_id)?;
+    let client = http()?;
+    let project: Value = client.get(format!("https://api.modrinth.com/v2/project/{project_id}"))
         .send().await.map_err(|e| e.to_string())?
         .error_for_status().map_err(|e| e.to_string())?
         .json().await.map_err(|e| e.to_string())?;
-    if let Some(ref id)=version_id {validate_project_id(id)?;}
-    let version = if let Some(id)=version_id.as_deref() {
-        versions.iter().find(|v|v["id"].as_str()==Some(id))
-            .ok_or("Selected resource pack version is not compatible with this Minecraft instance")?
-    } else {
-        versions.first().ok_or("No compatible resource pack found")?
+    if project["project_type"].as_str() != Some(kind) {
+        return Err("Modrinth project has a different content type".into());
+    }
+
+    let game_versions = serde_json::to_string(&vec![&instance.version]).map_err(|e| e.to_string())?;
+    let versions: Vec<Value> = client.get(format!("https://api.modrinth.com/v2/project/{project_id}/version"))
+        .query(&[("game_versions", game_versions.as_str()), ("include_changelog", "false")])
+        .send().await.map_err(|e| e.to_string())?
+        .error_for_status().map_err(|e| e.to_string())?
+        .json().await.map_err(|e| e.to_string())?;
+    let version = match version_id.as_deref() {
+        Some(id) => versions.iter().find(|v| v["id"].as_str() == Some(id))
+            .ok_or("Selected release is incompatible with this Minecraft version")?,
+        None => versions.first().ok_or("No compatible content release found")?,
     };
-    let files = version["files"].as_array().ok_or("Missing resource pack files")?;
-    let file = files.iter().find(|f| f["primary"].as_bool() == Some(true)).or_else(|| files.first()).ok_or("No downloadable file")?;
-    let filename = file["filename"].as_str().ok_or("Invalid file name")?;
-    if filename.len() > 160 || !filename.to_lowercase().ends_with(".zip")
-        || filename.contains('/') || filename.contains('\\')
-        || filename == "." || filename == ".." {
-        return Err("Unsafe resource pack filename".into());
+    let files = version["files"].as_array().ok_or("Modrinth release has no downloadable files")?;
+    let file = files.iter().find(|f| f["primary"].as_bool() == Some(true)
+        && f["filename"].as_str().is_some_and(safe_pack_filename))
+        .or_else(|| files.iter().find(|f| f["filename"].as_str().is_some_and(safe_pack_filename)))
+        .ok_or("No compatible ZIP download found")?;
+    let filename = file["filename"].as_str().ok_or("Missing ZIP filename")?;
+    let download_url = file["url"].as_str().ok_or("Missing Modrinth download URL")?;
+    let url = reqwest::Url::parse(download_url).map_err(|e| e.to_string())?;
+    if url.scheme() != "https" || url.host_str() != Some("cdn.modrinth.com") {
+        return Err("Pack must be downloaded from the official Modrinth CDN".into());
     }
-    let url = file["url"].as_str().ok_or("Missing download URL")?;
-    let url_parsed = reqwest::Url::parse(url).map_err(|e| e.to_string())?;
-    if url_parsed.scheme() != "https" || url_parsed.host_str() != Some("cdn.modrinth.com") {
-        return Err("Resource pack files must come from the official Modrinth CDN".into());
+    let digest = file["hashes"]["sha512"].as_str().ok_or("Missing SHA-512 checksum")?;
+    if digest.len() != 128 || !digest.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return Err("Malformed SHA-512 checksum".into());
     }
-    let expected = file["hashes"]["sha512"].as_str().ok_or("Missing SHA-512 hash")?;
-    let size = file["size"].as_u64().ok_or("Missing resource pack size")?;
-    if size == 0 || size > 256 * 1024 * 1024 { return Err("Resource pack exceeds the 256 MB safety limit or is empty".into()); }
-    let res = http.get(url).send().await.map_err(|e| e.to_string())?
+    let expected_size = file["size"].as_u64().ok_or("Missing ZIP size")?;
+    if expected_size == 0 || expected_size > 256 * 1024 * 1024 {
+        return Err("Content pack exceeds the 256 MB safety limit".into());
+    }
+    let response = client.get(download_url).send().await.map_err(|e| e.to_string())?
         .error_for_status().map_err(|e| e.to_string())?;
-    // A missing Content-Length must not allow unlimited allocations.
+    if response.content_length().is_some_and(|n| n > expected_size) {
+        return Err("Downloaded size exceeds Modrinth metadata".into());
+    }
     let mut bytes = Vec::new();
     let mut received = 0u64;
-    let mut chunks = res.bytes_stream();
+    let mut chunks = response.bytes_stream();
     while let Some(chunk) = chunks.next().await {
-        let chunk=chunk.map_err(|e|format!("Resource pack stream interrupted: {e}"))?;
-        received=received.checked_add(chunk.len() as u64).ok_or("Resource pack size overflow")?;
-        if received>size {
-            return Err("Resource pack download exceeded the declared size".into());
-        }
+        let chunk = chunk.map_err(|e| format!("Download interrupted: {e}"))?;
+        received = received.checked_add(chunk.len() as u64).ok_or("ZIP size overflow")?;
+        if received > expected_size { return Err("Download exceeds declared size".into()); }
         bytes.extend_from_slice(&chunk);
     }
-    if received!=size {return Err("Downloaded size does not match Modrinth metadata".into());}
-    if !bytes.starts_with(b"PK\x03\x04") {
-        return Err("Resource pack is not a ZIP archive".into());
+    if received != expected_size { return Err("Download truncated".into()); }
+    if !format!("{:x}", Sha512::digest(&bytes)).eq_ignore_ascii_case(digest) {
+        return Err("Content pack SHA-512 mismatch".into());
     }
-    if format!("{:x}", Sha512::digest(&bytes)) != expected.to_ascii_lowercase() {
-        return Err("Resource pack hash validation failed".into());
-    }
+    tokio::task::spawn_blocking(move || inspect_pack_archive(&bytes))
+        .await.map_err(|e| format!("ZIP inspection interrupted: {e}"))??;
+
     let dir: PathBuf = super::instances::game_directory(&app, &instance_id, &instance.version)?
-        .join("resourcepacks");
-    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+        .join(pack_folder(kind)?);
+    super::game_folders::prepare_folders(dir.parent().ok_or("Invalid game directory")?)
+        .map_err(|e| format!("Cannot prepare Minecraft folders: {e}"))?;
     let path = dir.join(filename);
-    if path.exists() { return Err("Resource pack already exists; remove it before reinstalling".into()); }
+    if fs::symlink_metadata(&path).is_ok() {
+        return Err("Content pack already exists; remove it before reinstalling".into());
+    }
+    // Re-fetch the same expected metadata only after integrity validation.
+    // Stream again to avoid keeping large verified files in frontend memory.
+    let response = client.get(download_url).send().await.map_err(|e| e.to_string())?
+        .error_for_status().map_err(|e| e.to_string())?;
+    let mut body = Vec::new();
+    let mut size = 0u64;
+    let mut stream = response.bytes_stream();
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|e| e.to_string())?;
+        size = size.checked_add(chunk.len() as u64).ok_or("ZIP size overflow")?;
+        if size > expected_size { return Err("Download exceeds declared size".into()); }
+        body.extend_from_slice(&chunk);
+    }
+    if size != expected_size || !format!("{:x}", Sha512::digest(&body)).eq_ignore_ascii_case(digest) {
+        return Err("Content pack changed during download".into());
+    }
     let temporary = dir.join(format!("{filename}.fre-download"));
-    fs::write(&temporary, bytes).map_err(|e| e.to_string())?;
-    fs::rename(&temporary, &path).map_err(|e| e.to_string())?;
-    Ok(format!("Installed resource pack: {filename}"))
+    fs::write(&temporary, body).map_err(|e| e.to_string())?;
+    if let Err(error) = fs::rename(&temporary, &path) {
+        let _ = fs::remove_file(&temporary);
+        return Err(error.to_string());
+    }
+    Ok(format!("Installed {}: {}", kind, filename))
+}
+
+#[tauri::command]
+pub async fn install_resourcepack(app: AppHandle, instance_id: String,
+                                  project_id: String, version_id: Option<String>) -> Result<String, String> {
+    install_pack(app, instance_id, project_id, version_id, "resourcepack").await
+}
+
+#[tauri::command]
+pub async fn install_shaderpack(app: AppHandle, instance_id: String,
+                                project_id: String, version_id: Option<String>) -> Result<String, String> {
+    install_pack(app, instance_id, project_id, version_id, "shader").await
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InstalledPack {
+    filename: String,
+    bytes: u64,
+    enabled: bool,
+}
+
+fn content_dir(app: &AppHandle, instance_id: &str, kind: &str) -> Result<PathBuf, String> {
+    let instance = super::instances::read(app, instance_id)?;
+    let path = super::instances::game_directory(app, instance_id, &instance.version)?;
+    Ok(path.join(pack_folder(kind)?))
+}
+
+fn safe_local_pack(name: &str) -> bool {
+    let bare = name.strip_suffix(".disabled").unwrap_or(name);
+    safe_pack_filename(bare) && (name.ends_with(".zip") || name.ends_with(".zip.disabled"))
+}
+
+#[tauri::command]
+pub fn list_installed_packs(app: AppHandle, instance_id: String, kind: String)
+    -> Result<Vec<InstalledPack>, String> {
+    let dir = content_dir(&app, &instance_id, &kind)?;
+    if !dir.exists() { return Ok(Vec::new()); }
+    let mut found = Vec::new();
+    for item in fs::read_dir(&dir).map_err(|e| e.to_string())? {
+        let item = item.map_err(|e| e.to_string())?;
+        let name = item.file_name().to_string_lossy().to_string();
+        if !safe_local_pack(&name) { continue; }
+        let metadata = fs::symlink_metadata(item.path()).map_err(|e| e.to_string())?;
+        if metadata.file_type().is_symlink() || !metadata.is_file() { continue; }
+        found.push(InstalledPack { filename: name.clone(), bytes: metadata.len(),
+                                   enabled: name.ends_with(".zip") });
+    }
+    found.sort_by(|a,b| a.filename.to_lowercase().cmp(&b.filename.to_lowercase()));
+    Ok(found)
+}
+
+#[tauri::command]
+pub fn toggle_installed_pack(app: AppHandle, instance_id: String, kind: String, filename: String)
+    -> Result<(), String> {
+    if !safe_local_pack(&filename) { return Err("Unsafe content filename".into()); }
+    let dir = content_dir(&app, &instance_id, &kind)?;
+    let current = dir.join(&filename);
+    let metadata = fs::symlink_metadata(&current).map_err(|e| e.to_string())?;
+    if metadata.file_type().is_symlink() || !metadata.is_file() {return Err("Invalid pack file".into());}
+    let target = if filename.ends_with(".zip.disabled") {
+        dir.join(filename.trim_end_matches(".disabled"))
+    } else { dir.join(format!("{filename}.disabled")) };
+    if fs::symlink_metadata(&target).is_ok() {return Err("Target content file already exists".into());}
+    fs::rename(current,target).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn remove_installed_pack(app: AppHandle, instance_id: String, kind: String, filename: String)
+    -> Result<(), String> {
+    if !safe_local_pack(&filename) {return Err("Unsafe content filename".into());}
+    let dir = content_dir(&app, &instance_id, &kind)?;
+    let path = dir.join(filename);
+    let metadata = fs::symlink_metadata(&path).map_err(|e| e.to_string())?;
+    if metadata.file_type().is_symlink() || !metadata.is_file() {return Err("Invalid pack file".into());}
+    fs::remove_file(path).map_err(|e|e.to_string())
 }
 
 #[cfg(test)]
