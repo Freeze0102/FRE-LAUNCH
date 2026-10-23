@@ -150,14 +150,15 @@ async fn verified_jar(client: &Client, version: &Value, dir: &Path) -> Result<St
 }
 
 #[tauri::command]
-pub async fn install_fabric_mod(app: AppHandle, instance_id: String, project_id: String) -> Result<Vec<String>, String> {
+pub async fn install_fabric_mod(app: AppHandle, instance_id: String, project_id: String, version_id: Option<String>) -> Result<Vec<String>, String> {
     valid_id(&project_id)?;
     let instance=super::instances::read(&app,&instance_id)?;
     if instance.loader!="fabric" {
         return Err("Switch this Minecraft instance to Fabric before installing mods".into());
     }
     let client=client()?;
-    let mut queue=VecDeque::from([(project_id,None::<String>)]);
+    if let Some(ref id)=version_id { valid_id(id)?; }
+    let mut queue=VecDeque::from([(project_id,version_id)]);
     let mut visited=HashSet::new();
     let mut versions=Vec::new();
     while let Some((project,version_id))=queue.pop_front() {
