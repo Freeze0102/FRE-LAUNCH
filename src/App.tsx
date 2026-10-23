@@ -100,7 +100,7 @@ function rememberInstall(version:string,status:"installing"|"complete"|"error"|"
 }
 const stages:Record<string,string>={
   metadata:"МЕТАДАНІ",client:"КЛІЄНТ",libraries:"БІБЛІОТЕКИ",
-  assets:"РЕСУРСИ",fabric:"FABRIC",quilt:"QUILT",complete:"ГОТОВО"
+  assets:"РЕСУРСИ",natives:"РОЗПАКУВАННЯ",fabric:"FABRIC",quilt:"QUILT",complete:"ГОТОВО"
 };
 const themes=[
   {id:"midnight",label:"NIGHT CONTROL · ОСНОВНА",color:"#c9f079"},

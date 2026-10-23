@@ -9,9 +9,10 @@ const timeline=[
   {id:"client",title:"Клієнт",hint:"Minecraft JAR"},
   {id:"libraries",title:"Бібліотеки",hint:"Java-залежності"},
   {id:"assets",title:"Ресурси",hint:"Звуки й текстури"},
+  {id:"natives",title:"Розпакування",hint:"Файли для Windows"},
   {id:"complete",title:"Завершено",hint:"Файли готові"},
 ];
-const stageIndex:Record<string,number>={preflight:0,metadata:1,client:2,libraries:3,assets:4,complete:5};
+const stageIndex:Record<string,number>={preflight:0,metadata:1,client:2,libraries:3,assets:4,natives:5,complete:6};
 
 export default function InstallDeck({version,progress,preflight,isInstalling,onCheck,onLogs}:{
   version:string;progress:InstallProgress|null;preflight:Preflight|null;isInstalling:boolean;onCheck:()=>void;onLogs:()=>void
@@ -41,7 +42,7 @@ export default function InstallDeck({version,progress,preflight,isInstalling,onC
         <small>Папка гри відрізняється від місця встановлення самого FRE LAUNCH.</small>
       </div>
       <div className="install-deck-sequence">
-        <div className="install-sequence-heading"><span>ТЕХНІЧНИЙ МАРШРУТ / 06</span><span>НЕЗАЛЕЖНІ ЕТАПИ</span></div>
+        <div className="install-sequence-heading"><span>ТЕХНІЧНИЙ МАРШРУТ / 07</span><span>НЕЗАЛЕЖНІ ЕТАПИ</span></div>
         <div className="install-checkpoints">{timeline.map((stage,i)=>{
           const done=progress?.stage==="complete"||!!progress&&i<index;
           const active=!!progress&&i===index&&progress.stage!=="complete";

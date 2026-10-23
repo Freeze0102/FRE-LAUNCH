@@ -676,3 +676,6 @@ html{color-scheme:dark}
 }
 @media(prefers-reduced-motion:reduce){.fre-app button{transition:none!important}.fre-app .fre-feature-art{transform:none!important}}
 
+/* The final installation checkpoint spans the width to avoid an orphaned tile. */
+.install-checkpoint:last-child{grid-column:1/-1;min-height:68px;flex-direction:row;align-items:center;gap:16px}
+.install-checkpoint:last-child .install-step-mark{margin:0}
