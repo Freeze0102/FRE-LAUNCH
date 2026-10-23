@@ -11,7 +11,7 @@ async function getBytes(url) {
   assert.equal(parsed.protocol, "https:", "Minecraft downloads must use HTTPS");
   assert.ok([
     "piston-meta.mojang.com", "piston-data.mojang.com",
-    "resources.download.minecraft.net", "launchermeta.mojang.com",
+    "libraries.minecraft.net", "resources.download.minecraft.net", "launchermeta.mojang.com",
     "launcher.mojang.com"
   ].includes(parsed.hostname), `Unexpected Mojang host: ${parsed.hostname}`);
   let last = "";
@@ -56,4 +56,22 @@ assert.ok(sample, "No small asset available for a network smoke test");
 const assetUrl = `https://resources.download.minecraft.net/${sample.hash.slice(0,2)}/${sample.hash}`;
 const assetBytes = await getBytes(assetUrl);
 checkHash(assetBytes, sample.hash, "real Minecraft asset");
-console.log(`Mojang smoke OK: ${RELEASE} / Java ${profile.javaVersion.majorVersion} / ${profile.libraries.length} libraries / ${Object.keys(index.objects).length} assets / sample asset SHA-1 verified`);
+
+// Verify the full game client, not just its metadata. This catches upstream
+// binary failures that a manifest-only smoke test would never detect.
+const clientMeta = profile.downloads.client;
+const clientBytes = await getBytes(clientMeta.url);
+assert.ok(clientBytes.length > 1024 * 1024 && clientBytes.length < 512 * 1024 * 1024, "Invalid Minecraft client size");
+checkHash(clientBytes, clientMeta.sha1, "Minecraft client JAR");
+assert.ok(clientBytes.subarray(0,4).equals(Buffer.from([80,75,3,4])), "Minecraft client is not a ZIP/JAR");
+
+// Verify one real Mojang library as well, using its declared SHA-1.
+const libraries = profile.libraries
+  .map(lib => lib.downloads?.artifact)
+  .filter(lib => lib?.url && lib?.sha1 && lib?.size > 0 && lib?.size < 4_000_000);
+const sampleLibrary = libraries.find(lib => new URL(lib.url).hostname === "libraries.minecraft.net");
+assert.ok(sampleLibrary, "No small official library with SHA-1 to test");
+const libraryBytes = await getBytes(sampleLibrary.url);
+checkHash(libraryBytes, sampleLibrary.sha1, "Minecraft library");
+assert.ok(libraryBytes.subarray(0,4).equals(Buffer.from([80,75,3,4])), "Minecraft library is not a ZIP/JAR");
+console.log(`Mojang smoke OK: ${RELEASE} / Java ${profile.javaVersion.majorVersion} / ${profile.libraries.length} libraries / ${Object.keys(index.objects).length} assets / client JAR, library and asset SHA-1 verified`);

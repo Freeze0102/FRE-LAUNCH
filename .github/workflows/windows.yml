@@ -21,12 +21,12 @@ jobs:
     timeout-minutes: 65
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '22'
-          # No npm lockfile is committed yet; cache: npm would fail before installation.
+          package-manager-cache: false # No lockfile; keep setup-node from enabling unsafe auto-cache
       - name: Set up Rust stable
         uses: dtolnay/rust-toolchain@stable
       - name: Cache Rust build output
@@ -79,19 +79,19 @@ jobs:
           New-Item -ItemType Directory -Force -Path "$base/administrator" | Out-Null
           Copy-Item $file.FullName "$base/administrator/FRE-LAUNCH-Administrator-Setup.exe"
       - name: Upload non-admin Windows installer
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: FRE-LAUNCH-Windows-Installer
           path: src-tauri/target/release/bundle/nsis/current-user/*.exe
           if-no-files-found: error
       - name: Upload administrator Windows installer
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: FRE-LAUNCH-Windows-Admin-Installer
           path: src-tauri/target/release/bundle/nsis/administrator/*.exe
           if-no-files-found: error
       - name: Upload portable Windows executable
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: FRE-LAUNCH-Windows-Portable
           path: src-tauri/target/release/fre-launch.exe

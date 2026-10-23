@@ -1,4 +1,4 @@
-# FRE LAUNCH 0.5 Alpha — FIELD NOTES
+# FRE LAUNCH 0.5.2 Alpha — NIGHT CONTROL
 
 **Your Minecraft. Your Rules.** Неофіційний лаунчер Minecraft Java Edition для Windows 10/11 x64. Стек: Tauri 2, Rust, React, TypeScript.
 
@@ -102,3 +102,10 @@ GitHub Actions додатково збирає варіант з адмін-пр
 ## FRE LAUNCH 0.5.1 Alpha — crash reliability build
 
 Інсталятор має новий номер 0.5.1, щоб його не сплутати зі старим 0.5.0. Це та сама програма й ті самі дані Minecraft. При встановленні вибирай останній успішний Windows Build в GitHub Actions. Після повторного збою відкрий «Діагностика» → «КОПІЮВАТИ ЗВІТ»; якщо Windows не створила WER, запусти `perfmon /rel`.
+
+## FRE LAUNCH 0.5.2 — цілісність інсталяції
+
+- Виправлено перевірку статусу встановлених ігрових файлів: відсутній чи пошкоджений Minecraft client, бібліотека або індекс ресурсів тепер змінює статус на «не встановлено» й запускає ремонт при спробі гри.
+- Файли старих Maven-бібліотек без SHA-1 повинні мати справжній ZIP/JAR-заголовок, а не випадковий HTML від сервера.
+- CI перевіряє SHA-1 **повного клієнтського Minecraft JAR, реальної бібліотеки та ресурсу** з офіційного Mojang CDN. Це не гарантує відсутності вильоту на конкретному ПК.
+- Оновлено GitHub Actions до Node 24-compatible action versions, прибрано попередження про Node.js 20.

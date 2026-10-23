@@ -344,11 +344,8 @@ async fn critical_cache_ready(base:&Path, version:&str, meta:&Value) -> Result<b
     for (_,path,hash,_) in libraries(meta,base)?{
         if let Some(expected)=hash{
             if !super::downloads::verify_file(&path,&expected).await?{return Ok(false);}
-        }else{
-            match fs::metadata(&path).await{
-                Ok(meta) if meta.len()>0 => {},
-                _=>return Ok(false)
-            }
+        }else if !super::downloads::usable_unhashed_cache(&path).await? {
+            return Ok(false);
         }
     }
     if let Some(index)=meta["assetIndex"].as_object(){
@@ -368,8 +365,16 @@ async fn critical_cache_ready(base:&Path, version:&str, meta:&Value) -> Result<b
 #[tauri::command]
 pub async fn is_installed(app: AppHandle, version: String) -> Result<bool, String> {
     validate_version(&version)?;
-    Ok(fs::try_exists(root(&app)?.join("versions").join(&version).join(".installed"))
-        .await.map_err(|e| e.to_string())?)
+    let base=root(&app)?;
+    let dir=base.join("versions").join(&version);
+    if !fs::try_exists(dir.join(".installed")).await.map_err(|e|e.to_string())? {
+        return Ok(false);
+    }
+    let json=dir.join(format!("{version}.json"));
+    if !fs::try_exists(&json).await.map_err(|e|e.to_string())? {return Ok(false);}
+    let metadata=fs::read(&json).await.map_err(|e|e.to_string())?;
+    let Ok(meta)=serde_json::from_slice::<Value>(&metadata) else {return Ok(false);};
+    critical_cache_ready(&base,&version,&meta).await
 }
 
 #[tauri::command]

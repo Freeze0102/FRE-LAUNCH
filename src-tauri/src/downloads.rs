@@ -66,6 +66,17 @@ async fn looks_like_jar(path: &Path) -> Result<bool, String> {
         Err(error)=>Err(error.to_string())
     }
 }
+/// For historical libraries without Mojang SHA-1 metadata, reuse only
+/// existing, non-empty JARs with a ZIP header (not partial HTML error pages).
+pub async fn usable_unhashed_cache(path:&Path) -> Result<bool,String> {
+    if !fs::try_exists(path).await.map_err(|e|e.to_string())? {return Ok(false);}
+    let info=fs::metadata(path).await.map_err(|e|e.to_string())?;
+    if !info.is_file() || info.len()==0 {return Ok(false);}
+    let is_jar=path.extension().and_then(|ext|ext.to_str())
+        .is_some_and(|ext|ext.eq_ignore_ascii_case("jar"));
+    if is_jar {looks_like_jar(path).await} else {Ok(true)}
+}
+
 pub async fn verify_file(path: &Path, expected_sha1: &str) -> Result<bool, String> {
     if !fs::try_exists(path).await.map_err(|e| e.to_string())? { return Ok(false); }
     let mut file = fs::File::open(path).await.map_err(|e| e.to_string())?;
@@ -107,12 +118,8 @@ async fn download_once(
             return Err("Invalid expected SHA-1 digest".into());
         }
         if verify_file(destination, sha).await? { return Ok(()); }
-    } else if fs::try_exists(destination).await.map_err(|e| e.to_string())?
-        && fs::metadata(destination).await.map_err(|e| e.to_string())?.len() > 0 {
-        // Legacy Maven artifacts without hashes still need a valid JAR signature.
-        let is_jar=destination.extension().and_then(|ext|ext.to_str())
-            .is_some_and(|ext|ext.eq_ignore_ascii_case("jar"));
-        if !is_jar || looks_like_jar(destination).await? {return Ok(());}
+    } else if usable_unhashed_cache(destination).await? {
+        return Ok(());
     }
 
     if let Some(parent) = destination.parent() {
@@ -195,8 +202,10 @@ mod tests {
         let path=std::env::temp_dir().join(format!("fre-bad-artifact-{}.jar",Uuid::new_v4()));
         fs::write(&path,b"<html>Service Unavailable</html>").await.unwrap();
         assert!(!looks_like_jar(&path).await.unwrap());
+        assert!(!usable_unhashed_cache(&path).await.unwrap());
         fs::write(&path,&[80,75,3,4,0,0]).await.unwrap();
         assert!(looks_like_jar(&path).await.unwrap());
+        assert!(usable_unhashed_cache(&path).await.unwrap());
         fs::remove_file(path).await.unwrap();
     }
     #[test]
