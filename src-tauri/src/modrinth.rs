@@ -199,8 +199,10 @@ async fn install_pack(app: AppHandle, instance_id: String, project_id: String,
     if !format!("{:x}", Sha512::digest(&bytes)).eq_ignore_ascii_case(digest) {
         return Err("Content pack SHA-512 mismatch".into());
     }
-    tokio::task::spawn_blocking(move || inspect_pack_archive(&bytes))
-        .await.map_err(|e| format!("ZIP inspection interrupted: {e}"))??;
+    let bytes = tokio::task::spawn_blocking(move || {
+        inspect_pack_archive(&bytes)?;
+        Ok::<Vec<u8>, String>(bytes)
+    }).await.map_err(|e| format!("ZIP inspection interrupted: {e}"))??;
 
     let dir: PathBuf = super::instances::game_directory(&app, &instance_id, &instance.version)?
         .join(pack_folder(kind)?);
@@ -210,24 +212,8 @@ async fn install_pack(app: AppHandle, instance_id: String, project_id: String,
     if fs::symlink_metadata(&path).is_ok() {
         return Err("Content pack already exists; remove it before reinstalling".into());
     }
-    // Re-fetch the same expected metadata only after integrity validation.
-    // Stream again to avoid keeping large verified files in frontend memory.
-    let response = client.get(download_url).send().await.map_err(|e| e.to_string())?
-        .error_for_status().map_err(|e| e.to_string())?;
-    let mut body = Vec::new();
-    let mut size = 0u64;
-    let mut stream = response.bytes_stream();
-    while let Some(chunk) = stream.next().await {
-        let chunk = chunk.map_err(|e| e.to_string())?;
-        size = size.checked_add(chunk.len() as u64).ok_or("ZIP size overflow")?;
-        if size > expected_size { return Err("Download exceeds declared size".into()); }
-        body.extend_from_slice(&chunk);
-    }
-    if size != expected_size || !format!("{:x}", Sha512::digest(&body)).eq_ignore_ascii_case(digest) {
-        return Err("Content pack changed during download".into());
-    }
     let temporary = dir.join(format!("{filename}.fre-download"));
-    fs::write(&temporary, body).map_err(|e| e.to_string())?;
+    fs::write(&temporary, bytes).map_err(|e| e.to_string())?;
     if let Err(error) = fs::rename(&temporary, &path) {
         let _ = fs::remove_file(&temporary);
         return Err(error.to_string());
