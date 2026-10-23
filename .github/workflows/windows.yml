@@ -93,6 +93,32 @@ jobs:
         run: cargo test --manifest-path src-tauri/Cargo.toml
       - name: Build standard non-admin Windows installer
         run: npm run tauri build
+      - name: Verify PE executable reserves 8 MiB stack for WebView2
+        shell: pwsh
+        run: |
+          $path = "src-tauri/target/release/fre-launch.exe"
+          if (!(Test-Path $path)) { throw "Compiled Windows EXE not found" }
+          $stream = [System.IO.File]::OpenRead((Resolve-Path $path).Path)
+          $reader = [System.IO.BinaryReader]::new($stream)
+          try {
+            $stream.Position = 0x3c
+            $pe = $reader.ReadInt32()
+            if ($pe -lt 0x40 -or $pe -gt $stream.Length - 0x100) {
+              throw "Invalid PE header offset"
+            }
+            $stream.Position = $pe
+            if ($reader.ReadUInt32() -ne 0x00004550) { throw "Missing PE signature" }
+            $stream.Position = $pe + 24
+            if ($reader.ReadUInt16() -ne 0x20b) { throw "Expected x64 PE32+ binary" }
+            $stream.Position = $pe + 24 + 72
+            $reserved = $reader.ReadUInt64()
+            Write-Host "Windows main-thread stack reserve: $reserved bytes"
+            if ($reserved -lt 8MB) {
+              throw "FRE LAUNCH must reserve >= 8 MiB stack for WebView2; expected /STACK:8388608"
+            }
+          } finally {
+            $reader.Dispose()
+          }
       - name: Stage standard installer for smoke test and download
         shell: pwsh
         run: |

@@ -89,3 +89,10 @@
 - The NSIS build, custom-folder installation and Rust tests passed, but running the installed binary in the Windows runner terminated with `0xC00000FD` (stack overflow) after `TAURI_SETUP`. The build therefore has NOT been approved for release.
 - Record a frontend-mounted breadcrumb to separate WebView2/native failure from UI initialization.
 - The updated workflow tests both normal startup and forced software-rendering recovery, prints launcher startup.log and Windows Application crash events, and blocks release if either startup fails. No silent suppression of the crash.
+
+## 0.5.6 / Windows stack overflow mitigation — security hold stays active
+
+- Windows CI run 39985988909 confirmed a real native `0xC00000FD` stack overflow after React mounted, WebView2 requested a resource, and the Mojang manifest returned. The captured ProcDump/WinDbg stack includes `EmbeddedBrowserWebView!FireWebResourceRequestedEvent`; the process stack reached its default 1 MiB reserve.
+- Increase the Windows executable main-thread stack reserve to 8 MiB using a Cargo build-script linker argument. Virtual reservation does not mean 8 MiB of immediately committed memory. Add a PE-header CI assertion and retain the 12-second normal/recovery-mode startup checks.
+- This is a hypothesis-driven crash fix to validate on the Windows runner; do not claim the crash is resolved until runtime smoke tests pass.
+- Version 0.5.6 builds remain subject to Microsoft Defender antivirus checks, and the published-release / downloadable-artifact approval gate remains closed because v0.5.5 administrator installer was detected as Trojan:Win32/Bearfoos.B!ml on a user PC. **Passing Defender scan on one CI runner is not sufficient to declare this incident resolved.**

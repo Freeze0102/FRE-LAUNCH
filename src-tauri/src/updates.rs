@@ -56,7 +56,7 @@ struct UpdateProgress {
 
 fn http() -> Result<reqwest::Client, String> {
     reqwest::Client::builder()
-        .user_agent("FRE-LAUNCH-Updater/0.5.5 (https://github.com/Freeze0102/FRE-LAUNCH)")
+        .user_agent("FRE-LAUNCH-Updater/0.5.6 (https://github.com/Freeze0102/FRE-LAUNCH)")
         .timeout(std::time::Duration::from_secs(90))
         .build().map_err(|e|e.to_string())
 }
