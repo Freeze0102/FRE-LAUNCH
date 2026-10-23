@@ -399,7 +399,7 @@ async fn launch_inner(app: AppHandle, version: String, nickname: String, memory_
         None
     } else {
         let required = meta["javaVersion"]["majorVersion"].as_u64().unwrap_or(8) as u32;
-        super::java::list_java_runtimes().into_iter()
+        super::java::list_java_runtimes(app.clone()).into_iter()
             .find(|runtime| runtime.major == required)
             .map(|runtime| runtime.path)
     };
