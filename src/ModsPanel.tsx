@@ -183,12 +183,12 @@ export default function ModsPanel({version, instanceId}: {version: string; insta
           ? <button className="secondary" disabled={busy || !selectedInstance || (kind==="mod"&&selectedInstance.loader!=="fabric")} title={kind==="mod"&&selectedInstance?.loader!=="fabric"?"Потрібна Fabric-збірка":"Встановити"} onClick={()=>void install(hit)}>{busy?"...":"Встановити"}</button>
           : <span className="muted">Перегляд</span>}
       </article>)}
-    </div>
+    </div>}
     {!opened&&<div className="toolbar" style={{justifyContent:"space-between",marginTop:12}}>
       <button className="secondary" disabled={loading||offset===0} onClick={()=>void search(Math.max(0,offset-24))}>← Назад</button>
       <span className="muted">{hits.length ? `Результати ${offset+1}–${offset+hits.length}` : "Нічого не знайдено. Спробуй прибрати фільтр версії."}</span>
       <button className="secondary" disabled={loading||hits.length<24||offset>=984} onClick={()=>void search(offset+24)}>Далі →</button>
-    </div>
+    </div>}
     {!!instanceId&&<div className="installed-mods">
       <div className="panel-heading"><h3>Встановлені моди</h3><button className="icon-button" title="Оновити" onClick={()=>void refreshMods()}><RefreshCw size={16}/></button></div>
       {installed.length===0&&<p className="muted">Немає встановлених модів у цій збірці.</p>}
