@@ -39,6 +39,8 @@ jobs:
         run: npm run check
       - name: Build frontend
         run: npm run build
+      - name: Smoke-test real Mojang release metadata and asset integrity
+        run: node scripts/smoke-mojang.mjs
       - name: Generate application icons
         run: npm run tauri icon src-tauri/icons/app.svg
       - name: Run Rust unit tests

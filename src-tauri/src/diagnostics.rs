@@ -54,3 +54,12 @@ mod tests {
     use super::*;
     #[test] fn log_size_is_bounded() {assert!(MAX_LOG_BYTES>=MAX_VIEW_BYTES as u64);}
 }
+
+/// Persists a previous abnormal exit for later review, without telemetry.
+#[tauri::command]
+pub fn record_interrupted_install(app: AppHandle, version: String) -> Result<(), String> {
+    super::minecraft::validate_version(&version)?;
+    write(&app, "INSTALL_INTERRUPTED",
+        &format!("Previous session ended unexpectedly while installing Minecraft {version}"));
+    Ok(())
+}

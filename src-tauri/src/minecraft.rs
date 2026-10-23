@@ -253,6 +253,12 @@ async fn install(app: &AppHandle, version: &str) -> Result<Value, String> {
         validate_version(id)?;
         let path = base.join("assets").join("indexes").join(format!("{id}.json"));
         download_one(&http, url, &path, sha_from(asset_index)).await?;
+        // Asset indexes can contain tens of thousands of records; reject
+        // unexpected oversized content before allocating and parsing JSON.
+        let index_size=fs::metadata(&path).await.map_err(|e|e.to_string())?.len();
+        if index_size > 40 * 1024 * 1024 {
+            return Err("Mojang asset index exceeded 40 MB safety limit".into());
+        }
         let index_data: Value = serde_json::from_slice(&fs::read(&path).await.map_err(|e| e.to_string())?)
             .map_err(|e| e.to_string())?;
         let objects = index_data["objects"].as_object().ok_or("Invalid assets index")?;

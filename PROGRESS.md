@@ -39,3 +39,12 @@
 - Logs metadata, client, library and sampled asset-download milestones for post-crash diagnosis.
 - Original six-stage FRE DOWNLOAD ENGINE screen shows per-stage progress, disk-access status and links to logs.
 - **Unverified on the affected Windows machine:** a green CI build alone does not prove the reported abrupt close is fixed.
+
+## Minecraft download reliability audit (October 2026)
+
+- Streamed Mojang downloads now retry transient HTTP/network errors and checksum mismatches up to three times without retrying local write failures.
+- Disk preflight verifies at least 900 MB available on the **actual Minecraft storage volume**; records begin, success and failure breadcrumbs.
+- Asset downloads use four concurrent tasks, capped JSON index size, and sparse progress events; native ZIP extraction limits file counts and expanded size.
+- Unexpected interruptions are copied from persisted UI state into native diagnostics on next launch.
+- The Windows pipeline now smoke-tests real Minecraft 1.21.10 Mojang metadata and a sample SHA-1 verified asset in addition to existing unit tests.
+- **Limitation:** app execution and the original native crash cannot be verified with CI alone. A Windows crash report from the affected PC remains necessary for certainty.

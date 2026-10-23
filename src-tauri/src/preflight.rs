@@ -53,16 +53,23 @@ pub fn ensure_write_access(app: &AppHandle) -> Result<PathBuf, String> {
 
 #[tauri::command]
 pub async fn install_preflight(app: AppHandle) -> Result<InstallPreflight, String> {
+    super::diagnostics::write(&app, "PREFLIGHT_BEGIN", "Checking Minecraft game-data volume");
     tokio::task::spawn_blocking(move || {
         let path=target(&app)?;
         let display=path.to_string_lossy().into_owned();
         match test_write(&path) {
-            Ok(())=>Ok(InstallPreflight{
+            Ok(())=>{
+                super::diagnostics::write(&app,"PREFLIGHT_OK",&display);
+                Ok(InstallPreflight{
                 path:display,
                 ready:true,
-                detail:"Каталог Minecraft доступний для запису".into()
-            }),
-            Err(e)=>Ok(InstallPreflight{path:display,ready:false,detail:e})
+                detail:"Каталог Minecraft доступний для запису, місця достатньо".into()
+            })
+            },
+            Err(e)=>{
+                super::diagnostics::write(&app,"PREFLIGHT_ERROR",&format!("{display}: {e}"));
+                Ok(InstallPreflight{path:display,ready:false,detail:e})
+            }
         }
     }).await.map_err(|e| format!("Перевірка диска перервалася: {e}"))?
 }

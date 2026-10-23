@@ -174,6 +174,7 @@ export default function App() {
         if(previous.status==="installing") {
           const version=previous.version||"невідомої версії";
           markInstall(version,"interrupted","Попереднє встановлення перервалося. Причина невідома, відкрий діагностику.");
+          void invoke("record_interrupted_install",{version}).catch(()=>{});
         }
       }
     }catch{/* Invalid cached state must not stop application startup */}
