@@ -165,6 +165,8 @@ export default function ModsPanel({version, instanceId}: {version: string; insta
         Моя бібліотека {instanceId? `(${installed.length+resourcepacks.length+shaderpacks.length})`:""}
       </button>
     </nav>
+    {error&&<div className="error">{error}</div>}
+    {message&&<div className="notice"><ShieldCheck size={16}/>{message}</div>}
     {view==="browse"&&<>
     <div className="toolbar">
       <div className="search"><Search size={18}/><input placeholder="Знайти Sodium, Lithium, Fabric API..." value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")void search(0);}}/></div>
@@ -196,8 +198,7 @@ export default function ModsPanel({version, instanceId}: {version: string; insta
     </label>
     <p className="muted">Пошук у всьому каталозі Modrinth. Без галочки показуються також проєкти для інших версій, але встановлення потребує сумісного релізу.</p>
     <p className="muted">{instanceId ? `Збірка: ${selectedInstance?.name??"Обрана"} · ${selectedInstance?.loader??"Vanilla"}` : "Спочатку обери окрему збірку для встановлення."} · Minecraft {version||"—"}</p>
-    {error&&<div className="error">{error}</div>}
-    {message&&<div className="notice"><ShieldCheck size={16}/>{message}</div>}
+
     {opened&&<section className="fre-mod-detail">
       <button className="secondary" onClick={()=>{setOpened(null);setDetails(null);setError("");}}><ArrowLeft size={16}/> До каталогу</button>
       <div className="fre-mod-detail-hero">
