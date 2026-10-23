@@ -75,7 +75,7 @@ pub async fn modrinth_project_details(project_id: String) -> Result<Value, Strin
 
 /// Only install verified Modrinth ZIP resource packs, never execute third-party code.
 #[tauri::command]
-pub async fn install_resourcepack(app: AppHandle, instance_id: String, project_id: String) -> Result<String, String> {
+pub async fn install_resourcepack(app: AppHandle, instance_id: String, project_id: String, version_id: Option<String>) -> Result<String, String> {
     validate_project_id(&project_id)?;
     let instance = super::instances::read(&app, &instance_id)?;
     let http = http()?;
@@ -93,7 +93,13 @@ pub async fn install_resourcepack(app: AppHandle, instance_id: String, project_i
         .send().await.map_err(|e| e.to_string())?
         .error_for_status().map_err(|e| e.to_string())?
         .json().await.map_err(|e| e.to_string())?;
-    let version = versions.first().ok_or("No compatible resource pack found")?;
+    if let Some(ref id)=version_id {validate_project_id(id)?;}
+    let version = if let Some(id)=version_id.as_deref() {
+        versions.iter().find(|v|v["id"].as_str()==Some(id))
+            .ok_or("Selected resource pack version is not compatible with this Minecraft instance")?
+    } else {
+        versions.first().ok_or("No compatible resource pack found")?
+    };
     let files = version["files"].as_array().ok_or("Missing resource pack files")?;
     let file = files.iter().find(|f| f["primary"].as_bool() == Some(true)).or_else(|| files.first()).ok_or("No downloadable file")?;
     let filename = file["filename"].as_str().ok_or("Invalid file name")?;
