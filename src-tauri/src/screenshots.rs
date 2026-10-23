@@ -15,8 +15,26 @@ pub struct ScreenshotInfo {
 }
 
 fn screenshot_folder(app: &AppHandle, instance_id: &str) -> Result<PathBuf, String> {
+    use tauri::Manager;
     let instance = super::instances::read(app, instance_id)?;
-    Ok(super::instances::game_directory(app, instance_id, &instance.version)?.join("screenshots"))
+    let game = super::instances::game_directory(app, instance_id, &instance.version)?;
+    let screenshots = game.join("screenshots");
+    // Both the instance and screenshots directory must be normal directories.
+    // Prevent local symlinks/junctions from redirecting photo access outside app data.
+    for folder in [&game, &screenshots] {
+        if let Ok(meta) = fs::symlink_metadata(folder) {
+            if meta.file_type().is_symlink() || !meta.is_dir() {
+                return Err("Screenshot folder must be a normal directory".into());
+            }
+            let canonical = fs::canonicalize(folder).map_err(|e| e.to_string())?;
+            let data = fs::canonicalize(app.path().app_data_dir().map_err(|e| e.to_string())?)
+                .map_err(|e| e.to_string())?;
+            if !canonical.starts_with(data) {
+                return Err("Screenshot folder is outside the app data directory".into());
+            }
+        }
+    }
+    Ok(screenshots)
 }
 
 fn check_filename(filename: &str) -> Result<(), String> {
