@@ -13,6 +13,8 @@ export default function ModsPanel({version, instanceId}: {version: string; insta
   const [query,setQuery]=useState("");
   const [kind,setKind]=useState("mod");
   const [hits,setHits]=useState<ModrinthHit[]>([]);
+  const [onlyCompatible,setOnlyCompatible]=useState(false);
+  const [offset,setOffset]=useState(0);
   const [selectedInstance,setSelectedInstance]=useState<Instance|null>(null);
   const [installed,setInstalled]=useState<InstalledMod[]>([]);
   const [loading,setLoading]=useState(false);
@@ -30,17 +32,18 @@ export default function ModsPanel({version, instanceId}: {version: string; insta
   }
   useEffect(()=>{void refreshMods();},[instanceId]);
 
-  async function search() {
+  async function search(pageOffset=0) {
     setLoading(true);setError("");
     try {
       const results=await invoke<ModrinthHit[]>("search_modrinth", {
-        query,version:version || null,projectType:kind,
+        query:query.trim(),version:onlyCompatible ? version || null : null,projectType:kind,offset:pageOffset,
       });
       setHits(results);
+      setOffset(pageOffset);
     } catch(err){setError(String(err));setHits([]);}
     finally{setLoading(false);}
   }
-  useEffect(()=>{void search();},[kind,version]);
+  useEffect(()=>{void search(0);},[kind,version,onlyCompatible]);
 
   async function install(hit: ModrinthHit) {
     if (!instanceId || !selectedInstance){setError("Спочатку створи та обери Minecraft-збірку.");return;}
@@ -79,15 +82,20 @@ export default function ModsPanel({version, instanceId}: {version: string; insta
     <div className="panel-heading"><h3>FRE MODRINTH</h3><Package size={20}/></div>
     <p>Офіційний каталог Modrinth: моди, ресурс-паки, шейдери й модпаки. Моди Fabric та ресурс-паки можна встановлювати з перевіркою SHA-512.</p>
     <div className="toolbar">
-      <div className="search"><Search size={18}/><input placeholder="Знайти Sodium, Lithium, Fabric API..." value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")void search();}}/></div>
+      <div className="search"><Search size={18}/><input placeholder="Знайти Sodium, Lithium, Fabric API..." value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")void search(0);}}/></div>
       <select value={kind} onChange={e=>setKind(e.target.value)}>
         <option value="mod">Моди</option>
         <option value="resourcepack">Ресурс-паки</option>
         <option value="shader">Шейдери</option>
         <option value="modpack">Модпаки</option>
       </select>
-      <button className="primary" onClick={()=>void search()} disabled={loading}>{loading?"Шукаю...":"Знайти"}</button>
+      <button className="primary" onClick={()=>void search(0)} disabled={loading}>{loading?"Шукаю...":"Знайти"}</button>
     </div>
+    <label className="muted" style={{display:"flex",alignItems:"center",gap:8,marginTop:12}}>
+      <input type="checkbox" checked={onlyCompatible} onChange={e=>setOnlyCompatible(e.target.checked)}/>
+      Показувати лише проєкти для Minecraft {version||"обраної версії"}
+    </label>
+    <p className="muted">Пошук у всьому каталозі Modrinth. Без галочки показуються також проєкти для інших версій, але встановлення потребує сумісного релізу.</p>
     <p className="muted">{instanceId ? `Збірка: ${selectedInstance?.name??"Обрана"} · ${selectedInstance?.loader??"Vanilla"}` : "Спочатку обери окрему збірку для встановлення."} · Minecraft {version||"—"}</p>
     {error&&<div className="error">{error}</div>}
     {message&&<div className="notice"><ShieldCheck size={16}/>{message}</div>}
@@ -99,6 +107,11 @@ export default function ModsPanel({version, instanceId}: {version: string; insta
           ? <button className="secondary" disabled={busy || !selectedInstance || (kind==="mod"&&selectedInstance.loader!=="fabric")} title={kind==="mod"&&selectedInstance?.loader!=="fabric"?"Потрібна Fabric-збірка":"Встановити"} onClick={()=>void install(hit)}>{busy?"...":"Встановити"}</button>
           : <span className="muted">Перегляд</span>}
       </article>)}
+    </div>
+    <div className="toolbar" style={{justifyContent:"space-between",marginTop:12}}>
+      <button className="secondary" disabled={loading||offset===0} onClick={()=>void search(Math.max(0,offset-24))}>← Назад</button>
+      <span className="muted">{hits.length ? `Результати ${offset+1}–${offset+hits.length}` : "Нічого не знайдено. Спробуй прибрати фільтр версії."}</span>
+      <button className="secondary" disabled={loading||hits.length<24||offset>=984} onClick={()=>void search(offset+24)}>Далі →</button>
     </div>
     {!!instanceId&&<div className="installed-mods">
       <div className="panel-heading"><h3>Встановлені моди</h3><button className="icon-button" title="Оновити" onClick={()=>void refreshMods()}><RefreshCw size={16}/></button></div>
