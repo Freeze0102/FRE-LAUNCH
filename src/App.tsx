@@ -130,8 +130,8 @@ export default function App() {
     try{setDiagnostics(await invoke<Diagnostics>("read_diagnostics"));}
     catch(e){setDiagnostics({logPath:"Недоступний файл журналу",contents:"Не вдалося прочитати журнал: "+humanError(e)});}
   }
-  async function refreshVersions() {
-    setLoading(true);setError("");
+  async function refreshVersions(preserveError=false) {
+    setLoading(true);if(!preserveError)setError("");
     try{
       const data=await invoke<Version[]>("get_versions");
       setVersions(data);
@@ -155,7 +155,7 @@ export default function App() {
         }
       }
     }catch{/* Invalid cached state must not stop application startup */}
-    void refreshVersions();
+    void refreshVersions(true);
     void invoke<string>("java_info").then(setJava).catch(e=>setJava("Java в PATH не знайдена: "+humanError(e)));
     const a=listen<Progress>("install-progress",event=>setProgress(event.payload));
     const b=listen<string>("game-log",event=>setLogs(prev=>[...prev.slice(-499),event.payload]));
