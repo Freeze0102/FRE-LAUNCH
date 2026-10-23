@@ -57,6 +57,22 @@ pub async fn search_modrinth(query: String, version: Option<String>, project_typ
     Ok(res.hits)
 }
 
+/// Project details and versions for the catalog detail drawer.
+#[tauri::command]
+pub async fn modrinth_project_details(project_id: String) -> Result<Value, String> {
+    validate_project_id(&project_id)?;
+    let client = http()?;
+    let project: Value = client.get(format!("https://api.modrinth.com/v2/project/{project_id}"))
+        .send().await.map_err(|e|e.to_string())?
+        .error_for_status().map_err(|e|e.to_string())?
+        .json().await.map_err(|e|e.to_string())?;
+    let versions: Vec<Value> = client.get(format!("https://api.modrinth.com/v2/project/{project_id}/version"))
+        .send().await.map_err(|e|e.to_string())?
+        .error_for_status().map_err(|e|e.to_string())?
+        .json().await.map_err(|e|e.to_string())?;
+    Ok(serde_json::json!({"project":project,"versions":versions}))
+}
+
 /// Only install verified Modrinth ZIP resource packs, never execute third-party code.
 #[tauri::command]
 pub async fn install_resourcepack(app: AppHandle, instance_id: String, project_id: String) -> Result<String, String> {
