@@ -174,3 +174,18 @@
 .fabric-options .primary{align-self:flex-start}
 .fabric-options .muted{display:flex;gap:6px;align-items:center}
 [data-theme="light"] .installed-mod-row{border-color:#dadeec}
+
+/* FRE SCREENSHOT GALLERY */
+.screenshot-refresh{display:flex;align-items:center;gap:7px;margin-top:15px}
+.screenshot-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px;margin-top:20px}
+.screenshot-card{display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:#202338;border:1px solid #353a52;border-radius:13px;padding:10px}
+.screenshot-preview{display:grid;place-items:center;width:100%;aspect-ratio:16/9;border:0;background:#101320;border-radius:9px;overflow:hidden;color:#bca5ff}
+.screenshot-preview img{width:100%;height:100%;object-fit:cover}
+.screenshot-meta{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px}
+.screenshot-meta b{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.screenshot-meta small{font-size:10px;color:#989bb7}
+.screenshot-more{display:block;margin:20px auto 0}
+.screenshot-overlay{position:fixed;inset:0;z-index:1000;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#060712ee;padding:30px;gap:12px;color:white}
+.screenshot-overlay img{max-width:92vw;max-height:80vh;object-fit:contain;border-radius:8px}
+.screenshot-overlay-close{position:absolute;right:22px;top:20px;background:#343650;color:white;border:1px solid #767ba3;border-radius:10px;padding:10px;cursor:pointer}
+[data-theme="light"] .screenshot-card{background:#f6f5fd;border-color:#d8dced;color:#30334e}

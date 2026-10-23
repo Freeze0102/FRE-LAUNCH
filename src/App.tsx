@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { motion } from "motion/react";
-import { House, Layers3, Puzzle, UserRound, Shirt, Server, Download, ScrollText, Settings2, Archive, Search, RefreshCw, Play, Coffee, ShieldCheck, Sparkles, ChevronDown, HardDriveDownload, Terminal, CheckCircle2, AlertTriangle, Copy } from "lucide-react";
+import { House, Layers3, Puzzle, UserRound, Shirt, Server, Download, ScrollText, Settings2, Archive, Search, RefreshCw, Play, Coffee, ShieldCheck, Sparkles, ChevronDown, HardDriveDownload, Terminal, CheckCircle2, AlertTriangle, Copy, Camera } from "lucide-react";
 import { create } from "zustand";
 import { InstancesPanel } from "./Features";
 import ModsPanel from "./ModsPanel";
@@ -11,11 +11,12 @@ import BackupsPanel from "./BackupsPanel";
 import AccountsPanel from "./AccountsPanel";
 import JavaPanel from "./JavaPanel";
 import ServersPanel from "./ServersPanel";
+import ScreenshotsPanel from "./ScreenshotsPanel";
 import { persist } from "zustand/middleware";
 
 type Version = { id: string; type: string; url: string; time: string; releaseTime: string };
 type Progress = { stage: string; current: number; total: number; message: string };
-type Page = "Home" | "Versions" | "Instances" | "Mods" | "Skins" | "Accounts" | "Servers" | "Downloads" | "Logs" | "Backups" | "Settings";
+type Page = "Home" | "Versions" | "Instances" | "Mods" | "Skins" | "Accounts" | "Servers" | "Downloads" | "Logs" | "Backups" | "Screenshots" | "Settings";
 type Task = "idle" | "installing" | "launching" | "running";
 type Store = {
   page: Page; setPage: (page: Page) => void;
@@ -45,13 +46,14 @@ const menus = [
   {name: "Downloads", icon: Download, label: "Завантаження"},
   {name: "Logs", icon: ScrollText, label: "Логи"},
   {name: "Backups", icon: Archive, label: "Копії"},
+  {name: "Screenshots", icon: Camera, label: "Скріншоти"},
   {name: "Settings", icon: Settings2, label: "Налаштування"}
 ] as const;
 const labels: Record<Page, string> = {
   Home: "Головна", Versions: "Версії Minecraft", Instances: "Мої збірки",
   Mods: "Моди та модпаки", Skins: "Студія скінів", Accounts: "Акаунти",
   Servers: "Сервери", Downloads: "Завантаження", Logs: "Логи та діагностика",
-  Backups: "Резервні копії", Settings: "Налаштування"
+  Backups: "Резервні копії", Screenshots: "Скріншоти", Settings: "Налаштування"
 };
 const future: Record<string, string> = {
   Instances: "Керування окремими збірками та модлоадерами буде додано після стабілізації запуску.",
@@ -188,6 +190,7 @@ export default function App() {
       {page === "Mods" && <ModsPanel version={selected} instanceId={activeInstanceId}/>}
       {page === "Skins" && <SkinStudio/>}
       {page === "Servers" && <ServersPanel/>}
+      {page === "Screenshots" && <ScreenshotsPanel instanceId={activeInstanceId}/>}
       {page === "Backups" && <BackupsPanel instanceId={activeInstanceId} instanceName={activeInstanceId ? "Вибрана збірка" : ""}/>}
       {page === "Accounts" && <AccountsPanel nickname={nickname} onSelect={setNickname}/>}
       {page === "Settings" && <section className="panel narrow">
