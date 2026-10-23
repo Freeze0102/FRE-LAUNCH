@@ -104,6 +104,12 @@ export default function ModsPanel({version, instanceId}: {version: string; insta
     } catch(err){setError(String(err));}
     finally{setBusy(false);}
   }
+  async function scan(mod:InstalledMod){
+    setBusy(true);setError("");setMessage("");
+    try { setMessage(await invoke<string>("scan_installed_mod",{instanceId,filename:mod.filename})); }
+    catch(err){ setError(String(err)); }
+    finally {setBusy(false);}
+  }
   async function remove(mod:InstalledMod){
     if (!window.confirm(`Видалити мод «${mod.filename}»? Ігрові світи не будуть видалені.`))return;
     setBusy(true);setError("");setMessage("");
@@ -187,12 +193,13 @@ export default function ModsPanel({version, instanceId}: {version: string; insta
       {installed.length===0&&<p className="muted">Немає встановлених модів у цій збірці.</p>}
       {installed.map(mod=><div className="installed-mod-row" key={mod.filename}>
         <div><b>{mod.filename}</b><span>{(mod.bytes/1024/1024).toFixed(1)} MB · {mod.enabled?"Увімкнено":"Вимкнено"}</span></div>
+        <button className="secondary" disabled={busy} onClick={()=>void scan(mod)}><ShieldCheck size={15}/> Перевірити</button>
         <button className="secondary" disabled={busy} onClick={()=>void toggle(mod)}>{mod.enabled?"Вимкнути":"Увімкнути"}</button>
         <button className="icon-button danger" title="Видалити" disabled={busy} onClick={()=>void remove(mod)}><Trash2 size={16}/></button>
       </div>)}
     </div>}
     <div className="notice"><ShieldCheck size={18}/>
-      <span><strong>FRE SAFE DOWNLOAD</strong> · Завантаження тільки з офіційного CDN Modrinth через HTTPS, перевірка SHA-512, розміру, формату JAR та сумісності Minecraft/Fabric. Залежності перевіряються перед встановленням. Це перевірка цілісності, а не антивірус: навіть справжній мод може містити шкідливий код.</span>
+      <span><strong>FRE SAFE DOWNLOAD</strong> · Завантаження тільки з офіційного CDN Modrinth через HTTPS, перевірка SHA-512, розміру, формату JAR та сумісності Minecraft/Fabric. Залежності перевіряються перед встановленням. Це перевірка цілісності, а не антивірус. Для встановлених модів доступна окрема перевірка через Microsoft Defender, якщо він установлений. Жоден сканер не гарантує повної безпеки.</span>
     </div>
     <p className="muted">Не встановлюй випадкові JAR з Google. Якщо мод відсутній у Modrinth, його не можна автоматично підтвердити через цей каталог. Моди — сторонній виконуваний код; перед запуском перевіряй автора й репутацію проєкту.</p>
   </section>;
