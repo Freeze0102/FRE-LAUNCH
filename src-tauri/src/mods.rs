@@ -137,6 +137,11 @@ async fn verified_jar(client: &Client, version: &Value, dir: &Path) -> Result<St
     if received!=expected_size {
         return Err("Mod file size does not match Modrinth metadata".into());
     }
+    // JAR is a ZIP container. Reject mislabeled downloads even if their
+    // metadata appears otherwise consistent; never execute downloaded files.
+    if !bytes.starts_with(b"PK\\x03\\x04") {
+        return Err("Downloaded mod is not a valid JAR/ZIP container".into());
+    }
     if !format!("{:x}",Sha512::digest(&bytes)).eq_ignore_ascii_case(digest){
         return Err("Mod SHA-512 integrity check failed".into());
     }
