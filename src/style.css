@@ -1004,3 +1004,22 @@ html{color-scheme:dark}
 @media(max-width:1270px){.fl-workbench{grid-template-columns:minmax(0,1.25fr) minmax(242px,.85fr)}.fl-game-identity{gap:15px}.fl-game-art{height:118px;min-width:118px;width:118px}.fl-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:960px){.fl-workbench,.fl-bottom-grid{grid-template-columns:1fr}.fl-library-stage{min-height:auto}.fl-game-stage{min-height:280px}}
 @media(max-width:680px){.fl-game-stage{padding:18px}.fl-game-identity{flex-direction:column;align-items:flex-start}.fl-game-art{width:96px;min-width:96px;height:96px}.fl-stat-grid,.fre-files-grid{grid-template-columns:1fr}.fre-file-tile-root{grid-column:auto}.fl-release small{display:none}.fl-library-stage{min-height:0}}
+
+/* Modrinth project browser */
+.fre-mod-detail{margin:20px 0;padding:22px;border:1px solid var(--line,#34394c);border-radius:18px;background:#191e2d}
+.fre-mod-detail-hero{display:flex;gap:20px;align-items:center;margin:22px 0}
+.fre-mod-detail-hero h2{font-size:25px;margin:0 0 8px}
+.fre-mod-detail-hero p{line-height:1.6;margin:0 0 10px}
+.fre-mod-detail-icon{height:88px;width:88px;border-radius:18px;object-fit:cover}
+.fre-mod-detail-layout{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(280px,0.7fr);gap:22px}
+.fre-mod-detail-description,.fre-mod-detail-versions{padding:20px;border-radius:15px;background:#202638;min-width:0}
+.fre-mod-detail-description h3,.fre-mod-detail-versions h3{display:flex;align-items:center;gap:8px;margin:0 0 16px}
+.fre-mod-detail-description p{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.65;max-height:660px;overflow:auto}
+.fre-mod-version-scroll{max-height:360px;overflow:auto;display:grid;gap:7px;margin:15px 0}
+.fre-mod-version{width:100%;text-align:left;display:flex;align-items:center;justify-content:space-between;background:#161b29;color:inherit;border:1px solid #3a4257;border-radius:10px;padding:12px;cursor:pointer}
+.fre-mod-version span{display:grid;gap:5px;min-width:0}.fre-mod-version small{opacity:.75;overflow-wrap:anywhere}
+.fre-mod-version.selected{border-color:#a58afb;background:#30294b}
+.fre-mod-version:disabled{opacity:.45;cursor:not-allowed}
+.fre-mod-open{border:0;padding:0;background:transparent;color:inherit;text-align:left;cursor:pointer}
+.fre-mod-open:hover{text-decoration:underline}
+@media(max-width:900px){.fre-mod-detail-layout{grid-template-columns:1fr}}
