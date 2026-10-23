@@ -1,6 +1,6 @@
 # FRE LAUNCH — development status
 
-## 0.5.0 Alpha / FIELD NOTES
+## 0.5.1 Alpha / NIGHT CONTROL (installation reliability)
 
 ### Implemented in repository
 
