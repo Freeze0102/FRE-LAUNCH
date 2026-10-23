@@ -3,6 +3,7 @@
 ## 0.3.0 Alpha (candidate, CI verification pending)
 
 ### Implemented in repository
+- **FRE SERVER HUB (new):** SQLite server favorites, add/edit/delete, true Minecraft Java TCP status handshake with bounded response, 8-second timeout, ping/players/version/MOTD. SRV DNS lookup and direct-connect launch not yet supported.
 - Tauri 2 / Rust / React / TypeScript desktop project.
 - Windows GitHub Actions with TypeScript, Rust unit tests, icon generation, NSIS installer and portable EXE artifacts.
 - Mojang version manifest discovery for release, snapshots, old alpha and beta.

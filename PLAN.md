@@ -16,7 +16,8 @@
 - [ ] Java runtime download and automatic path selection.
 - [ ] Microsoft OAuth and Minecraft ownership checks.
 - [ ] Fabric/Forge/NeoForge/Quilt and compatible mod installation.
-- [ ] Server manager, updater, complete translations, logging/privacy hardening.
+- [x] Server library and status ping (no SRV DNS or direct-connect yet).
+- [ ] Updater, complete translations, logging/privacy hardening.
 - [ ] Release verified stable installer.
 
 Current policy: never claim runtime verification solely because GitHub Actions builds the executable.
