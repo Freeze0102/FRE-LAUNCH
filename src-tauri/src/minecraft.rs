@@ -3,7 +3,7 @@ use reqwest::Client;
 use serde::Serialize;
 use serde_json::Value;
 use sha1::{Digest, Sha1};
-use std::{collections::HashSet, path::{Path, PathBuf}, process::Stdio, sync::atomic::{AtomicBool, Ordering}, time::Duration};
+use std::{collections::HashSet, path::{Path, PathBuf}, process::Stdio, sync::atomic::{AtomicBool, Ordering}};
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::{fs, io::{AsyncBufReadExt, BufReader}, process::Command};
 use uuid::Uuid;
@@ -28,6 +28,11 @@ pub(super) fn validate_version(id: &str) -> Result<(), String> {
 
 fn root(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(app.path().app_data_dir().map_err(|e| e.to_string())?.join("minecraft"))
+}
+
+fn value_str<'a>(v: &'a Value, key: &str) -> Result<&'a str, String> {
+    v.get(key).and_then(Value::as_str)
+        .ok_or_else(||format!("Missing Minecraft metadata property: {key}"))
 }
 
 fn client() -> Result<Client, String> {
