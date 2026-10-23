@@ -10,14 +10,15 @@ pub const MAX_FILE_BYTES: u64 = 512 * 1024 * 1024;
 const MAX_ATTEMPTS: u32 = 3;
 
 fn retryable_download_error(error: &str) -> bool {
-    error.starts_with("Download failed:") ||
-    error.starts_with("Download stream interrupted:") ||
-    error.starts_with("Downloaded file hash mismatch") ||
-    error.starts_with("HTTP error: 429") ||
-    error.starts_with("HTTP error: 500") ||
-    error.starts_with("HTTP error: 502") ||
-    error.starts_with("HTTP error: 503") ||
-    error.starts_with("HTTP error: 504")
+    if error.starts_with("Download failed:") ||
+       error.starts_with("Download stream interrupted:") ||
+       error.starts_with("Downloaded file hash mismatch") {return true;}
+    // HTTP status is emitted as a bare numeric code below. Avoid brittle
+    // matching against reqwest's human-readable error representation.
+    error.strip_prefix("HTTP error: ")
+        .and_then(|detail| detail.get(..3))
+        .and_then(|code|code.parse::<u16>().ok())
+        .is_some_and(|code|code == 408 || code == 429 || (500..=599).contains(&code))
 }
 
 pub fn trusted_url(url: &str) -> Result<(), String> {
@@ -103,8 +104,12 @@ async fn download_once(
     if let Some(parent) = destination.parent() {
         fs::create_dir_all(parent).await.map_err(|e| e.to_string())?;
     }
-    let response = client.get(url).send().await.map_err(|e| format!("Download failed: {e}"))?
-        .error_for_status().map_err(|e| format!("HTTP error: {e}"))?;
+    let response = client.get(url).send().await.map_err(|e| format!("Download failed: {e}"))?;
+    if !response.status().is_success() {
+        let status=response.status();
+        return Err(format!("HTTP error: {} {}", status.as_u16(),
+            status.canonical_reason().unwrap_or("unknown status")));
+    }
     if let Some(size) = response.content_length() {
         if size > MAX_FILE_BYTES { return Err("Minecraft dependency exceeds file size limit".into()); }
     }
@@ -154,6 +159,8 @@ mod tests {
     #[test]
     fn retry_only_transient_download_errors() {
         assert!(retryable_download_error("HTTP error: 503 Service Unavailable"));
+        assert!(retryable_download_error("HTTP error: 408 Request Timeout"));
+        assert!(retryable_download_error("HTTP error: 520 Unknown Error"));
         assert!(retryable_download_error("Download stream interrupted: timeout"));
         assert!(retryable_download_error("Downloaded file hash mismatch"));
         assert!(!retryable_download_error("HTTP error: 404 Not Found"));
