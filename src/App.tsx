@@ -26,6 +26,18 @@ import ScreenshotsPanel from "./ScreenshotsPanel";
 type Version = { id: string; type: string; url: string; time: string; releaseTime: string };
 type Progress = {stage: string; current: number; total: number; message: string};
 type Diagnostics = {logPath:string; contents:string};
+type LastInstall = {version:string;status:"installing"|"complete"|"error"|"interrupted";message:string;time:string};
+function previousInstall():LastInstall|null {
+  try {
+    const raw=localStorage.getItem(LAST_INSTALL_KEY);
+    if(!raw)return null;
+    const data:unknown=JSON.parse(raw);
+    if(typeof data!=="object"||!data)return null;
+    const saved=data as Partial<LastInstall>;
+    if(typeof saved.version!=="string"||!["installing","complete","error","interrupted"].includes(saved.status??""))return null;
+    return {version:saved.version,status:saved.status as LastInstall["status"],message:typeof saved.message==="string"?saved.message:"",time:typeof saved.time==="string"?saved.time:""};
+  }catch{return null;}
+}
 type InstallPreflight = {path:string; ready:boolean; detail:string};
 type Task = "idle" | "installing" | "launching" | "running";
 type Page = "Home" | "Versions" | "Instances" | "Mods" | "Skins" | "Accounts" |
@@ -91,7 +103,7 @@ const stages:Record<string,string>={
   assets:"РЕСУРСИ",fabric:"FABRIC",quilt:"QUILT",complete:"ГОТОВО"
 };
 const themes=[
-  {id:"midnight",label:"FIELD NOTES",color:"#c9f079"},
+  {id:"midnight",label:"NIGHT CONTROL · ОСНОВНА",color:"#c9f079"},
   {id:"neon",label:"AFTER DARK",color:"#ed9275"},
   {id:"ocean",label:"DEEP WATER",color:"#79d9db"},
   {id:"emerald",label:"WILDERNESS",color:"#98d885"},
@@ -120,6 +132,9 @@ export default function App() {
   const [java,setJava]=useState("Перевірка Java...");
   const [logs,setLogs]=useState<string[]>([]);
   const [diagnostics,setDiagnostics]=useState<Diagnostics|null>(null);
+  const [diagnosticsBusy,setDiagnosticsBusy]=useState(false);
+  const [diagnosticsError,setDiagnosticsError]=useState("");
+  const [lastAttempt,setLastAttempt]=useState<LastInstall|null>(previousInstall);
   const [preflight,setPreflight]=useState<InstallPreflight|null>(null);
   const [lastUiCrash,setLastUiCrash]=useState(()=>{try{return localStorage.getItem(LAST_UI_CRASH)||"";}catch{return "";}});
   const busyRef=useRef(false);
@@ -129,10 +144,17 @@ export default function App() {
   const activeLabel=menus.find(item=>item.name===page)?.index??"01";
 
   useEffect(()=>{document.documentElement.dataset.theme=theme;},[theme]);
-  async function loadDiagnostics() {
-    try{setDiagnostics(await invoke<Diagnostics>("read_diagnostics"));}
-    catch(e){setDiagnostics({logPath:"Недоступний файл журналу",contents:"Не вдалося прочитати журнал: "+humanError(e)});}
+  function markInstall(version:string,status:LastInstall["status"],message="") {
+    rememberInstall(version,status,message);
+    setLastAttempt({version,status,message,time:new Date().toISOString()});
   }
+  async function loadDiagnostics() {
+    setDiagnosticsBusy(true);setDiagnosticsError("");
+    try{setDiagnostics(await invoke<Diagnostics>("read_diagnostics"));}
+    catch(e){setDiagnosticsError(humanError(e));setDiagnostics({logPath:"",contents:""});}
+    finally{setDiagnosticsBusy(false);}
+  }
+  useEffect(()=>{if(page==="Logs")void loadDiagnostics();},[page]);
   async function refreshVersions(preserveError=false) {
     setLoading(true);if(!preserveError)setError("");
     try{
@@ -151,10 +173,7 @@ export default function App() {
         const previous=JSON.parse(text) as {version?:string;status?:string};
         if(previous.status==="installing") {
           const version=previous.version||"невідомої версії";
-          setError(`Попередній сеанс обірвався під час встановлення Minecraft ${version}. Відкрито діагностику: скопіюй журнал для перевірки.`);
-          setPage("Logs");
-          rememberInstall(version,"interrupted","Unexpected process exit during download");
-          void loadDiagnostics();
+          markInstall(version,"interrupted","Попереднє встановлення перервалося. Причина невідома, відкрий діагностику.");
         }
       }
     }catch{/* Invalid cached state must not stop application startup */}
@@ -188,7 +207,7 @@ export default function App() {
     if(!version||busyRef.current)return;
     busyRef.current=true;
     activeVersionRef.current=version;
-    rememberInstall(version,"installing");
+    markInstall(version,"installing");
     setSelected(version);
     setTask("installing");
     setError("");setMessage("");setProgress({stage:"metadata",current:0,total:1,message:"Починаємо встановлення Minecraft..."});
@@ -197,11 +216,11 @@ export default function App() {
       setPreflight(check);
       if(!check.ready)throw new Error("Немає доступу до папки Minecraft: "+check.detail+" ("+check.path+")");
       const result=await invoke<string>("install_version",{version});
-      rememberInstall(version,"complete",result);
+      markInstall(version,"complete",result);
       setMessage(result);
       if(useApp.getState().selected===version)setInstalled(true);
     }catch(e){
-      rememberInstall(version,"error",humanError(e));
+      markInstall(version,"error",humanError(e));
       setError(humanError(e));
       setPage("Downloads");
       void loadDiagnostics();
@@ -254,9 +273,8 @@ export default function App() {
         </button>)}
       </nav>
       <div className="fre-rail-foot">
-        <span className="fre-status-live"><i/> СИСТЕМА ONLINE</span>
-        <strong>ALPHA / 0.5</strong>
-        <small>НЕОФІЦІЙНИЙ MINECRAFT LAUNCHER</small>
+        <span className="fre-status-live"><i/> FRE LAUNCH / JAVA</span>
+        <div className="fre-build-status"><strong>0.5 <span>ALPHA</span></strong><small>ТЕСТОВА ВЕРСІЯ</small></div>
       </div>
     </aside>
     <div className="fre-workspace">
@@ -278,7 +296,7 @@ export default function App() {
             {page!=="Home"&&<button className="fre-return" onClick={()=>setPage("Home")}><House size={16}/> ПУНКТ ЗАПУСКУ <ArrowRight size={15}/></button>}
           </div>
         </div>
-        {error&&<div className="fre-alert" role="alert"><AlertTriangle size={20}/><div><strong>ПОМИЛКА ОПЕРАЦІЇ</strong><p>{error}</p></div><button onClick={()=>{setPage("Logs");void loadDiagnostics();}}>ДІАГНОСТИКА <ArrowRight size={15}/></button><button className="fre-alert-close" onClick={()=>setError("")} title="Закрити"><X size={18}/></button></div>}
+        {error&&<div className="fre-incident" role="alert"><AlertTriangle size={16}/><span title={error}>{error}</span><button onClick={()=>setPage("Logs")}><Terminal size={14}/> ЖУРНАЛ <ArrowRight size={13}/></button><button onClick={()=>setError("")} title="Приховати повідомлення" aria-label="Приховати повідомлення"><X size={16}/></button></div>}
         {message&&<div className="fre-flash" role="status"><Check size={17}/><span>{message}</span><button onClick={()=>setMessage("")} title="Закрити"><X size={16}/></button></div>}
 
         {page==="Home"&&<>
@@ -367,22 +385,53 @@ export default function App() {
           onLogs={()=>{void loadDiagnostics();setPage("Logs");}}
         />}
 
-        {page==="Logs"&&<section className="fre-diag-sheet">
-          <div className="fre-module-label"><span>CRASH REPORT / LOCAL ONLY</span><ShieldCheck size={19}/></div>
-          <h2>ЖУРНАЛ ЗАПУСКУ.</h2><p>Тут можна знайти помилку, навіть якщо встановлення зупинилося. Журнал зберігається лише на комп'ютері.</p>
-          <div className="fre-log-toolbar"><button onClick={()=>void loadDiagnostics()}><RefreshCw size={16}/> ЧИТАТИ ЖУРНАЛ</button>
-            <button disabled={!diagnostics?.contents} onClick={()=>void copyText(diagnostics?.contents??"")}><Copy size={16}/> КОПІЮВАТИ ПОМИЛКИ</button>
-            <button disabled={!logs.length} onClick={()=>void copyText(logs.join("\n"))}><Copy size={16}/> КОПІЮВАТИ ЛОГ ГРИ</button>
-            <button onClick={()=>setLogs([])}><X size={16}/> ОЧИСТИТИ ЕКРАН</button></div>
-          {diagnostics&&<div className="fre-diagnostic-location"><FolderOpen size={16}/><span>{diagnostics.logPath}</span></div>}
-          <div className="fre-log-label">FRE / INSTALL DIAGNOSTICS</div>
-          <pre className="fre-log-output">{diagnostics?.contents||"Натисни «Читати журнал», щоб показати історію встановлень."}</pre>
-          <div className="fre-log-label">INTERFACE / LAST JS FAILURE</div>
-          <pre className="fre-log-output">{lastUiCrash||"Інтерфейс не зберіг повідомлень про попередні JavaScript-помилки."}</pre>
-          {lastUiCrash&&<div className="fre-log-toolbar"><button onClick={()=>void copyText(lastUiCrash)}><Copy size={16}/> КОПІЮВАТИ ЗБІЙ UI</button><button onClick={()=>{try{localStorage.removeItem(LAST_UI_CRASH)}catch{}setLastUiCrash("");}}><X size={16}/> ОЧИСТИТИ ЗБЕРЕЖЕНУ ПОМИЛКУ</button></div>}
-          <div className="fre-log-label">MINECRAFT / LIVE OUTPUT</div>
-          <pre className="fre-log-output">{logs.length?logs.join("\n"):"Minecraft ще не надсилав повідомлень."}</pre>
-          <p>Якщо програма закрилася під час встановлення, після повторного запуску відкрий цю сторінку та скопіюй журнал.</p>
+
+        {page==="Logs"&&<section className="fre-diag-sheet fre-diagnostics">
+          <div className="fre-module-label"><span>FRE / DIAGNOSTICS · LOCAL ONLY</span><ShieldCheck size={19}/></div>
+          <div className="fre-diag-header"><div><h2>СИСТЕМНИЙ ЖУРНАЛ.</h2><p>Остання спроба та повідомлення про збої зберігаються локально. Дані не надсилаються нікуди.</p></div><span className="fre-diag-index">D / 01</span></div>
+          <div className="fre-diag-overview">
+            <div className="fre-diag-metric">
+              <span>ОСТАННЯ СПРОБА</span>
+              <strong>{lastAttempt ? lastAttempt.status==="complete"?"ГОТОВО":lastAttempt.status==="interrupted"?"ПЕРЕРВАНО":lastAttempt.status==="error"?"ПОМИЛКА":"В ПРОЦЕСІ":"НЕМАЄ"}</strong>
+              <small>{lastAttempt ? "Minecraft "+lastAttempt.version : "Встановлень ще не записано"}</small>
+            </div>
+            <div className="fre-diag-metric">
+              <span>ЧАС ОСТАННЬОЇ СПРОБИ</span>
+              <strong className="fre-diag-metric-small">{lastAttempt?.time&&!Number.isNaN(Date.parse(lastAttempt.time))?new Date(lastAttempt.time).toLocaleString("uk-UA"):"—"}</strong>
+              <small>{lastAttempt?.message||"Дані про спробу з'являться після встановлення"}</small>
+            </div>
+            <div className="fre-diag-metric">
+              <span>JAVA / RUNTIME</span>
+              <strong className="fre-diag-metric-small">{java.startsWith("Java в PATH")?"НЕ ЗНАЙДЕНА":"ПЕРЕВІРЕНО"}</strong>
+              <small title={java}>{java}</small>
+            </div>
+          </div>
+          <div className="fre-log-toolbar">
+            <button disabled={diagnosticsBusy} onClick={()=>void loadDiagnostics()}><RefreshCw size={16}/> {diagnosticsBusy?"ЧИТАЄМО...":"ОНОВИТИ ЖУРНАЛ"}</button>
+            <button onClick={()=>void copyText([
+              "FRE LAUNCH / 0.5 ALPHA",
+              "Last attempt: "+(lastAttempt?JSON.stringify(lastAttempt):"none"),
+              "Java: "+java,
+              "Log path: "+(diagnostics?.logPath||"unknown"),
+              "Install diagnostics:", diagnostics?.contents||"(no native records)",
+              "UI error:", lastUiCrash||"(none)",
+              "Game output:", logs.length?logs.join("\n"):"(none)"
+            ].join("\n"))}><Copy size={16}/> КОПІЮВАТИ ЗВІТ</button>
+            <button disabled={!logs.length} onClick={()=>void copyText(logs.join("\n"))}><Copy size={16}/> ЛОГ ГРИ</button>
+          </div>
+          {diagnosticsError&&<div className="fre-diag-warning"><AlertTriangle size={16}/> Не вдалося прочитати файл журналу: {diagnosticsError}</div>}
+          {diagnostics?.logPath&&<div className="fre-diagnostic-location"><FolderOpen size={16}/><span>{diagnostics.logPath}</span></div>}
+          <div className="fre-log-label">01 / MINECRAFT INSTALL ENGINE</div>
+          {diagnosticsBusy&&!diagnostics?<div className="fre-log-placeholder">Читаємо локальний журнал встановлення...</div>:
+            diagnostics?.contents?.trim()?
+            <pre className="fre-log-output">{diagnostics.contents}</pre>:
+            <div className="fre-log-placeholder"><Terminal size={23}/><strong>У ФАЙЛІ ПОКИ НЕМАЄ ЗАПИСІВ</strong><p>Якщо лаунчер закрився до запуску Rust-команди, системний журнал міг не встигнути створитися. Час і статус спроби показано вище — їх зберігає інтерфейс.</p><button onClick={()=>void loadDiagnostics()}>ПЕРЕВІРИТИ ЩЕ РАЗ <RefreshCw size={14}/></button></div>}
+          <div className="fre-log-label">02 / INTERFACE · LAST FAILURE</div>
+          {lastUiCrash?<><pre className="fre-log-output">{lastUiCrash}</pre><div className="fre-log-toolbar"><button onClick={()=>void copyText(lastUiCrash)}><Copy size={16}/> КОПІЮВАТИ ПОМИЛКУ</button><button onClick={()=>{try{localStorage.removeItem(LAST_UI_CRASH)}catch{}setLastUiCrash("");}}><X size={16}/> ПРИБРАТИ ЗАПИС</button></div></>:
+          <div className="fre-log-mini-empty">Помилок інтерфейсу поки не зафіксовано.</div>}
+          <div className="fre-log-label">03 / GAME CONSOLE · LIVE OUTPUT</div>
+          {logs.length?<pre className="fre-log-output">{logs.join("\n")}</pre>:
+          <div className="fre-log-mini-empty">Гра ще не надсилала повідомлень у цьому сеансі.</div>}
         </section>}
 
         <footer className="fre-footer"><span>FRE LAUNCH © ALPHA 0.5</span><span>YOUR MINECRAFT / YOUR RULES</span><button onClick={()=>{setShowMore(v=>!v);}}>ПРО ПРОЄКТ <CircleHelp size={14}/></button></footer>
