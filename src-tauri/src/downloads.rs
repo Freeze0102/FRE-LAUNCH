@@ -17,7 +17,8 @@ pub fn trusted_url(url: &str) -> Result<(), String> {
         "resources.download.minecraft.net" | "libraries.minecraft.net" |
         "launcher.mojang.com" | "launchermeta.mojang.com" |
         "meta.mojang.com" | "s3.amazonaws.com" |
-        "maven.fabricmc.net" | "meta.fabricmc.net") {
+        "maven.fabricmc.net" | "meta.fabricmc.net" |
+        "meta.quiltmc.org" | "maven.quiltmc.org") {
         return Err(format!("Untrusted Minecraft download domain: {host}"));
     }
     Ok(())
@@ -123,6 +124,9 @@ mod tests {
     fn trusted_host_is_exact() {
         assert!(trusted_url("https://piston-data.mojang.com/v1/objects/foo").is_ok());
         assert!(trusted_url("https://maven.fabricmc.net/net/fabricmc/foo.jar").is_ok());
+        assert!(trusted_url("https://meta.quiltmc.org/v3/versions/loader").is_ok());
+        assert!(trusted_url("https://maven.quiltmc.org/repository/release/org/quiltmc/loader.jar").is_ok());
+        assert!(trusted_url("https://maven.quiltmc.org.attacker.test/").is_err());
         assert!(trusted_url("http://piston-data.mojang.com/client.jar").is_err());
         assert!(trusted_url("https://piston-data.mojang.com.evil.test/").is_err());
         assert!(trusted_url("https://evil.test/?host=libraries.minecraft.net").is_err());
