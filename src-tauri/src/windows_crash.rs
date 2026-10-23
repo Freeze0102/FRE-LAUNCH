@@ -29,8 +29,15 @@ fn decode_report(bytes: &[u8]) -> String {
     }
 }
 
+// Scanning Windows WER directories can touch many files. Run outside
+// the WebView2/Tauri UI event thread so opening diagnostics never stalls it.
 #[tauri::command]
-pub fn read_windows_crash_report() -> Result<String, String> {
+pub async fn read_windows_crash_report() -> Result<String, String> {
+    tokio::task::spawn_blocking(read_report_file)
+        .await.map_err(|e|format!("WER scan task interrupted: {e}"))?
+}
+
+fn read_report_file() -> Result<String, String> {
     #[cfg(not(windows))]
     {Ok(String::new())}
 
