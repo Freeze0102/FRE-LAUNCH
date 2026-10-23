@@ -22,7 +22,14 @@ const MANIFEST: &str = "https://piston-meta.mojang.com/mc/game/version_manifest_
 struct Progress { stage: String, current: usize, total: usize, message: String }
 
 fn progress(app: &AppHandle, stage: &str, current: usize, total: usize, message: impl Into<String>) {
-    let _ = app.emit("install-progress", Progress { stage: stage.into(), current, total, message: message.into() });
+    let message = message.into();
+    // Keep a durable breadcrumb trail when Windows unexpectedly terminates downloads.
+    // Asset events can be frequent, so log only meaningful milestones.
+    if stage != "assets" || current == 0 || current == total || current % 250 == 0 {
+        super::diagnostics::write(app, "INSTALL_STAGE",
+            &format!("{stage} {current}/{total}: {message}"));
+    }
+    let _ = app.emit("install-progress", Progress { stage: stage.into(), current, total, message });
 }
 
 pub(super) fn validate_version(id: &str) -> Result<(), String> {
