@@ -12,6 +12,7 @@ import {
   Wrench, X, Zap, Archive, ScrollText
 } from "lucide-react";
 import WorldArt from "./WorldArt";
+import InstallDeck, {type Preflight} from "./InstallDeck";
 import { LAST_UI_CRASH } from "./ErrorBoundary";
 import { InstancesPanel } from "./Features";
 import ModsPanel from "./ModsPanel";
@@ -118,6 +119,7 @@ export default function App() {
   const [java,setJava]=useState("Перевірка Java...");
   const [logs,setLogs]=useState<string[]>([]);
   const [diagnostics,setDiagnostics]=useState<Diagnostics|null>(null);
+  const [preflight,setPreflight]=useState<Preflight|null>(null);
   const [lastUiCrash,setLastUiCrash]=useState(()=>{try{return localStorage.getItem(LAST_UI_CRASH)||"";}catch{return "";}});
   const busyRef=useRef(false);
   const activeVersionRef=useRef("");
@@ -129,6 +131,17 @@ export default function App() {
   async function loadDiagnostics() {
     try{setDiagnostics(await invoke<Diagnostics>("read_diagnostics"));}
     catch(e){setDiagnostics({logPath:"Недоступний файл журналу",contents:"Не вдалося прочитати журнал: "+humanError(e)});}
+  }
+  async function checkDisk() {
+    try {
+      const result=await invoke<Preflight>("install_preflight");
+      setPreflight(result);
+      return result;
+    } catch(e) {
+      const fail:Preflight={path:"Невідомий каталог",ready:false,detail:humanError(e)};
+      setPreflight(fail);
+      return fail;
+    }
   }
   async function refreshVersions(preserveError=false) {
     setLoading(true);if(!preserveError)setError("");
@@ -155,6 +168,7 @@ export default function App() {
         }
       }
     }catch{/* Invalid cached state must not stop application startup */}
+    void checkDisk();
     void refreshVersions(true);
     void invoke<string>("java_info").then(setJava).catch(e=>setJava("Java в PATH не знайдена: "+humanError(e)));
     const a=listen<Progress>("install-progress",event=>setProgress(event.payload));
@@ -184,11 +198,13 @@ export default function App() {
     if(!version||busyRef.current)return;
     busyRef.current=true;
     activeVersionRef.current=version;
-    rememberInstall(version,"installing");
     setSelected(version);
     setTask("installing");
     setError("");setMessage("");setProgress({stage:"metadata",current:0,total:1,message:"Починаємо встановлення Minecraft..."});
     try{
+      const check=await checkDisk();
+      if(!check.ready)throw Error("Диск недоступний: "+check.detail+". Каталог: "+check.path);
+      rememberInstall(version,"installing");
       const result=await invoke<string>("install_version",{version});
       rememberInstall(version,"complete",result);
       setMessage(result);
@@ -350,13 +366,14 @@ export default function App() {
           <section className="fre-control-paper"><div className="fre-module-label"><span>03 / JAVA</span><Coffee size={18}/></div><JavaPanel instanceId={activeInstanceId}/></section>
         </div>}
 
-        {page==="Downloads"&&<section className="fre-diag-sheet">
-          <div className="fre-module-label"><span>INSTALL MONITOR / LIVE</span><MonitorDot size={19}/></div>
-          <h2>{task==="installing"?"ЙДЕ ВСТАНОВЛЕННЯ":"МОНІТОР ЗАВАНТАЖЕНЬ"}</h2>
-          {progress?<><p>{progress.message}</p><div className="fre-diag-progress"><div style={{width:percent+"%"}}/></div>
-          <div className="fre-diag-stats"><span>ЕТАП: {stages[progress.stage]??progress.stage.toUpperCase()}</span><strong>{progress.current} / {progress.total}</strong><b>{percent}%</b></div></>:<p>Немає активних завантажень. Обери версію Minecraft, щоб встановити її.</p>}
-          <button className="fre-inline-btn" onClick={()=>{void loadDiagnostics();setPage("Logs");}}><Terminal size={17}/> ДІАГНОСТИКА <ArrowRight size={16}/></button>
-        </section>}
+        {page==="Downloads"&&<InstallDeck
+          version={selected}
+          progress={progress}
+          preflight={preflight}
+          isInstalling={task==="installing"}
+          onCheck={()=>{void checkDisk();}}
+          onLogs={()=>{void loadDiagnostics();setPage("Logs");}}
+        />}
 
         {page==="Logs"&&<section className="fre-diag-sheet">
           <div className="fre-module-label"><span>CRASH REPORT / LOCAL ONLY</span><ShieldCheck size={19}/></div>
