@@ -159,7 +159,7 @@ export default function App() {
       <div className="nav">
         {menus.map(({name, icon: Icon, label}) => <button key={name} className={"nav-item " + (page === name ? "active" : "")} onClick={() => setPage(name)}><Icon size={19}/><span>{label}</span></button>)}
       </div>
-      <div className="side-bottom"><div className="status-dot"/> Версія 0.3.0 · Alpha</div>
+      <div className="side-bottom"><div className="status-dot"/> Версія 0.4.0 · Alpha</div>
     </aside>
     <main className="main">
       <header className="top"><div><div className="eyebrow">FRE LAUNCH / {page.toUpperCase()}</div><h1>{labels[page]}</h1></div><button className="user-pill" onClick={() => setPage("Accounts")}><div className="avatar">{nickname[0]?.toUpperCase() || "P"}</div><div><b>{nickname}</b><small>Offline profile</small></div><ChevronDown size={16}/></button></header>

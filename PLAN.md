@@ -1,22 +1,23 @@
-# FRE LAUNCH development roadmap
+# FRE LAUNCH technical roadmap
 
-- [x] Base Tauri/React/Rust UI and GitHub Windows installer.
-- [x] Official Minecraft version discovery.
-- [x] Vanilla client/library/resource installer and preliminary offline launch engine.
-- [x] Live logs, real progress and SHA-1 verification.
-- [x] SQLite database for separated instances, preferences and per-instance Java/RAM.
-- [x] Verified resource pack installation and Modrinth discovery.
-- [x] Interactive skin preview and imported PNG capes.
-- [x] Persistent UI color themes.
-- [x] SQLite offline account manager with multiple local nicknames.
-- [x] ZIP world backups with non-overwriting restoration.
-- [x] Discover installed Java runtimes and configure each instance.
-- [ ] Verify Windows 0.3.0 CI with tests; fix all failures.
-- [ ] Verify actual game launch on a Windows PC and cover older versions.
-- [ ] Java runtime download and automatic path selection.
-- [ ] Microsoft OAuth and Minecraft ownership checks.
-- [ ] Fabric/Forge/NeoForge/Quilt and compatible mod installation.
-- [ ] Server manager, updater, complete translations, logging/privacy hardening.
-- [ ] Release verified stable installer.
+## Implemented in code (runtime verification still required)
+- [x] Desktop Tauri + Rust + React application, GitHub Windows installer.
+- [x] Mojang version discovery, vanilla download/install core with SHA-1.
+- [x] Streamed, bounded verified downloads and restricted HTTPS redirects.
+- [x] Per-instance isolated natives, libraries and Java selection.
+- [x] Windows x64 verified Temurin JRE download.
+- [x] SQLite instances with per-instance RAM and Fabric Loader settings.
+- [x] Official Fabric Meta loader selection and Maven dependency installation.
+- [x] Modrinth Fabric mod installation, required dependencies, SHA-512 and enable/disable/remove.
+- [x] Server list with live Minecraft protocol status checks.
+- [x] Local offline accounts, skin preview/editor, themes, world backups.
+- [x] Legacy virtual asset directories for selected historical versions.
 
-Current policy: never claim runtime verification solely because GitHub Actions builds the executable.
+## Still to build or verify
+- [ ] Confirm 0.4 Windows CI fully passes and merge stable changes.
+- [ ] Test actual offline-compatible vanilla and Fabric gameplay on Windows.
+- [ ] Microsoft OAuth with entitlement verification and safe credential vault.
+- [ ] Forge, NeoForge and Quilt.
+- [ ] Production-grade rollback, resumable downloads and full repair flows.
+- [ ] Update service, full localization, settings import/export and crash telemetry opt-in.
+- [ ] Extensive security and accessibility review; stable release.
