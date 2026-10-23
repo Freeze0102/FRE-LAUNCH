@@ -1,4 +1,5 @@
 mod minecraft;
+mod downloads;
 mod instances;
 mod modrinth;
 mod backups;
