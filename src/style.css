@@ -1124,3 +1124,35 @@ input:focus-visible,button:focus-visible,select:focus-visible,textarea:focus-vis
 @media(prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
 }
+
+/* Modrinth-inspired content manager: compact discover/library navigation. */
+.fre-content-tabs{
+  display:flex;gap:5px;align-items:center;flex-wrap:wrap;
+  padding:5px;margin:18px 0 20px;background:#141b18;
+  border:1px solid #324138;border-radius:13px;
+}
+.fre-content-tabs button{
+  flex:1;min-width:150px;padding:12px 16px;
+  border:1px solid transparent;border-radius:9px;background:transparent;
+  color:#abbdb0;font-weight:700;text-align:center;
+}
+.fre-content-tabs button:hover{color:#effff0;background:#24372a}
+.fre-content-tabs button.active{
+  background:#2b4634;border-color:#518462;color:#b7ffc2;
+  box-shadow:inset 0 1px 0 #ffffff13;
+}
+.fre-content-tabs button:focus-visible{outline:2px solid #76e996;outline-offset:2px}
+.fre-mod-detail-versions .fre-mod-version-scroll{scrollbar-color:#61796a #1b2720}
+.installed-mods{margin-top:20px}
+.installed-mods .panel-heading{margin-bottom:14px}
+@media(max-width:900px){
+  .panel>.toolbar{flex-wrap:wrap}
+  .panel>.toolbar>.search{flex-basis:100%;min-width:0}
+  .panel>.toolbar>select{flex:1;min-width:140px}
+  .panel>.toolbar>.primary{justify-content:center}
+  .installed-mod-row{flex-wrap:wrap;gap:10px}
+  .installed-mod-row>div:first-child{flex:1 1 100%;min-width:0}
+}
+@media(prefers-reduced-motion:no-preference){
+  .fre-content-tabs button{transition:background-color .18s ease,color .18s ease,border-color .18s ease}
+}
