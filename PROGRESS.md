@@ -96,3 +96,9 @@
 - Increase the Windows executable main-thread stack reserve to 8 MiB using a Cargo build-script linker argument. Virtual reservation does not mean 8 MiB of immediately committed memory. Add a PE-header CI assertion and retain the 12-second normal/recovery-mode startup checks.
 - This is a hypothesis-driven crash fix to validate on the Windows runner; do not claim the crash is resolved until runtime smoke tests pass.
 - Version 0.5.6 builds remain subject to Microsoft Defender antivirus checks, and the published-release / downloadable-artifact approval gate remains closed because v0.5.5 administrator installer was detected as Trojan:Win32/Bearfoos.B!ml on a user PC. **Passing Defender scan on one CI runner is not sufficient to declare this incident resolved.**
+
+## 0.5.6 / Private security-review build artifact
+
+- Full Windows CI run `39999387669` passed Rust, TypeScript, React, npm audit, executable PE /STACK reserve check, Microsoft Defender custom scans for current-user/administrator installer and executable, Windows NSIS installation, and normal+recovery 12-second startup. This resolves the previously reproduced startup crash **on the CI runner only**, not necessarily every user PC.
+- CI Artifacts were missing because `FRE_LAUNCH_SECURITY_APPROVED` intentionally blocked uploads and public Release publishing; no build error occurred.
+- GitHub Actions now packages private review-only v0.5.6 binaries, SHA256SUMS and an explicit risk warning after all executable and Defender CI checks. No public release or auto-update publication until security approval. v0.5.5 stays quarantined as a private draft.

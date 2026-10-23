@@ -327,27 +327,55 @@ jobs:
             throw 'Defender recorded a malware detection: installers must not be published.'
           }
           Write-Host 'Defender scan passed; no detections reported on this runner'
-      - name: Upload non-admin Windows installer
-        if: vars.FRE_LAUNCH_SECURITY_APPROVED == 'true'
+      # CI artifacts remain private to the source repository and are offered
+      # for investigation ONLY. This is not a release or an installation approval.
+      # Both installers and the portable EXE passed Defender on the runner above.
+      - name: Stage Windows binaries for independent security review
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = (Get-Content 'src-tauri/tauri.conf.json' -Raw | ConvertFrom-Json).version
+          if ($version -ne '0.5.6') {
+            throw "This security-review workflow is pinned to v0.5.6, not $version. Reassess before changing versions."
+          }
+          $root = 'src-tauri/target/release/security-review'
+          New-Item -Path $root -ItemType Directory -Force | Out-Null
+          $files = @(
+            @('src-tauri/target/release/bundle/nsis/current-user/FRE-LAUNCH-CurrentUser-Setup.exe', 'FRE-LAUNCH-CurrentUser-Setup.exe'),
+            @('src-tauri/target/release/bundle/nsis/administrator/FRE-LAUNCH-Administrator-Setup.exe', 'FRE-LAUNCH-Administrator-Setup.exe'),
+            @('src-tauri/target/release/fre-launch.exe', 'fre-launch.exe')
+          )
+          $hashes = @()
+          foreach ($pair in $files) {
+            if (!(Test-Path $pair[0])) { throw "Missing reviewed binary: $($pair[0])" }
+            $destination = Join-Path $root $pair[1]
+            Copy-Item -LiteralPath $pair[0] -Destination $destination -Force
+            $hash = (Get-FileHash -LiteralPath $destination -Algorithm SHA256).Hash.ToLowerInvariant()
+            $hashes += "$hash  $($pair[1])"
+            Write-Host "Review-only SHA256: $($pair[1]) = $hash"
+          }
+          $hashes | Set-Content -LiteralPath (Join-Path $root 'SHA256SUMS.txt') -Encoding ascii
+          Copy-Item -LiteralPath 'SECURITY_NOTICE.md' -Destination (Join-Path $root 'SECURITY_NOTICE.md')
+          $warning = @(
+            'SECURITY REVIEW ONLY — NOT CLEARED FOR INSTALLATION',
+            'FRE LAUNCH v0.5.6, Windows x64.',
+            'These binaries were built and checked with Microsoft Defender on the GitHub Actions runner.',
+            'This does not establish that they are malware-free.',
+            'The v0.5.5 administrator installer triggered Trojan:Win32/Bearfoos.B!ml on a user computer.',
+            'DO NOT RUN OR INSTALL until the original detection and these binaries have independent review.',
+            'Do not disable or bypass Windows Defender.',
+            'See SHA256SUMS.txt and SECURITY_NOTICE.md. Public releases remain manually gated.'
+          )
+          $warning | Set-Content -LiteralPath (Join-Path $root 'READ_BEFORE_USING.txt') -Encoding utf8
+      - name: Upload v0.5.6 binaries for security review only
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@v6
         with:
-          name: FRE-LAUNCH-Windows-Installer
-          path: src-tauri/target/release/bundle/nsis/current-user/*.exe
+          name: FRE-LAUNCH-0.5.6-SECURITY-REVIEW-ONLY
+          path: src-tauri/target/release/security-review/
           if-no-files-found: error
-      - name: Upload administrator Windows installer
-        if: vars.FRE_LAUNCH_SECURITY_APPROVED == 'true'
-        uses: actions/upload-artifact@v6
-        with:
-          name: FRE-LAUNCH-Windows-Admin-Installer
-          path: src-tauri/target/release/bundle/nsis/administrator/*.exe
-          if-no-files-found: error
-      - name: Upload portable Windows executable
-        if: vars.FRE_LAUNCH_SECURITY_APPROVED == 'true'
-        uses: actions/upload-artifact@v6
-        with:
-          name: FRE-LAUNCH-Windows-Portable
-          path: src-tauri/target/release/fre-launch.exe
-          if-no-files-found: warn
+          retention-days: 7
       - name: Publish versioned Windows release for in-app updates
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.FRE_LAUNCH_SECURITY_APPROVED == 'true' && !cancelled()
         shell: pwsh

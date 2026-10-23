@@ -18,7 +18,7 @@ If you have executed the installer:
 - A dedicated job attempts to mark the flagged v0.5.5 release as **draft** so it is not available through normal releases.
 - Windows CI now requires an active Microsoft Defender engine. It updates definitions and scans the launcher executable, non-admin installer and admin installer; any detection blocks the build.
 - Production npm dependencies are audited for known high/critical vulnerabilities.
-- Installer artifacts and new releases are withheld unless the GitHub Actions variable `FRE_LAUNCH_SECURITY_APPROVED` has deliberately been set to `true` **after** incident review. This variable alone does not guarantee safety; an antivirus scan, binary provenance and publisher authentication are all separate checks.
+- Public installer releases are withheld unless the GitHub Actions variable `FRE_LAUNCH_SECURITY_APPROVED` has deliberately been set to `true` **after** incident review. A private GitHub Actions artifact named `FRE-LAUNCH-0.5.6-SECURITY-REVIEW-ONLY` may contain the runner-scanned v0.5.6 binaries together with SHA256 checksums, **for independent security analysis only and not for installation**. This variable alone does not guarantee safety; an antivirus scan, binary provenance and publisher authentication are all separate checks.
 - Code signing and independent external AV verification are still **not implemented**; therefore these builds are **not attested to be free of malware**.
 
 ### Verify the exact file
@@ -35,3 +35,9 @@ The publisher can submit the original trusted-source build for Microsoft's suspe
 - Root cause of the Defender alert: **not determined**.
 - v0.5.5: **security hold — not approved for installation**.
 - A new reviewed build must have a **new version and new SHA-256**; do not silently replace old assets.
+
+### v0.5.6 development status
+
+- Windows CI run `39999387669` completed successfully: compiled the executable, checked an 8 MiB Windows main-thread stack reserve, tested installation plus 12-second normal and recovery startup, and scanned both installer flavors with Microsoft Defender.
+- Its installer artifacts were absent only because all uploads were explicitly gated by the security-approval variable. A new CI artifact is restricted to the **private** GitHub source repository, clearly labelled `SECURITY-REVIEW-ONLY`, and includes SHA-256 hashes and warning text. **This is not clearance to install it**.
+- Public GitHub Release publication is still blocked. Do not change `FRE_LAUNCH_SECURITY_APPROVED` until the incident has been investigated and a distribution decision is documented.
