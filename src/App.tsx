@@ -9,6 +9,7 @@ import SkinStudio from "./SkinStudio";
 import BackupsPanel from "./BackupsPanel";
 import AccountsPanel from "./AccountsPanel";
 import JavaPanel from "./JavaPanel";
+import ServersPanel from "./ServersPanel";
 import { persist } from "zustand/middleware";
 
 type Version = { id: string; type: string; url: string; time: string; releaseTime: string };
@@ -185,6 +186,7 @@ export default function App() {
       {page === "Instances" && <InstancesPanel version={selected} active={activeInstanceId} setActive={setActiveInstanceId} setVersion={setSelected} setMemory={setMemoryMb} navigateHome={() => setPage("Home")}/>}
       {page === "Mods" && <ModsPanel version={selected} instanceId={activeInstanceId}/>}
       {page === "Skins" && <SkinStudio/>}
+      {page === "Servers" && <ServersPanel/>}
       {page === "Backups" && <BackupsPanel instanceId={activeInstanceId} instanceName={activeInstanceId ? "Вибрана збірка" : ""}/>}
       {page === "Accounts" && <AccountsPanel nickname={nickname} onSelect={setNickname}/>}
       {page === "Settings" && <section className="panel narrow">
@@ -208,7 +210,7 @@ export default function App() {
       </section>}
       {page === "Downloads" && <section className="panel narrow"><div className="panel-heading"><h3>Стан встановлення</h3><Download size={19}/></div>{progress ? <><p>{progress.message}</p><p>{progress.stage}: {progress.current}/{progress.total}</p></> : <p>Наразі немає активних завантажень.</p>}</section>}
       {page === "Logs" && <section className="panel"><div className="panel-heading"><h3>Журнал Minecraft</h3><Terminal size={19}/></div><div className="toolbar"><button className="secondary" disabled={!logs.length} onClick={() => void navigator.clipboard.writeText(logs.join("\n"))}><Copy size={15}/> Копіювати логи</button><button className="secondary" onClick={() => setLogs([])}>Очистити</button></div><pre className="log-view">{logs.length ? logs.join("\n") : "Логи з’являться тут після запуску Minecraft."}</pre></section>}
-      {page in future && !["Instances","Mods","Skins","Backups"].includes(page) && <section className="panel empty"><ShieldCheck size={38}/><h3>Модуль у розробці</h3><p>{future[page]}</p><button className="secondary" onClick={() => setPage("Home")}>На головну</button></section>}
+      {page in future && !["Instances","Mods","Skins","Backups","Servers"].includes(page) && <section className="panel empty"><ShieldCheck size={38}/><h3>Модуль у розробці</h3><p>{future[page]}</p><button className="secondary" onClick={() => setPage("Home")}>На головну</button></section>}
       <footer>FRE LAUNCH <span>•</span> Your Minecraft. Your Rules. <span>•</span> Alpha build</footer>
     </main>
   </div>;

@@ -127,3 +127,16 @@
 .skin-edit-toolbar input{width:42px;height:34px;cursor:pointer;background:none;border:0;padding:0}
 .pixel-canvas{display:block;width:min(100%,500px);height:auto;max-height:500px;object-fit:contain;image-rendering:pixelated;image-rendering:crisp-edges;background-color:#24263c;background-image:linear-gradient(45deg,#32354e 25%,transparent 25%),linear-gradient(-45deg,#32354e 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#32354e 75%),linear-gradient(-45deg,transparent 75%,#32354e 75%);background-size:18px 18px;background-position:0 0,0 9px,9px -9px,-9px 0;touch-action:none;border:2px solid #555071;border-radius:5px}
 .skin-save{display:flex;align-items:center;gap:7px;text-decoration:none}
+
+/* FRE SERVER MANAGER */
+.server-grid{display:flex;flex-direction:column;gap:12px;margin-top:18px}
+.server-card{display:flex;align-items:center;gap:12px;background:#202238;border:1px solid #343950;border-radius:14px;padding:16px}
+.server-badge{width:52px;height:52px;display:grid;place-items:center;background:#403863;border-radius:13px;color:#bfafff}
+.server-info{min-width:0;flex:1;display:flex;flex-direction:column;gap:6px}
+.server-info strong{font-size:14px}.server-info>span,.server-info small{font-size:11px;color:#a3a8bf;overflow-wrap:anywhere}
+.server-stat{display:flex;flex-wrap:wrap;gap:12px;color:#70dfb8;font-size:11px}
+.server-stat span,.server-offline{display:flex;align-items:center;gap:5px}
+.server-offline{color:#e5adad!important}
+.create-form .server-port{width:85px;min-width:85px;flex:none}
+[data-theme="light"] .server-card{background:#f8f8ff;color:#2e3048;border-color:#dce0ed}
+@media(max-width:700px){.server-card{flex-wrap:wrap}.server-info{min-width:130px}}
