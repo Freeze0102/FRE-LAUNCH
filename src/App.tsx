@@ -162,6 +162,7 @@ export default function App() {
 
   useEffect(()=>{document.documentElement.dataset.theme=theme;},[theme]);
   useEffect(()=>{
+    void invoke("mark_frontend_mounted").catch(()=>{});
     void invoke<boolean>("software_rendering").then(setRecoveryMode).catch(()=>{});
     // Clear the crash-recovery marker only when the launcher has remained
     // responsive, not immediately after the initial React frame.

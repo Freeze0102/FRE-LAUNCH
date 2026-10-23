@@ -73,22 +73,50 @@ jobs:
             throw "Installer exited but fre-launch.exe was not installed at the requested path"
           }
           Write-Host "NSIS installed to custom path: $folder"
-      - name: Smoke-test installed launcher survives startup
+      - name: Smoke-test launcher normal and WebView2 recovery startup
         shell: pwsh
-        timeout-minutes: 2
+        timeout-minutes: 3
         run: |
           $exe = Join-Path $env:RUNNER_TEMP "FRELaunchSmoke/fre-launch.exe"
           if (!(Test-Path $exe)) { throw "Installed EXE missing" }
-          $p = Start-Process -FilePath $exe -PassThru
-          Start-Sleep -Seconds 12
-          $p.Refresh()
-          if ($p.HasExited) {
-            $log = Join-Path $env:LOCALAPPDATA "FRE-LAUNCH/startup.log"
-            if (Test-Path $log) { Get-Content $log -Tail 50 | Write-Host }
-            throw "FRE LAUNCH exited within 12 seconds of startup (exit code $($p.ExitCode))"
+          $attempts = @()
+          $startTime = (Get-Date).AddSeconds(-3)
+          foreach ($mode in @("normal", "recovery")) {
+            if ($mode -eq "recovery") {
+              $env:FRE_LAUNCH_FORCE_SOFTWARE = "1"
+            }
+            Write-Host "Starting FRE LAUNCH in $mode mode"
+            $p = Start-Process -FilePath $exe -PassThru
+            Start-Sleep -Seconds 12
+            $p.Refresh()
+            if ($p.HasExited) {
+              $hexCode = "0x{0:X8}" -f ([uint32]([int64]$p.ExitCode -band 0xffffffffL))
+              Write-Warning "Launcher $mode exited before 12 seconds: $hexCode"
+              $attempts += "$mode exited $hexCode"
+            } else {
+              Write-Host "Launcher $mode survived 12 seconds (PID $($p.Id))"
+              $attempts += "$mode alive"
+              Stop-Process -Id $p.Id -Force
+            }
           }
-          Write-Host "Installed launcher survived 12-second smoke test"
-          Stop-Process -Id $p.Id -Force
+          Remove-Item Env:FRE_LAUNCH_FORCE_SOFTWARE -ErrorAction SilentlyContinue
+          $log = Join-Path $env:LOCALAPPDATA "FRE-LAUNCH/startup.log"
+          if (Test-Path $log) {
+            Write-Host "=== FRE LAUNCH bootstrap log ==="
+            Get-Content $log -Tail 100 | Write-Host
+          }
+          Write-Host "=== Windows Application crash events ==="
+          try {
+            Get-WinEvent -FilterHashtable @{LogName="Application"; StartTime=$startTime} -ErrorAction Stop |
+              Where-Object { $_.Message -match 'fre-launch|msedgewebview2|0xc00000fd' } |
+              Select-Object -First 8 -ExpandProperty Message | ForEach-Object { Write-Host $_ }
+          } catch { Write-Warning "Event log unavailable: $_" }
+          if ($attempts[0] -ne "normal alive") {
+            throw "Normal launcher startup failed. Recovery result: $($attempts[1]). Release intentionally blocked."
+          }
+          if ($attempts[1] -ne "recovery alive") {
+            throw "WebView2 recovery startup failed too. Release intentionally blocked."
+          }
       - name: Remove first NSIS installer before admin build
         shell: pwsh
         run: |

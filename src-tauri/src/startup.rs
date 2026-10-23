@@ -135,6 +135,11 @@ pub fn mark_frontend_ready() -> Result<(),String> {
 }
 
 #[tauri::command]
+pub fn mark_frontend_mounted() {
+    log_bootstrap("FRONTEND_MOUNTED", "React home screen initialized");
+}
+
+#[tauri::command]
 pub fn software_rendering() -> bool {
     std::env::var_os("FRE_LAUNCH_SAFE_MODE").is_some()
 }

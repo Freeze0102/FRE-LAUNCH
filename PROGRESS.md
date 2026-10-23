@@ -83,3 +83,9 @@
 - Remove empty motivational slogans, including the crash-screen headline; use functional error/help messages instead.
 - Maintain existing install, logs, Java manager, update center, skins, backups and instance functionality; version bumped to 0.5.5 for a fresh release.
 - CI and Windows executable survival test required before declaring the new build stable. Private GitHub Releases still cannot serve anonymous in-app updates unless public release distribution is configured.
+
+## 0.5.5 startup diagnosis after Windows CI smoke failure
+
+- The NSIS build, custom-folder installation and Rust tests passed, but running the installed binary in the Windows runner terminated with `0xC00000FD` (stack overflow) after `TAURI_SETUP`. The build therefore has NOT been approved for release.
+- Record a frontend-mounted breadcrumb to separate WebView2/native failure from UI initialization.
+- The updated workflow tests both normal startup and forced software-rendering recovery, prints launcher startup.log and Windows Application crash events, and blocks release if either startup fails. No silent suppression of the crash.
