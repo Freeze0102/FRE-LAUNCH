@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Image, RefreshCw, Trash2, X, Camera } from "lucide-react";
+import { Image, RefreshCw, Trash2, X, Camera, Download } from "lucide-react";
 
 type Screenshot = {filename:string;sizeBytes:number;modifiedAt:number};
 
@@ -40,6 +40,13 @@ export default function ScreenshotsPanel({instanceId}:{instanceId:string}) {
     return()=>{alive=false;};
   },[items,visible,instanceId]);
 
+  useEffect(()=>{
+    if(!lightbox)return;
+    const onKey=(event:KeyboardEvent)=>{if(event.key==="Escape")setLightbox(null);};
+    window.addEventListener("keydown",onKey);
+    return ()=>window.removeEventListener("keydown",onKey);
+  },[lightbox]);
+
   async function remove(file:Screenshot){
     if(!instanceId || !window.confirm(`Видалити скріншот «${file.filename}» назавжди?`))return;
     setBusy(true);setError("");
@@ -70,6 +77,7 @@ export default function ScreenshotsPanel({instanceId}:{instanceId:string}) {
     {items.length>visible&&<button className="secondary screenshot-more" onClick={()=>setVisible(v=>v+12)}>Показати ще ({items.length-visible})</button>}
     {lightbox&&previews[lightbox]&&<div className="screenshot-overlay" role="dialog" aria-modal="true" aria-label="Попередній перегляд скріншота">
       <button className="screenshot-overlay-close" title="Закрити" onClick={()=>setLightbox(null)}><X size={20}/></button>
+      <a className="screenshot-overlay-download" href={previews[lightbox]} download={lightbox} title="Зберегти PNG"><Download size={17}/> Зберегти PNG</a>
       <img src={previews[lightbox]} alt={lightbox}/>
       <span>{lightbox}</span>
     </div>}
