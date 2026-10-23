@@ -239,6 +239,43 @@ pub async fn remove_installed_mod(app: AppHandle, instance_id: String, filename:
     fs::remove_file(directory.join(filename)).await.map_err(|e|e.to_string())
 }
 
+/// On-demand malware scan using the Windows Defender command-line scanner.
+/// This supplements, but cannot replace, Modrinth integrity verification.
+#[tauri::command]
+pub async fn scan_installed_mod(app: AppHandle, instance_id: String, filename: String) -> Result<String, String> {
+    if !valid_filename(&filename, ".jar") && !valid_filename(&filename, ".jar.disabled") {
+        return Err("Invalid mod filename".into());
+    }
+    let dir = mods_dir(&app, &instance_id)?;
+    let path = dir.join(&filename);
+    let metadata = fs::symlink_metadata(&path).await.map_err(|e| e.to_string())?;
+    if !metadata.is_file() || metadata.file_type().is_symlink() {
+        return Err("Only regular mod files can be scanned".into());
+    }
+    #[cfg(windows)]
+    {
+        let program_files = std::env::var_os("ProgramFiles")
+            .ok_or("Cannot find the Windows Program Files directory")?;
+        let scanner = std::path::PathBuf::from(program_files)
+            .join("Windows Defender").join("MpCmdRun.exe");
+        if !scanner.is_file() {
+            return Err("Microsoft Defender scanner unavailable. Scan this mod with your installed antivirus before launching.".into());
+        }
+        let output = tokio::process::Command::new(&scanner)
+            .arg("-Scan").arg("-ScanType").arg("3").arg("-File").arg(&path)
+            .output().await.map_err(|e| format!("Defender scan failed: {e}"))?;
+        if !output.status.success() {
+            return Err(format!("Defender did not clear this mod (exit code {:?}). Check Windows Security protection history.",output.status.code()));
+        }
+        Ok(format!("Microsoft Defender scan completed without a reported detection: {filename}. This does not guarantee the mod is safe."))
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = path;
+        Err("Microsoft Defender scan is available on Windows only".into())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
