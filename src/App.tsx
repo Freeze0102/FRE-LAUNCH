@@ -75,9 +75,9 @@ function themesafe(theme:unknown):string {
 }
 
 const menus = [
-  {name:"Home",label:"Грати",icon:Play,index:"01"},
-  {name:"Instances",label:"Бібліотека",icon:Boxes,index:"02"},
-  {name:"Mods",label:"Моди та ресурси",icon:Puzzle,index:"03"},
+  {name:"Home",label:"Головна",icon:House,index:"01"},
+  {name:"Instances",label:"Мої збірки",icon:Boxes,index:"02"},
+  {name:"Mods",label:"Каталог модів",icon:Puzzle,index:"03"},
   {name:"Versions",label:"Версії Minecraft",icon:Layers3,index:"04"},
   {name:"Skins",label:"Скіни",icon:Shirt,index:"05"},
   {name:"Servers",label:"Сервери",icon:Server,index:"06"},
@@ -89,8 +89,8 @@ const menus = [
   {name:"Settings",label:"Налаштування",icon:Settings2,index:"12"}
 ] as const;
 const titles:Record<Page,string>={
-  Home:"Грати",Versions:"Версії Minecraft",Instances:"Бібліотека",
-  Mods:"Моди та ресурси",Skins:"Скіни",Servers:"Сервери",
+  Home:"Головна",Versions:"Версії Minecraft",Instances:"Мої збірки",
+  Mods:"Каталог модів",Skins:"Скіни",Servers:"Сервери",
   Screenshots:"Скріншоти",Backups:"Резервні копії",Accounts:"Облікові записи",
   Downloads:"Завантаження",Logs:"Діагностика",Settings:"Налаштування"
 };
