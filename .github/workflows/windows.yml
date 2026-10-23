@@ -42,13 +42,50 @@ jobs:
         run: npm run tauri icon src-tauri/icons/app.svg
       - name: Run Rust unit tests
         run: cargo test --manifest-path src-tauri/Cargo.toml
-      - name: Build Windows installer
+      - name: Build standard non-admin Windows installer
         run: npm run tauri build
-      - name: Upload Windows installer
+      - name: Stage standard installer for smoke test and download
+        shell: pwsh
+        run: |
+          $base = "src-tauri/target/release/bundle/nsis"
+          $file = Get-ChildItem $base -File -Filter "*.exe" | Select-Object -First 1
+          if (!$file) { throw "NSIS current-user installer not found" }
+          New-Item -ItemType Directory -Force -Path "$base/current-user" | Out-Null
+          Copy-Item $file.FullName "$base/current-user/FRE-LAUNCH-CurrentUser-Setup.exe"
+      - name: Smoke-test installing in a custom Windows directory
+        shell: pwsh
+        timeout-minutes: 4
+        run: |
+          $file = "src-tauri/target/release/bundle/nsis/current-user/FRE-LAUNCH-CurrentUser-Setup.exe"
+          $folder = Join-Path $env:RUNNER_TEMP "FRELaunchSmoke"
+          # NSIS /D must be last and unquoted. Runner temp has no spaces.
+          $process = Start-Process -FilePath $file -ArgumentList @("/S", "/D=$folder") -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "NSIS silent installer exit code $($process.ExitCode)" }
+          if (!(Test-Path (Join-Path $folder "fre-launch.exe"))) {
+            throw "Installer exited but fre-launch.exe was not installed at the requested path"
+          }
+          Write-Host "NSIS installed to custom path: $folder"
+      - name: Build alternative all-users installer
+        run: npm run tauri build -- --config src-tauri/tauri.admin.conf.json
+      - name: Stage administrator installer
+        shell: pwsh
+        run: |
+          $base = "src-tauri/target/release/bundle/nsis"
+          $file = Get-ChildItem $base -File -Filter "*.exe" | Select-Object -First 1
+          if (!$file) { throw "NSIS administrator installer not found" }
+          New-Item -ItemType Directory -Force -Path "$base/administrator" | Out-Null
+          Copy-Item $file.FullName "$base/administrator/FRE-LAUNCH-Administrator-Setup.exe"
+      - name: Upload non-admin Windows installer
         uses: actions/upload-artifact@v4
         with:
           name: FRE-LAUNCH-Windows-Installer
-          path: src-tauri/target/release/bundle/nsis/*
+          path: src-tauri/target/release/bundle/nsis/current-user/*.exe
+          if-no-files-found: error
+      - name: Upload administrator Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: FRE-LAUNCH-Windows-Admin-Installer
+          path: src-tauri/target/release/bundle/nsis/administrator/*.exe
           if-no-files-found: error
       - name: Upload portable Windows executable
         uses: actions/upload-artifact@v4
