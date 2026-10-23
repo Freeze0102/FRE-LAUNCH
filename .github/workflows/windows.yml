@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: windows-build-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -96,3 +96,28 @@ jobs:
           name: FRE-LAUNCH-Windows-Portable
           path: src-tauri/target/release/fre-launch.exe
           if-no-files-found: warn
+      - name: Publish versioned Windows release for in-app updates
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = (Get-Content 'src-tauri/tauri.conf.json' -Raw | ConvertFrom-Json).version
+          $tag = "v$version"
+          $normal = 'src-tauri/target/release/bundle/nsis/current-user/FRE-LAUNCH-CurrentUser-Setup.exe'
+          $admin = 'src-tauri/target/release/bundle/nsis/administrator/FRE-LAUNCH-Administrator-Setup.exe'
+          foreach ($file in @($normal, $admin)) {
+            if (!(Test-Path $file)) { throw "Missing Windows installer: $file" }
+            $digest = (Get-FileHash $file -Algorithm SHA256).Hash.ToLowerInvariant()
+            [System.IO.File]::WriteAllText((Join-Path (Get-Location) "$file.sha256"), $digest, [System.Text.Encoding]::ASCII)
+            Write-Host "Release SHA256 for $file is $digest"
+          }
+          # Keep previously published releases immutable. Bump app version for a new release.
+          gh release view $tag --repo $env:GITHUB_REPOSITORY --json tagName *> $null
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "Existing $tag release is unchanged."
+          } else {
+            gh release create $tag $normal "$normal.sha256" $admin "$admin.sha256" --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "FRE LAUNCH $version" --notes "FRE LAUNCH $version for Windows. Includes user/admin installers and SHA256 files for in-app updates. Existing Minecraft data is preserved by normal upgrades." --latest
+            if ($LASTEXITCODE -ne 0) { throw "Could not publish GitHub release $tag" }
+          }
