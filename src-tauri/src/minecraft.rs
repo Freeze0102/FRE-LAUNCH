@@ -364,6 +364,7 @@ async fn critical_cache_ready(base:&Path, version:&str, meta:&Value) -> Result<b
 
 #[tauri::command]
 pub async fn is_installed(app: AppHandle, version: String) -> Result<bool, String> {
+    super::startup::log_bootstrap("IS_INSTALLED_START", &format!("Version {version}"));
     validate_version(&version)?;
     let base=root(&app)?;
     let dir=base.join("versions").join(&version);
@@ -379,6 +380,7 @@ pub async fn is_installed(app: AppHandle, version: String) -> Result<bool, Strin
 
 #[tauri::command]
 pub async fn java_info() -> Result<String, String> {
+    super::startup::log_bootstrap("JAVA_INFO_START", "Java worker");
     tokio::task::spawn_blocking(|| detect_java_version())
         .await.map_err(|e| format!("Java detection worker failed: {e}"))?
 }

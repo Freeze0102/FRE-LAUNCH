@@ -84,6 +84,22 @@ jobs:
           New-ItemProperty -Path $key -Name DumpType -Value 1 -PropertyType DWord -Force | Out-Null
           New-ItemProperty -Path $key -Name DumpCount -Value 4 -PropertyType DWord -Force | Out-Null
           Write-Host "Minidump directory: $folder"
+      - name: Prepare Windows ProcDump crash monitor
+        shell: pwsh
+        run: |
+          $folder = Join-Path $env:RUNNER_TEMP "FRELaunchCrashDumps"
+          New-Item -ItemType Directory -Force -Path $folder | Out-Null
+          $zip = Join-Path $env:RUNNER_TEMP "procdump.zip"
+          $out = Join-Path $env:RUNNER_TEMP "SysinternalsProcDump"
+          try {
+            Invoke-WebRequest -Uri "https://download.sysinternals.com/files/Procdump.zip" -OutFile $zip -TimeoutSec 45
+            Expand-Archive -LiteralPath $zip -DestinationPath $out -Force
+            if (!(Test-Path (Join-Path $out "procdump64.exe"))) {
+              Write-Warning "ProcDump download did not include the x64 binary"
+            }
+          } catch {
+            Write-Warning "ProcDump setup unavailable; WER fallback remains enabled: $_"
+          }
       - name: Smoke-test launcher normal and WebView2 recovery startup
         shell: pwsh
         timeout-minutes: 3
@@ -92,6 +108,18 @@ jobs:
           if (!(Test-Path $exe)) { throw "Installed EXE missing" }
           $attempts = @()
           $startTime = (Get-Date).AddSeconds(-3)
+          $folder = Join-Path $env:RUNNER_TEMP "FRELaunchCrashDumps"
+          $procdump = Join-Path $env:RUNNER_TEMP "SysinternalsProcDump/procdump64.exe"
+          $monitor = $null
+          if (Test-Path $procdump) {
+            try {
+              # Monitor unhandled exceptions (including 0xC00000FD) independently
+              # from Windows Error Reporting, which CI runners may disable.
+              $monitor = Start-Process -FilePath $procdump -ArgumentList @("-accepteula","-mm","-e","-w","fre-launch.exe",$folder) -PassThru
+              Start-Sleep -Seconds 3
+              Write-Host "ProcDump monitor started (PID $($monitor.Id))"
+            } catch { Write-Warning "Could not start ProcDump monitor: $_" }
+          }
           foreach ($mode in @("normal", "recovery")) {
             if ($mode -eq "recovery") {
               $env:FRE_LAUNCH_FORCE_SOFTWARE = "1"
@@ -111,6 +139,12 @@ jobs:
             }
           }
           Remove-Item Env:FRE_LAUNCH_FORCE_SOFTWARE -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 3
+          if ($monitor) {
+            $monitor.Refresh()
+            if (!$monitor.HasExited) { Stop-Process -Id $monitor.Id -Force -ErrorAction SilentlyContinue }
+          }
+          Write-Host "Saved minidumps: $(@(Get-ChildItem $folder -File -Filter '*.dmp' -ErrorAction SilentlyContinue).Count)"
           $log = Join-Path $env:LOCALAPPDATA "FRE-LAUNCH/startup.log"
           if (Test-Path $log) {
             Write-Host "=== FRE LAUNCH bootstrap log ==="
@@ -128,6 +162,14 @@ jobs:
           if ($attempts[1] -ne "recovery alive") {
             throw "WebView2 recovery startup failed too. Release intentionally blocked."
           }
+      - name: Upload crash files before analysis
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: FRE-LAUNCH-Native-Startup-Dumps
+          path: ${{ runner.temp }}/FRELaunchCrashDumps/*.dmp
+          if-no-files-found: warn
+          retention-days: 1
       - name: Inspect native Windows crash dump
         if: failure()
         shell: pwsh

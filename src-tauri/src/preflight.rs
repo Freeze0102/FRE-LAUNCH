@@ -53,6 +53,7 @@ pub fn ensure_write_access(app: &AppHandle) -> Result<PathBuf, String> {
 
 #[tauri::command]
 pub async fn install_preflight(app: AppHandle) -> Result<InstallPreflight, String> {
+    super::startup::log_bootstrap("PREFLIGHT_START", "Checking game storage");
     super::diagnostics::write(&app, "PREFLIGHT_BEGIN", "Checking Minecraft game-data volume");
     tokio::task::spawn_blocking(move || {
         let path=target(&app)?;

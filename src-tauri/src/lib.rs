@@ -34,6 +34,7 @@ struct VersionManifest { versions: Vec<MinecraftVersion> }
 
 #[tauri::command]
 async fn get_versions() -> Result<Vec<MinecraftVersion>, String> {
+    startup::log_bootstrap("VERSIONS_START", "Fetching Mojang version metadata");
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(20))
         .build().map_err(|e| e.to_string())?;
@@ -41,11 +42,13 @@ async fn get_versions() -> Result<Vec<MinecraftVersion>, String> {
         .send().await.map_err(|e| format!("Network error: {e}"))?
         .error_for_status().map_err(|e| format!("HTTP error: {e}"))?
         .json::<VersionManifest>().await.map_err(|e| format!("Invalid version manifest: {e}"))?;
+    startup::log_bootstrap("VERSIONS_DONE", &format!("Loaded {} versions", manifest.versions.len()));
     Ok(manifest.versions)
 }
 
 #[tauri::command]
 fn detect_java() -> Result<String, String> {
+    startup::log_bootstrap("JAVA_DETECT_START", "Looking for Java on PATH");
     let output = Command::new("java").arg("-version").output()
         .map_err(|e| format!("Java not found on PATH: {e}"))?;
     let version = String::from_utf8_lossy(&output.stderr).to_string();
