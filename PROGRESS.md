@@ -31,3 +31,11 @@
 - Full offline/online resilience and compatibility for ancient Minecraft versions.
 
 **Logs are local-only; no automatic crash uploads or telemetry.**
+
+## Install resilience + FRE DOWNLOAD ENGINE (testing)
+
+- Installation preflight: tests actual Minecraft app-data directory for creating, writing, syncing and removing a small file before downloads.
+- Preflight failures report the exact destination path and OS filesystem error rather than silently starting installation.
+- Durable local diagnostic breadcrumbs for metadata, client, libraries, asset milestones and completion.
+- Custom six-checkpoint install control deck with progress labelled per stage (not fabricated overall installation percentage).
+- Windows CI compilation and tests required before merging. Root cause of the user's abrupt process exit still requires logs from the actual Windows computer.
