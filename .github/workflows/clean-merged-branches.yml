@@ -1,0 +1,89 @@
+name: Clean merged branches
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Preview branch cleanup without deleting anything"
+        required: false
+        type: boolean
+        default: true
+
+# Never delete a branch from an unmerged PR or one with newer commits.
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: clean-merged-branches
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Delete only exact merged PR heads
+        uses: actions/github-script@v7
+        env:
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || false }}
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const dryRun = process.env.DRY_RUN === 'true';
+            const meta = await github.rest.repos.get({ owner, repo });
+            const defaultBranch = meta.data.default_branch;
+
+            const branches = await github.paginate(
+              github.rest.repos.listBranches,
+              { owner, repo, per_page: 100 }
+            );
+            const closedPRs = await github.paginate(
+              github.rest.pulls.list,
+              { owner, repo, state: 'closed', per_page: 100 }
+            );
+
+            const activePRs = await github.paginate(
+              github.rest.pulls.list,
+              { owner, repo, state: 'open', per_page: 100 }
+            );
+            const active = new Set(activePRs
+              .filter(pr => pr.head.repo?.full_name === `${owner}/${repo}`)
+              .map(pr => pr.head.ref));
+
+            let deleted = 0;
+            let skipped = 0;
+            for (const branch of branches) {
+              const name = branch.name;
+              if (name === defaultBranch || branch.protected || active.has(name)) {
+                skipped++;
+                continue;
+              }
+              const mergedExactPR = closedPRs.some(pr =>
+                !!pr.merged_at &&
+                pr.head.repo?.full_name === `${owner}/${repo}` &&
+                pr.head.ref === name &&
+                pr.head.sha === branch.commit.sha
+              );
+              if (!mergedExactPR) {
+                core.info(`Preserving ${name}: no matching, exactly merged PR head`);
+                skipped++;
+                continue;
+              }
+              if (dryRun) {
+                core.info(`Would delete merged branch: ${name}`);
+                continue;
+              }
+              try {
+                await github.rest.git.deleteRef({owner, repo, ref: `heads/${name}`});
+                core.info(`Deleted merged branch: ${name}`);
+                deleted++;
+              } catch (error) {
+                core.warning(`Could not delete ${name}: ${error.message}`);
+              }
+            }
+            core.summary.addHeading('FRE LAUNCH — branch cleanup')
+              .addRaw(`Dry run: ${dryRun}\n\nDeleted: ${deleted}\n\nPreserved: ${skipped}\n`)
+              .write();
