@@ -189,3 +189,8 @@
 .screenshot-overlay img{max-width:92vw;max-height:80vh;object-fit:contain;border-radius:8px}
 .screenshot-overlay-close{position:absolute;right:22px;top:20px;background:#343650;color:white;border:1px solid #767ba3;border-radius:10px;padding:10px;cursor:pointer}
 [data-theme="light"] .screenshot-card{background:#f6f5fd;border-color:#d8dced;color:#30334e}
+
+
+.screenshot-overlay-download{position:absolute;left:22px;top:20px;display:flex;align-items:center;gap:9px;text-decoration:none;background:linear-gradient(135deg,#9266f4,#5966d9);color:#fff;border:1px solid #a698de;border-radius:10px;padding:11px 15px;font-size:12px;font-weight:750}
+.screenshot-overlay-download:hover{filter:brightness(1.12)}
+@media(max-width:640px){.screenshot-overlay-download{left:12px;top:12px}.screenshot-overlay-close{right:12px;top:12px}}
