@@ -78,13 +78,13 @@ export default function ModsPanel({version, instanceId}: {version: string; insta
     try {
       const data=await invoke<ModDetails>("modrinth_project_details",{projectId:hit.project_id});
       setDetails(data);
-      const matches=data.versions.filter(v=>v.game_versions.includes(version)&& (kind!=="mod"||v.loaders.includes(selectedInstance?.loader||"fabric")));
+      const matches=data.versions.filter(v=>v.game_versions.includes(version)&& (hit.project_type!=="mod"||v.loaders.includes(selectedInstance?.loader||"fabric")));
       setChosenVersion(matches.find(v=>v.id===preferredVersionId)?.id||matches[0]?.id||"");
     } catch(e){setError(String(e));}
     finally{setDetailBusy(false);}
   }
   const compatibleVersions=details?.versions.filter(v=>v.game_versions.includes(version)&&
-    (kind!=="mod"||v.loaders.includes(selectedInstance?.loader||"fabric")))??[];
+    (opened?.project_type!=="mod"||v.loaders.includes(selectedInstance?.loader||"fabric")))??[];
   const shownVersions=showAllVersions?details?.versions??[]:compatibleVersions;
   async function installSelected() {
     if(!opened||!selectedInstance||!instanceId){setError("Спочатку обери збірку.");return;}
