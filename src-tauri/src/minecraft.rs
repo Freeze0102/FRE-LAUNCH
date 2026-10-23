@@ -94,11 +94,34 @@ async fn version_meta(client: &Client, version: &str) -> Result<Value, String> {
     Ok(details)
 }
 
+/// Legacy vanilla and Fabric libraries may use Maven coordinates instead of
+/// a modern "downloads.artifact" block.
+fn maven_library(lib: &Value, base: &Path) -> Result<Option<(String, PathBuf, Option<String>, bool)>, String> {
+    let Some(name) = lib["name"].as_str() else { return Ok(None); };
+    let coords: Vec<&str> = name.split(':').collect();
+    if coords.len() < 3 || coords.len() > 4 || coords.iter().any(|part|
+        part.is_empty() || !part.bytes().all(|c| c.is_ascii_alphanumeric() || matches!(c,b'.'|b'_'|b'-'|b'+'))
+    ) {return Err("Invalid Maven library coordinates".into());}
+    let group = coords[0].replace('.', "/");
+    let artifact = coords[1];
+    let version = coords[2];
+    let classifier = if coords.len() == 4 { format!("-{}", coords[3]) } else { String::new() };
+    let relative = format!("{group}/{artifact}/{version}/{artifact}-{version}{classifier}.jar");
+    let relative = safe_relative(&relative)?;
+    let repository = lib["url"].as_str().unwrap_or("https://libraries.minecraft.net/");
+    let url = format!("{}/{}",repository.trim_end_matches('/'),relative.to_string_lossy().replace('\\',"/"));
+    allowed_url(&url)?;
+    Ok(Some((url,base.join("libraries").join(relative),None,false)))
+}
+
 fn libraries(metadata: &Value, base: &Path) -> Result<Vec<(String, PathBuf, Option<String>, bool)>, String> {
     let mut result = Vec::new();
     for lib in metadata["libraries"].as_array().ok_or("Missing libraries array")? {
         if !os_rules(lib) { continue; }
-        let Some(downloads) = lib.get("downloads") else { continue; };
+        let Some(downloads) = lib.get("downloads") else {
+            if let Some(artifact) = maven_library(lib, base)? {result.push(artifact);}
+            continue;
+        };
         if let Some(artifact) = downloads.get("artifact") {
             let path = safe_relative(value_str(artifact, "path")?)?;
             result.push((value_str(artifact, "url")?.to_string(), base.join("libraries").join(path), sha_from(artifact).map(str::to_string), false));
