@@ -1,86 +1,93 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Globe2, Plus, RefreshCw, Trash2, Users, Wifi, WifiOff, Copy } from "lucide-react";
+import { Server, Plus, RefreshCw, Star, Pencil, Trash2, Wifi, WifiOff, Copy, Check, X } from "lucide-react";
 
-type Server = { id:string; name:string; host:string; port:number };
-type Status = { online:boolean; pingMs:number;version:string;playersOnline:number;playersMax:number;description:string };
+type SavedServer = { id:string; name:string; address:string; port:number; favorite:boolean };
+type ServerStatus = { online:boolean; version:string|null; playersOnline:number|null; maxPlayers:number|null; description:string|null; latencyMs:number|null; error:string|null };
 
-export default function ServersPanel() {
-  const [servers,setServers]=useState<Server[]>([]);
-  const [status,setStatus]=useState<Record<string,Status>>({});
-  const [errors,setErrors]=useState<Record<string,string>>({});
+export default function ServersPanel(){
+  const [servers,setServers]=useState<SavedServer[]>([]);
+  const [statuses,setStatuses]=useState<Record<string,ServerStatus>>({});
+  const [checking,setChecking]=useState<Record<string,boolean>>({});
   const [busy,setBusy]=useState(false);
-  const [checking,setChecking]=useState<string[]>([]);
-  const [name,setName]=useState("");
-  const [host,setHost]=useState("");
-  const [port,setPort]=useState("25565");
   const [error,setError]=useState("");
-
-  async function refresh() {
-    try {setServers(await invoke<Server[]>("list_servers"));setError("");}
-    catch(err) {setError(String(err));}
+  const [notice,setNotice]=useState("");
+  const [editing,setEditing]=useState<string|null>(null);
+  const [name,setName]=useState("");
+  const [address,setAddress]=useState("");
+  const [port,setPort]=useState("25565");
+  async function refresh(){
+    setBusy(true);
+    try{setServers(await invoke<SavedServer[]>("list_servers"));setError("");}
+    catch(e){setError(String(e));}
+    finally{setBusy(false);}
   }
   useEffect(()=>{void refresh();},[]);
-
-  async function add() {
-    setBusy(true);setError("");
-    try {
-      const entry=await invoke<Server>("add_server",{
-        name:name.trim(),host:host.trim(),port:Number(port)
-      });
-      setName("");setHost("");setPort("25565");
+  function resetForm(){setEditing(null);setName("");setAddress("");setPort("25565");}
+  async function save(){
+    const num=Number(port);
+    if(!name.trim()||!address.trim()||!Number.isInteger(num)||num<1||num>65535){
+      setError("Вкажи назву, правильну адресу та порт 1–65535.");return;
+    }
+    const old=editing?servers.find(s=>s.id===editing):undefined;
+    setBusy(true);setError("");setNotice("");
+    try{
+      const item=await invoke<SavedServer>("save_server",{id:editing,name:name.trim(),address:address.trim(),port:num,favorite:old?.favorite??false});
+      resetForm();await refresh();setNotice("Сервер збережено.");void ping(item);
+    }catch(e){setError(String(e));}
+    finally{setBusy(false);}
+  }
+  async function ping(s:SavedServer){
+    setChecking(prev=>({...prev,[s.id]:true}));
+    try{
+      const result=await invoke<ServerStatus>("check_server_status",{address:s.address,port:s.port});
+      setStatuses(prev=>({...prev,[s.id]:result}));
+    }catch(e){setStatuses(prev=>({...prev,[s.id]:{online:false,version:null,playersOnline:null,maxPlayers:null,description:null,latencyMs:null,error:String(e)}}));}
+    finally{setChecking(prev=>({...prev,[s.id]:false}));}
+  }
+  async function favorite(s:SavedServer){
+    try{
+      await invoke("save_server",{id:s.id,name:s.name,address:s.address,port:s.port,favorite:!s.favorite});
       await refresh();
-      void ping(entry);
-    } catch(err){setError(String(err));}
-    finally {setBusy(false);}
+    }catch(e){setError(String(e));}
   }
-  async function remove(server:Server) {
-    if(!window.confirm(`Видалити «${server.name}» зі списку серверів?`))return;
-    setBusy(true);
-    try {await invoke("delete_server",{id:server.id});await refresh();}
-    catch(err){setError(String(err));}
-    finally {setBusy(false);}
+  async function remove(s:SavedServer){
+    if(!window.confirm("Видалити сервер «"+s.name+"» зі списку?"))return;
+    try{
+      await invoke("delete_server",{id:s.id});
+      setStatuses(prev=>{const next={...prev};delete next[s.id];return next;});
+      await refresh();
+    }catch(e){setError(String(e));}
   }
-  async function ping(server:Server) {
-    setChecking(a=>a.includes(server.id)?a:[...a,server.id]);
-    setErrors(a=>({...a,[server.id]:""}));
-    try {
-      const response=await invoke<Status>("ping_server",{host:server.host,port:server.port});
-      setStatus(a=>({...a,[server.id]:response}));
-    } catch(err) {
-      setStatus(a=>{const copy={...a};delete copy[server.id];return copy;});
-      setErrors(a=>({...a,[server.id]:String(err)}));
-    } finally {setChecking(a=>a.filter(id=>id!==server.id));}
+  function edit(s:SavedServer){setEditing(s.id);setName(s.name);setAddress(s.address);setPort(String(s.port));}
+  async function copy(s:SavedServer){
+    const host=s.address.includes(":")?"["+s.address+"]":s.address;
+    try{await navigator.clipboard.writeText(host+":"+s.port);setNotice("Адресу скопійовано.");}
+    catch{setError("Не вдалося скопіювати адресу.");}
   }
   return <section className="panel">
-    <div className="panel-heading"><h3>FRE SERVERS</h3><Globe2 size={20}/></div>
-    <p>Збережені сервери Minecraft Java Edition. Перевіряй доступність, версію, кількість гравців і затримку через справжній статус-протокол Minecraft.</p>
-    <div className="toolbar create-form">
-      <input className="input" maxLength={50} value={name} onChange={e=>setName(e.target.value)} placeholder="Назва сервера"/>
-      <input className="input" maxLength={253} value={host} onChange={e=>setHost(e.target.value)} placeholder="Адреса: play.example.net"/>
-      <input className="input server-port" inputMode="numeric" value={port} onChange={e=>setPort(e.target.value.replace(/[^0-9]/g,""))} placeholder="Порт"/>
-      <button className="primary" disabled={busy || !name.trim() || !host.trim() || !Number.isInteger(Number(port)) || Number(port)<1 || Number(port)>65535} onClick={()=>void add()}><Plus size={16}/> Додати</button>
+    <div className="panel-heading"><h3>FRE SERVER HUB</h3><Server size={21}/></div>
+    <p>Зберігай Minecraft Java сервери й перевіряй доступність, пінг, версію та кількість гравців.</p>
+    <div className="server-form">
+      <div className="form-field"><label>Назва</label><input className="input" maxLength={64} placeholder="Мій сервер" value={name} onChange={e=>setName(e.target.value)}/></div>
+      <div className="form-field"><label>Адреса</label><input className="input" maxLength={253} placeholder="play.example.net" value={address} onChange={e=>setAddress(e.target.value)}/></div>
+      <div className="form-field short"><label>Порт</label><input className="input" inputMode="numeric" maxLength={5} value={port} onChange={e=>setPort(e.target.value.replace(/[^0-9]/g,""))}/></div>
+      <button className="primary" disabled={busy||!name.trim()||!address.trim()} onClick={()=>void save()}>{editing?<Check size={17}/>:<Plus size={17}/>} {editing?"Зберегти":"Додати"}</button>
+      {editing&&<button className="icon-button" title="Скасувати" onClick={resetForm}><X size={18}/></button>}
     </div>
     {error&&<div className="error">{error}</div>}
-    <div className="server-grid">
-      {servers.map(server=>{
-        const state=status[server.id];
-        const inProgress=checking.includes(server.id);
-        return <article className="server-card" key={server.id}>
-          <div className="server-badge"><Globe2 size={24}/></div>
-          <div className="server-info">
-            <strong>{server.name}</strong>
-            <span>{server.host}:{server.port}</span>
-            {inProgress?<span>Перевірка сервера...</span>:state?.online?<div className="server-stat"><span><Wifi size={14}/> Онлайн · {state.pingMs} мс</span><span><Users size={14}/> {state.playersOnline}/{state.playersMax}</span><span>{state.version}</span></div>:<span className="server-offline"><WifiOff size={13}/> {errors[server.id]||"Статус ще не перевірений"}</span>}
-            {state?.description&&<small>{state.description}</small>}
-          </div>
-          <button className="icon-button" title="Копіювати адресу" onClick={()=>void navigator.clipboard.writeText(`${server.host}:${server.port}`)}><Copy size={16}/></button>
-          <button className="icon-button" disabled={inProgress} title="Оновити статус" onClick={()=>void ping(server)}><RefreshCw size={16}/></button>
-          <button className="icon-button danger" disabled={busy} title="Видалити" onClick={()=>void remove(server)}><Trash2 size={16}/></button>
-        </article>;
-      })}
-    </div>
-    {servers.length===0&&<div className="small-empty"><Globe2 size={32}/><h3>Додай свій перший сервер</h3><p>Сервери зберігаються на цьому пристрої. Лаунчер не обходить перевірку ліцензії.</p></div>}
-    <p className="muted">FRE LAUNCH не відправляє твій Microsoft-пароль серверам. Для входу на захищені сервери потрібна офіційна авторизація Minecraft.</p>
+    {notice&&<div className="notice">{notice}</div>}
+    {!servers.length&&<div className="small-empty"><Server size={34}/><h3>Поки немає серверів</h3><p>Додай адресу вище, щоб бачити стан сервера.</p></div>}
+    <div className="server-grid">{servers.map(s=>{
+      const state=statuses[s.id],pending=checking[s.id];
+      return <article className="server-card" key={s.id}>
+        <div className="server-top"><div className="server-avatar"><Server size={24}/></div><div className="server-name"><b>{s.name}</b><small>{s.address}:{s.port}</small></div><button className={"icon-button "+(s.favorite?"starred":"")} onClick={()=>void favorite(s)} title="Обране"><Star size={18} fill={s.favorite?"currentColor":"none"}/></button></div>
+        <div className="server-state">{pending?<><RefreshCw size={17}/> Перевірка...</>:state?.online?<><Wifi size={17}/><strong>Онлайн</strong><span>{state.latencyMs??"—"} мс</span></>:state?<><WifiOff size={17}/><strong>Офлайн / недоступний</strong></>:<span>Статус ще не перевірений</span>}</div>
+        {state?.online&&<div className="server-details"><span>Версія: {state.version??"невідома"}</span><span>Гравці: {state.playersOnline??"?"}/{state.maxPlayers??"?"}</span>{state.description&&<p>{state.description}</p>}</div>}
+        {state?.error&&<p className="server-error">{state.error}</p>}
+        <div className="server-actions"><button className="secondary" disabled={pending} onClick={()=>void ping(s)}><RefreshCw size={15}/> Перевірити</button><button className="icon-button" title="Копіювати адресу" onClick={()=>void copy(s)}><Copy size={16}/></button><button className="icon-button" title="Редагувати" onClick={()=>edit(s)}><Pencil size={16}/></button><button className="icon-button danger" title="Видалити" onClick={()=>void remove(s)}><Trash2 size={16}/></button></div>
+      </article>;
+    })}</div>
+    <p className="muted">Стандартний Minecraft Java status ping. Сервери з SRV-записами чи захистом можуть помилково здаватися недоступними. Ця функція не виконує авторизацію.</p>
   </section>;
 }
