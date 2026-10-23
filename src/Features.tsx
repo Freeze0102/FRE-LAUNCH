@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import FabricOptions from "./FabricOptions";
 import { Boxes, Plus, Star, Trash2, RefreshCw, DownloadCloud, Search, Package, ShieldCheck, Pencil } from "lucide-react";
 
 export type Instance = {
@@ -9,6 +10,8 @@ export type Instance = {
   favorite: boolean;
   memoryMb: number;
   javaPath: string | null;
+  loader: string;
+  loaderVersion: string | null;
 };
 type Hit = {
   project_id: string;
@@ -109,7 +112,7 @@ export function InstancesPanel({version, active, setActive, setVersion, setMemor
     <div className="instance-grid">
       {instances.map((instance) => <div key={instance.id} className={"instance-card" + (active === instance.id ? " chosen" : "")}>
         <div className="instance-icon"><Boxes size={24}/></div>
-        <div className="instance-info"><b>{instance.name}</b><span>{instance.version} · {instance.memoryMb} MB RAM</span></div>
+        <div className="instance-info"><b>{instance.name}</b><span>{instance.version} · {instance.loader === "fabric" ? `Fabric ${instance.loaderVersion ?? "?"}` : "Vanilla"} · {instance.memoryMb} MB RAM</span></div>
         <button className={"icon-button" + (instance.favorite ? " starred" : "")} title="Обране" onClick={() => void favorite(instance)}><Star size={17} fill={instance.favorite ? "currentColor" : "none"}/></button>
         <button className="icon-button" title="Редагувати" onClick={() => editing === instance.id ? setEditing(null) : beginEdit(instance)}><Pencil size={17}/></button>
         <button className="secondary" onClick={() => {setActive(instance.id); setVersion(instance.version); setMemory(instance.memoryMb); navigateHome();}}>Обрати</button>
@@ -122,6 +125,7 @@ export function InstancesPanel({version, active, setActive, setVersion, setMemor
           <label className="field-label">Java executable (необов'язково)</label>
           <input className="input wide" value={editJava} onChange={(e) => setEditJava(e.target.value)} placeholder="C:\\Program Files\\Java\\bin\\java.exe"/>
           <div className="toolbar"><button className="primary" disabled={busy} onClick={() => void saveEdit(instance)}>Зберегти</button><button className="secondary" onClick={() => setEditing(null)}>Скасувати</button></div>
+          <FabricOptions instance={instance} onSaved={refresh}/>
         </div>}
       </div>)}
     </div>
@@ -163,7 +167,7 @@ export function ModsPanel({version, instanceId}: {version: string; instanceId: s
 
   return <section className="panel">
     <div className="panel-heading"><h3>FRE MODRINTH</h3><Package size={20}/></div>
-    <p>Пошук реальних проєктів Modrinth. Перевірене встановлення ресурс-паків доступне для окремих збірок; модлоадери та встановлення модів ще в розробці.</p>
+    <p>Пошук справжніх проєктів Modrinth. Ресурс-паки встановлюються з перевіркою файлів. Підтримку Fabric можна вибрати в налаштуваннях збірки; встановлення модів додамо після перевірки залежностей.</p>
     <div className="toolbar"><div className="search"><Search size={18}/><input placeholder="Назва моду чи ресурс-пака..." value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => {if(e.key==="Enter")void search();}}/></div>
       <select value={kind} onChange={(e) => setKind(e.target.value)}>
         <option value="resourcepack">Ресурс-паки</option><option value="mod">Моди</option><option value="shader">Шейдери</option><option value="modpack">Модпаки</option>
