@@ -113,3 +113,21 @@
 - Skin Studio now loads a local Steve-style 64x64 default PNG atlas without network requests or saved settings. Custom skins still override it; default can be restored. Include a PNG fallback if WebGL is unavailable.
 - The Home view is now a redesigned game-stage + actual-instance library launcher workspace with quick account/RAM/Java/file tools and release selection. Downloads view provides the game folder manager.
 - All security holds remain enforced: Windows Defender checking, security-review-only private GitHub Action ZIP, no signed/public installer yet, no automatic releases until manually authorized following the past Trojan:Win32/Bearfoos.B!ml alert.
+
+
+## Unreleased work — 24 October 2026: content library, shader packs, process isolation
+
+Changes in `main` (source only — Windows Build remains manually triggered to conserve Actions quota):
+
+- Added Modrinth search sorting, automatic query debounce, and Minecraft loader/version filtering.
+- Added per-instance Modrinth shader ZIP downloads with HTTPS, CDN restriction, SHA-512, file-size limits, ZIP content inspection, and randomized staging files.
+- Added an installed-content library: mods, resource packs, and shaders; resource/shader ZIPs can be toggled or removed from the selected instance.
+- Added read-only Fabric mod update discovery using the Modrinth `/v2/version_files/update` SHA-512 batch endpoint; it does **not** automatically replace old JARs.
+- Improved downloaded Fabric JAR staging to use unique create-new paths.
+- Redirected Java stdout/stderr to a durable file in the Minecraft instance's `logs` folder. The UI can tail this file while FRE LAUNCH is running; launcher exit no longer closes the child's output pipes.
+
+**Not yet proven in a Windows installation:** complete compile of these new commits, actual shader packs, update API integration, safe ZIP behavior on diverse real-world resources, and launch-after-close behavior. The last successful Windows build predates these commits. Do not describe this source branch as an approved installer or a production release.
+
+Remaining major gaps versus the Modrinth desktop app: Microsoft authentication, modpack `.mrpack` import and export, fully integrated CurseForge API, Forge/NeoForge support, transactional mod updates and rollback, richer per-project metadata, source provenance and deeper malware analysis, download manager, and full Windows regression testing.
+
+Release distribution remains blocked pending independent review of the historical v0.5.5 Defender alert; see `SECURITY_NOTICE.md`.
