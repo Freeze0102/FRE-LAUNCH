@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { motion } from "motion/react";
@@ -16,7 +16,8 @@ import InstallDeck from "./InstallDeck";
 import { LAST_UI_CRASH } from "./ErrorBoundary";
 import { InstancesPanel } from "./Features";
 import ModsPanel from "./ModsPanel";
-import SkinStudio from "./SkinStudio";
+// Avoid evaluating Three.js/WebGL while the launcher is only showing the home screen.
+const SkinStudio = lazy(() => import("./SkinStudio"));
 import BackupsPanel from "./BackupsPanel";
 import AccountsPanel from "./AccountsPanel";
 import JavaPanel from "./JavaPanel";
@@ -57,7 +58,24 @@ const useApp = create<Store>()(persist(set=>({
   memoryMb:4096,setMemoryMb:(memoryMb)=>set({memoryMb}),
   activeInstanceId:"",setActiveInstanceId:(activeInstanceId)=>set({activeInstanceId}),
   theme:"midnight",setTheme:(theme)=>set({theme})
-}),{name:"fre-launch-preferences"}));
+}),{
+  name:"fre-launch-preferences",
+  // Never restore the prior page after an unclean shutdown: skins/Three.js
+  // or a heavy page may have been open when Windows terminated WebView2.
+  merge:(stored,current)=>{
+    const value=(stored&&typeof stored==="object"?stored:{}) as Partial<Store>;
+    return {...current,...value,page:"Home",
+      theme:themesafe(value.theme),
+      nickname:typeof value.nickname==="string"&&/^[A-Za-z0-9_]{1,16}$/.test(value.nickname)?value.nickname:"Player",
+      memoryMb:typeof value.memoryMb==="number"&&value.memoryMb>=512&&value.memoryMb<=32768?value.memoryMb:4096,
+      selected:typeof value.selected==="string"&&value.selected.length<=64?value.selected:"",
+      activeInstanceId:typeof value.activeInstanceId==="string"&&value.activeInstanceId.length<=64?value.activeInstanceId:""
+    };
+  }
+}));
+function themesafe(theme:unknown):string {
+  return typeof theme==="string"&&["midnight","neon","ocean","emerald","light"].includes(theme)?theme:"midnight";
+}
 
 const menus = [
   {name:"Home",label:"Пункт запуску",icon:House,index:"01"},
@@ -141,10 +159,18 @@ export default function App() {
   const busyRef=useRef(false);
   const activeVersionRef=useRef("");
   const [showMore,setShowMore]=useState(false);
+  const [recoveryMode,setRecoveryMode]=useState(false);
   const isBusy=task==="installing"||task==="launching"||task==="running";
   const activeLabel=menus.find(item=>item.name===page)?.index??"01";
 
   useEffect(()=>{document.documentElement.dataset.theme=theme;},[theme]);
+  useEffect(()=>{
+    void invoke<boolean>("software_rendering").then(setRecoveryMode).catch(()=>{});
+    // Clear the crash-recovery marker only when the launcher has remained
+    // responsive, not immediately after the initial React frame.
+    const timer=window.setTimeout(()=>{void invoke("mark_frontend_ready").catch(()=>{});},20_000);
+    return ()=>window.clearTimeout(timer);
+  },[]);
   function markInstall(version:string,status:LastInstall["status"],message="") {
     rememberInstall(version,status,message);
     setLastAttempt({version,status,message,time:new Date().toISOString()});
@@ -292,6 +318,7 @@ export default function App() {
           <span>FRE / CONTROL ROOM</span><span className="fre-command-slash">/</span><b>{titles[page]}</b>
         </div>
         <div className="fre-command-right">
+          {recoveryMode&&<span title="Відновлення після аварійного завершення: WebView2 без GPU-прискорення" className="fre-safe-mode-tag">RECOVERY</span>}
           <button className="fre-command-java" onClick={()=>setPage("Settings")} title="Стан Java"><Coffee size={16}/><span>{java.startsWith("Java в PATH")?"JAVA НЕ ЗНАЙДЕНА":"JAVA READY"}</span></button>
           <button className="fre-command-account" onClick={()=>setPage("Accounts")} title="Вибрати профіль">
             <span className="fre-avatar">{nickname[0]?.toUpperCase()||"P"}</span><span>{nickname}</span><ChevronRight size={15}/>
@@ -363,7 +390,7 @@ export default function App() {
 
         {page==="Instances"&&<div className="fre-module"><InstancesPanel version={selected} active={activeInstanceId} setActive={setActiveInstanceId} setVersion={setSelected} setMemory={setMemoryMb} navigateHome={()=>setPage("Home")}/></div>}
         {page==="Mods"&&<div className="fre-module"><ModsPanel version={selected} instanceId={activeInstanceId}/></div>}
-        {page==="Skins"&&<div className="fre-module"><SkinStudio/></div>}
+        {page==="Skins"&&<div className="fre-module"><Suspense fallback={<div className="fre-log-mini-empty">Завантажуємо 3D-студію скінів…</div>}><SkinStudio/></Suspense></div>}
         {page==="Servers"&&<div className="fre-module"><ServersPanel/></div>}
         {page==="Screenshots"&&<div className="fre-module"><ScreenshotsPanel instanceId={activeInstanceId}/></div>}
         {page==="Backups"&&<div className="fre-module"><BackupsPanel instanceId={activeInstanceId} instanceName={activeInstanceId?"ВИБРАНА ЗБІРКА":""}/></div>}

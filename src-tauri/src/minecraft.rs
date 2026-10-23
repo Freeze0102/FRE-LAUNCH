@@ -378,7 +378,12 @@ pub async fn is_installed(app: AppHandle, version: String) -> Result<bool, Strin
 }
 
 #[tauri::command]
-pub fn java_info() -> Result<String, String> {
+pub async fn java_info() -> Result<String, String> {
+    tokio::task::spawn_blocking(|| detect_java_version())
+        .await.map_err(|e| format!("Java detection worker failed: {e}"))?
+}
+
+fn detect_java_version() -> Result<String, String> {
     let output = std::process::Command::new("java").arg("-version").output()
         .map_err(|e| format!("Java не знайдено в PATH: {e}"))?;
     if !output.status.success() { return Err("Java завершила перевірку з помилкою".into()); }

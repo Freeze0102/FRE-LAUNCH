@@ -1,4 +1,6 @@
 mod minecraft;
+mod startup;
+pub use startup::prepare_windows_webview;
 mod diagnostics;
 mod windows_crash;
 mod preflight;
@@ -57,6 +59,10 @@ pub fn run() {
             // Ensure the diagnostics page has a real startup breadcrumb even when a
             // previous installation stopped before the Rust install command began.
             diagnostics::write(&handle, "APP_START", "FRE LAUNCH process started");
+            if startup::software_rendering() {
+                diagnostics::write(&handle,"RECOVERY_MODE",
+                    "Previous startup ended too early; WebView2 GPU acceleration is disabled");
+            }
             let previous_hook = std::panic::take_hook();
             std::panic::set_hook(Box::new(move |panic| {
                 // Log Rust panics that happen outside the Minecraft installer too.
@@ -65,7 +71,7 @@ pub fn run() {
             }));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![get_versions, detect_java, minecraft::java_info, minecraft::install_version, diagnostics::read_diagnostics, diagnostics::record_interrupted_install, windows_crash::read_windows_crash_report, preflight::install_preflight, minecraft::is_installed, minecraft::launch_game, instances::list_instances, instances::create_instance, instances::update_instance, instances::delete_instance, modrinth::search_modrinth, modrinth::install_resourcepack, backups::create_world_backup, backups::list_world_backups, backups::restore_world_backup, accounts::list_offline_accounts, accounts::create_offline_account, accounts::delete_offline_account, java::list_java_runtimes, fabric::list_fabric_loaders, instances::set_instance_loader, servers::list_servers, servers::save_server, servers::delete_server, servers::check_server_status, mods::install_fabric_mod, mods::list_installed_mods, mods::toggle_installed_mod, mods::remove_installed_mod, managed_java::install_managed_java, screenshots::list_screenshots, screenshots::read_screenshot, screenshots::delete_screenshot])
+        .invoke_handler(tauri::generate_handler![startup::mark_frontend_ready, startup::software_rendering, get_versions, detect_java, minecraft::java_info, minecraft::install_version, diagnostics::read_diagnostics, diagnostics::record_interrupted_install, windows_crash::read_windows_crash_report, preflight::install_preflight, minecraft::is_installed, minecraft::launch_game, instances::list_instances, instances::create_instance, instances::update_instance, instances::delete_instance, modrinth::search_modrinth, modrinth::install_resourcepack, backups::create_world_backup, backups::list_world_backups, backups::restore_world_backup, accounts::list_offline_accounts, accounts::create_offline_account, accounts::delete_offline_account, java::list_java_runtimes, fabric::list_fabric_loaders, instances::set_instance_loader, servers::list_servers, servers::save_server, servers::delete_server, servers::check_server_status, mods::install_fabric_mod, mods::list_installed_mods, mods::toggle_installed_mod, mods::remove_installed_mod, managed_java::install_managed_java, screenshots::list_screenshots, screenshots::read_screenshot, screenshots::delete_screenshot])
         .run(tauri::generate_context!())
         .expect("error while running FRE LAUNCH");
 }
