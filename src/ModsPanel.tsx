@@ -14,6 +14,7 @@ type PackType = "resourcepack" | "shader";
 
 export default function ModsPanel({version, instanceId}: {version: string; instanceId: string}) {
   const [query,setQuery]=useState("");
+  const [view,setView]=useState<"browse"|"library">("browse");
   const [kind,setKind]=useState("mod");
   const [hits,setHits]=useState<ModrinthHit[]>([]);
   const [onlyCompatible,setOnlyCompatible]=useState(true);
@@ -158,6 +159,13 @@ export default function ModsPanel({version, instanceId}: {version: string; insta
   return <section className="panel">
     <div className="panel-heading"><h3>FRE MODRINTH</h3><Package size={20}/></div>
     <p>Каталог Modrinth: моди Fabric, ресурс-паки та шейдери встановлюються в окрему збірку з перевіркою файлів. Модпаки поки доступні для перегляду.</p>
+    <nav className="fre-content-tabs" aria-label="Каталог та встановлені ресурси">
+      <button className={view==="browse"?"active":""} onClick={()=>setView("browse")}>Шукати контент</button>
+      <button className={view==="library"?"active":""} onClick={()=>setView("library")}>
+        Моя бібліотека {instanceId? `(${installed.length+resourcepacks.length+shaderpacks.length})`:""}
+      </button>
+    </nav>
+    {view==="browse"&&<>
     <div className="toolbar">
       <div className="search"><Search size={18}/><input placeholder="Знайти Sodium, Lithium, Fabric API..." value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")void search(0);}}/></div>
       <select value={kind} onChange={e=>setKind(e.target.value)}>
@@ -237,7 +245,9 @@ export default function ModsPanel({version, instanceId}: {version: string; insta
       <span className="muted">{hits.length ? `Результати ${offset+1}–${offset+hits.length}` : "Нічого не знайдено. Спробуй прибрати фільтр версії."}</span>
       <button className="secondary" disabled={loading||hits.length<24||offset>=984} onClick={()=>void search(offset+24)}>Далі →</button>
     </div>}
-    {!!instanceId&&<div className="installed-mods">
+    </>}
+    {view==="library"&&!instanceId&&<p className="muted">Обери збірку в бібліотеці Minecraft, щоб керувати її встановленими модами й ресурсами.</p>}
+    {view==="library"&&!!instanceId&&<div className="installed-mods">
       <div className="panel-heading"><h3>Встановлені моди</h3><button className="icon-button" title="Оновити" onClick={()=>void refreshMods()}><RefreshCw size={16}/></button></div>
       {installed.length===0&&<p className="muted">Немає встановлених модів у цій збірці.</p>}
       {installed.map(mod=><div className="installed-mod-row" key={mod.filename}>
@@ -246,7 +256,7 @@ export default function ModsPanel({version, instanceId}: {version: string; insta
         <button className="icon-button danger" title="Видалити" disabled={busy} onClick={()=>void remove(mod)}><Trash2 size={16}/></button>
       </div>)}
     </div>}
-    {!!instanceId&&([{kind:"resourcepack",title:"Мої ресурс-паки",files:resourcepacks},
+    {view==="library"&&!!instanceId&&([{kind:"resourcepack",title:"Мої ресурс-паки",files:resourcepacks},
       {kind:"shader",title:"Мої шейдери",files:shaderpacks}] as const).map(group=>
       <div className="installed-mods" key={group.kind}>
         <div className="panel-heading"><h3>{group.title}</h3>
@@ -260,6 +270,10 @@ export default function ModsPanel({version, instanceId}: {version: string; insta
         </div>)}
       </div>
     )}
+    {view==="library"&&!!instanceId&&<div className="notice">
+      <Info size={16}/> Ресурс-паки вмикаються в налаштуваннях Minecraft. Для шейдерів потрібен Iris або інший сумісний завантажувач.
+      <button className="secondary" onClick={()=>{setView("browse");setKind("mod");setQuery("Iris");setOpened(null);}}>Знайти Iris</button>
+    </div>}
     <div className="notice"><ShieldCheck size={18}/>
       <span><strong>FRE SAFE DOWNLOAD</strong> · Встановлення з Modrinth використовує HTTPS, SHA-512, обмеження розміру та перевірку ZIP/JAR. Для модів Fabric підтягуються обов’язкові залежності. Лаунчер не є антивірусом і не гарантує відсутності шкідливого Java-коду.</span>
     </div>
