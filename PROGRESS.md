@@ -1,39 +1,33 @@
-# FRE LAUNCH development status
+# FRE LAUNCH — development status
 
-Version: **0.4.0 Alpha** — feature branch `feat/launcher-reliability-fabric`.
+## 0.5.0 Alpha / FIELD NOTES
 
-## Code completed in this branch (CI verification pending)
-- Streamed downloads (SHA-1, size cap, HTTPS host and redirect validation).
-- Per-instance native extraction and Java selection based on required game version.
-- Legacy virtual/resource asset materialization.
-- Fabric Loader integration through documented Fabric Meta profile endpoint.
-- Modrinth Fabric mod installation (required dependencies, verified SHA-512), local mod toggles/removal.
-- Live Minecraft Java server status protocol and persistent server addresses.
-- Per-instance screenshot gallery with safe PNG validation, thumbnails and deletion.
-- Portable Temurin JRE installation with SHA-256 checksum validation; versions 8, 11, 17, 21, 25.
-- React interface for modloaders, mods, Java installs and server management.
+### Implemented in repository
 
-## Existing from 0.3.0 Alpha
-- Original dark launcher UI with themes, skin editor, local profiles, SQLite game instances.
-- Mojang version manifest, Java process launch, live logs, saved world backups, resource packs.
-- Windows GitHub Actions NSIS installer and portable EXE.
+- An original editoral / voxel-world UI: custom SVG biome, ink + paper palette, lime accent, condensed typography, custom navigation and launch console, responsive layouts and five saved themes.
+- Frontend ErrorBoundary: fatal React render errors show a branded recovery screen and save error text locally; uncaught JS errors are also preserved in local storage.
+- Tauri installer command: prevents overlapping version installs and reports ordinary errors and intercepted async panics. Records local install-start, success and error entries; exposes logs through the Diagnostics page.
+- Dual Windows NSIS packages:
+  - Standard current-user installer without elevation.
+  - Alternative administrator installer with per-user/system-wide choice.
+  - Embedded WebView2 bootstrapper.
+- GitHub Actions checks TypeScript and Rust, builds both installers and portable EXE, and smoke-tests standard installer in a custom Windows directory.
+- Vanilla Mojang downloads with hash verification; initial real Java process launch implementation.
+- SQLite-backed instances, local offline accounts, Java manager, Fabric/Quilt metadata support, checked Modrinth resource/mod installs, custom skins and 3D preview, server ping, screenshots and ZIP backups.
 
-## Verification
-- **0.3.0 main Windows build passed**, see GitHub Actions.
-- **0.4.0:** GitHub Actions in PR #3 will test TypeScript/Rust and Windows packaging.
-- Actual Minecraft gameplay has **not** been independently verified in a real Windows graphical session.
-- Do not call 0.4 a stable or fully verified game launcher yet.
+### Verification
 
-## Known limitations
-- Microsoft OAuth and entitlements are not implemented; offline profiles only.
-- Forge/NeoForge/Quilt not implemented.
-- Older versions and advanced OS-specific launcher rules may require fixes.
-- No robust pause/resume download UI; version installer progress is stage-based.
-- Modrinth resources and Minecraft game launch require network, except already cached assets.
+- 0.4 Windows packaging was green in main.
+- 0.5 final build and custom-dir NSIS smoke test must be confirmed through the latest GitHub Actions results.
+- No independently confirmed Minecraft gameplay session on a Windows desktop yet.
+- The exact cause of a crash reported while clicking Install has not been reproduced because no Windows crash log or exception details were supplied. Added diagnostics and reduced common failure paths, but a successful build alone is not proof of resolution.
 
-## Next priorities
-1. Green Windows CI and installer artifacts for 0.4.
-2. Real vanilla/Fabric launch smoke tests on Windows.
-3. Microsoft accounts and secure authentication.
-4. Additional modloaders and version compatibility testing.
-5. UI polish, localization and stable release packaging.
+### Still missing
+
+- Microsoft OAuth + entitlement validation, secure token storage.
+- Forge, NeoForge, broad Minecraft version and GPU/Java compatibility coverage.
+- Full tests on affected Windows PC and stable release signing/updater.
+- Ability to relocate actual Minecraft game data onto D: through the launcher.
+- Full offline/online resilience and compatibility for ancient Minecraft versions.
+
+**Logs are local-only; no automatic crash uploads or telemetry.**
