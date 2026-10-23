@@ -31,3 +31,11 @@
 - Full offline/online resilience and compatibility for ancient Minecraft versions.
 
 **Logs are local-only; no automatic crash uploads or telemetry.**
+
+## Installation preflight and dedicated download deck (new in main)
+
+- Checks actual Minecraft data directory by creating, writing, syncing and deleting a test file before downloads.
+- Disk errors display the actual target path, not just the application's install location.
+- Logs metadata, client, library and sampled asset-download milestones for post-crash diagnosis.
+- Original six-stage FRE DOWNLOAD ENGINE screen shows per-stage progress, disk-access status and links to logs.
+- **Unverified on the affected Windows machine:** a green CI build alone does not prove the reported abrupt close is fixed.
