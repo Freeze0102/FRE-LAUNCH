@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Package, DownloadCloud, Search, ShieldCheck, Trash2, RefreshCw, ArrowLeft, CheckCircle2, Info, ExternalLink } from "lucide-react";
 import type { Instance } from "./Features";
@@ -10,12 +10,15 @@ type ModrinthHit = {
 type ModVersion = {id:string;name:string;version_number:string;game_versions:string[];loaders:string[];date_published:string};
 type ModDetails = {project:{title:string;body:string;description:string;icon_url:string|null;downloads:number;project_type:string;categories:string[]};versions:ModVersion[]};
 type InstalledMod = {filename: string; enabled: boolean; bytes: number};
+type PackType = "resourcepack" | "shader";
 
 export default function ModsPanel({version, instanceId}: {version: string; instanceId: string}) {
   const [query,setQuery]=useState("");
   const [kind,setKind]=useState("mod");
   const [hits,setHits]=useState<ModrinthHit[]>([]);
   const [onlyCompatible,setOnlyCompatible]=useState(true);
+  const [sort,setSort]=useState("relevance");
+  const searchSequence=useRef(0);
   const [offset,setOffset]=useState(0);
   const [opened,setOpened]=useState<ModrinthHit|null>(null);
   const [details,setDetails]=useState<ModDetails|null>(null);
@@ -24,33 +27,47 @@ export default function ModsPanel({version, instanceId}: {version: string; insta
   const [showAllVersions,setShowAllVersions]=useState(false);
   const [selectedInstance,setSelectedInstance]=useState<Instance|null>(null);
   const [installed,setInstalled]=useState<InstalledMod[]>([]);
+  const [resourcepacks,setResourcepacks]=useState<InstalledMod[]>([]);
+  const [shaderpacks,setShaderpacks]=useState<InstalledMod[]>([]);
   const [loading,setLoading]=useState(false);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
   const [message,setMessage]=useState("");
 
   async function refreshMods() {
-    if (!instanceId) {setSelectedInstance(null);setInstalled([]);return;}
+    if (!instanceId) {setSelectedInstance(null);setInstalled([]);setResourcepacks([]);setShaderpacks([]);return;}
     try {
-      const profiles=await invoke<Instance[]>("list_instances");
+      const [profiles,mods,resources,shaders]=await Promise.all([
+        invoke<Instance[]>("list_instances"),
+        invoke<InstalledMod[]>("list_installed_mods",{instanceId}),
+        invoke<InstalledMod[]>("list_installed_packs",{instanceId,kind:"resourcepack"}),
+        invoke<InstalledMod[]>("list_installed_packs",{instanceId,kind:"shader"}),
+      ]);
       setSelectedInstance(profiles.find(p=>p.id===instanceId)??null);
-      setInstalled(await invoke<InstalledMod[]>("list_installed_mods",{instanceId}));
+      setInstalled(mods);setResourcepacks(resources);setShaderpacks(shaders);
     } catch(err){setError(String(err));}
   }
   useEffect(()=>{void refreshMods();},[instanceId]);
 
   async function search(pageOffset=0) {
+    const request=++searchSequence.current;
     setLoading(true);setError("");
     try {
       const results=await invoke<ModrinthHit[]>("search_modrinth", {
-        query:query.trim(),version:onlyCompatible ? version || null : null,projectType:kind,offset:pageOffset,
+        query:query.trim(),version:onlyCompatible ? version || null : null,
+        projectType:kind,offset:pageOffset,sort,
+        loader:onlyCompatible && kind==="mod" && selectedInstance?.loader!=="vanilla"
+          ? selectedInstance?.loader || null : null,
       });
-      setHits(results);
-      setOffset(pageOffset);
-    } catch(err){setError(String(err));setHits([]);}
-    finally{setLoading(false);}
+      if(request===searchSequence.current){setHits(results);setOffset(pageOffset);}
+    } catch(err){
+      if(request===searchSequence.current){setError(String(err));setHits([]);}
+    } finally{if(request===searchSequence.current)setLoading(false);}
   }
-  useEffect(()=>{void search(0);},[kind,version,onlyCompatible]);
+  useEffect(()=>{
+    const handle=window.setTimeout(()=>{void search(0);},350);
+    return ()=>window.clearTimeout(handle);
+  },[query,kind,version,onlyCompatible,selectedInstance?.loader,sort]);
 
   async function openProject(hit:ModrinthHit) {
     setOpened(hit);setDetails(null);setChosenVersion("");setShowAllVersions(false);setDetailBusy(true);setError("");
@@ -75,9 +92,12 @@ export default function ModsPanel({version, instanceId}: {version: string; insta
         const added=await invoke<string[]>("install_fabric_mod",{instanceId,projectId:opened.project_id,versionId:chosenVersion});
         setMessage(`Встановлено: ${added.join(", ")}`);
         await refreshMods();
-      } else if(opened.project_type==="resourcepack") {
-        setMessage(await invoke<string>("install_resourcepack",{instanceId,projectId:opened.project_id,versionId:chosenVersion}));
-      } else {throw Error("Автоматичне встановлення цього типу поки не підтримується.");}
+      } else if(opened.project_type==="resourcepack"||opened.project_type==="shader") {
+        const command=opened.project_type==="shader"?"install_shaderpack":"install_resourcepack";
+        const response=await invoke<string>(command,{instanceId,projectId:opened.project_id,versionId:chosenVersion});
+        setMessage(opened.project_type==="shader"?`${response}. Для роботи шейдерів також потрібен Iris або інший сумісний шейдерний завантажувач.`:response);
+        await refreshMods();
+      } else {throw Error("Імпорт модпаків поки не підтримується; не встановлюємо збірку частково.");}
     } catch(e){setError(String(e));}finally{setBusy(false);}
   }
 
@@ -85,8 +105,11 @@ export default function ModsPanel({version, instanceId}: {version: string; insta
     if (!instanceId || !selectedInstance){setError("Спочатку створи та обери Minecraft-збірку.");return;}
     setBusy(true);setError("");setMessage("");
     try {
-      if (kind==="resourcepack") {
-        setMessage(await invoke<string>("install_resourcepack",{instanceId,projectId:hit.project_id}));
+      if (kind==="resourcepack"||kind==="shader") {
+        const command=kind==="shader"?"install_shaderpack":"install_resourcepack";
+        const response=await invoke<string>(command,{instanceId,projectId:hit.project_id});
+        setMessage(kind==="shader"?`${response}. Для шейдерів потрібен Iris/інший сумісний завантажувач.`:response);
+        await refreshMods();
       } else if (kind==="mod") {
         if (selectedInstance.loader!=="fabric")throw Error("Для встановлення модів вибери Fabric у налаштуваннях збірки.");
         const added=await invoke<string[]>("install_fabric_mod",{instanceId,projectId:hit.project_id});
@@ -114,9 +137,27 @@ export default function ModsPanel({version, instanceId}: {version: string; insta
     finally{setBusy(false);}
   }
 
+  async function togglePack(pack:InstalledMod, packKind:PackType){
+    setBusy(true);setError("");setMessage("");
+    try{
+      await invoke("toggle_installed_pack",{instanceId,kind:packKind,filename:pack.filename});
+      await refreshMods();
+    }catch(err){setError(String(err));}
+    finally{setBusy(false);}
+  }
+  async function removePack(pack:InstalledMod, packKind:PackType){
+    if(!window.confirm(`Видалити «${pack.filename}» з цієї збірки?`))return;
+    setBusy(true);setError("");setMessage("");
+    try{
+      await invoke("remove_installed_pack",{instanceId,kind:packKind,filename:pack.filename});
+      await refreshMods();
+    }catch(err){setError(String(err));}
+    finally{setBusy(false);}
+  }
+
   return <section className="panel">
     <div className="panel-heading"><h3>FRE MODRINTH</h3><Package size={20}/></div>
-    <p>Офіційний каталог Modrinth: моди, ресурс-паки, шейдери й модпаки. Моди Fabric та ресурс-паки можна встановлювати з перевіркою SHA-512.</p>
+    <p>Каталог Modrinth: моди Fabric, ресурс-паки та шейдери встановлюються в окрему збірку з перевіркою файлів. Модпаки поки доступні для перегляду.</p>
     <div className="toolbar">
       <div className="search"><Search size={18}/><input placeholder="Знайти Sodium, Lithium, Fabric API..." value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")void search(0);}}/></div>
       <select value={kind} onChange={e=>setKind(e.target.value)}>
@@ -124,6 +165,13 @@ export default function ModsPanel({version, instanceId}: {version: string; insta
         <option value="resourcepack">Ресурс-паки</option>
         <option value="shader">Шейдери</option>
         <option value="modpack">Модпаки</option>
+      </select>
+      <select value={sort} onChange={e=>setSort(e.target.value)} aria-label="Сортування результатів">
+        <option value="relevance">За відповідністю</option>
+        <option value="downloads">Найпопулярніші</option>
+        <option value="updated">Нещодавно оновлені</option>
+        <option value="newest">Нові проєкти</option>
+        <option value="follows">За підписками</option>
       </select>
       <button className="primary" onClick={()=>void search(0)} disabled={loading}>{loading?"Шукаю...":"Знайти"}</button>
     </div>
@@ -136,7 +184,7 @@ export default function ModsPanel({version, instanceId}: {version: string; insta
     </div>
     <label className="muted" style={{display:"flex",alignItems:"center",gap:8,marginTop:12}}>
       <input type="checkbox" checked={onlyCompatible} onChange={e=>setOnlyCompatible(e.target.checked)}/>
-      Показувати лише проєкти для Minecraft {version||"обраної версії"}
+      Автопідбір під Minecraft {version||"обраної версії"}{kind==="mod"&&selectedInstance?.loader&&selectedInstance.loader!=="vanilla"?` · ${selectedInstance.loader}`:""}
     </label>
     <p className="muted">Пошук у всьому каталозі Modrinth. Без галочки показуються також проєкти для інших версій, але встановлення потребує сумісного релізу.</p>
     <p className="muted">{instanceId ? `Збірка: ${selectedInstance?.name??"Обрана"} · ${selectedInstance?.loader??"Vanilla"}` : "Спочатку обери окрему збірку для встановлення."} · Minecraft {version||"—"}</p>
@@ -167,7 +215,7 @@ export default function ModsPanel({version, instanceId}: {version: string; insta
               </button>;
             })}</div>
             {!compatibleVersions.length&&<p className="muted">Немає сумісної версії. Можеш переглянути інші, але встановлення несумісних заблоковано.</p>}
-            <button className="primary" disabled={busy||!chosenVersion||!selectedInstance||!["mod","resourcepack"].includes(opened.project_type)||(opened.project_type==="mod"&&selectedInstance.loader!=="fabric")} onClick={()=>void installSelected()}>
+            <button className="primary" disabled={busy||!chosenVersion||!selectedInstance||!["mod","resourcepack","shader"].includes(opened.project_type)||(opened.project_type==="mod"&&selectedInstance.loader!=="fabric")} onClick={()=>void installSelected()}>
               <DownloadCloud size={17}/> {busy?"Встановлення…":"Встановити у збірку"}
             </button>
           </div>
@@ -179,7 +227,7 @@ export default function ModsPanel({version, instanceId}: {version: string; insta
         {hit.icon_url ? <img className="mod-icon" src={hit.icon_url} alt=""/> : <span className="mod-icon fallback"><Package size={24}/></span>}
         <div className="mod-copy"><button className="fre-mod-open" onClick={()=>void openProject(hit)}><h3>{hit.title}</h3></button><p>{hit.description}</p><small><DownloadCloud size={13}/>{hit.downloads.toLocaleString("uk-UA")} завантажень</small></div>
         <button className="secondary" onClick={()=>void openProject(hit)}>Детальніше</button>
-        {(kind==="mod"||kind==="resourcepack")
+        {(kind==="mod"||kind==="resourcepack"||kind==="shader")
           ? <button className="secondary" disabled={busy || !selectedInstance || (kind==="mod"&&selectedInstance.loader!=="fabric")} title={kind==="mod"&&selectedInstance?.loader!=="fabric"?"Потрібна Fabric-збірка":"Встановити"} onClick={()=>void install(hit)}>{busy?"...":"Встановити"}</button>
           : <span className="muted">Перегляд</span>}
       </article>)}
@@ -198,8 +246,22 @@ export default function ModsPanel({version, instanceId}: {version: string; insta
         <button className="icon-button danger" title="Видалити" disabled={busy} onClick={()=>void remove(mod)}><Trash2 size={16}/></button>
       </div>)}
     </div>}
+    {!!instanceId&&([{kind:"resourcepack",title:"Мої ресурс-паки",files:resourcepacks},
+      {kind:"shader",title:"Мої шейдери",files:shaderpacks}] as const).map(group=>
+      <div className="installed-mods" key={group.kind}>
+        <div className="panel-heading"><h3>{group.title}</h3>
+          <button className="icon-button" title="Оновити" onClick={()=>void refreshMods()}><RefreshCw size={16}/></button>
+        </div>
+        {group.files.length===0&&<p className="muted">У цій збірці поки немає файлів.</p>}
+        {group.files.map(pack=><div className="installed-mod-row" key={pack.filename}>
+          <div><b>{pack.filename}</b><span>{(pack.bytes/1024/1024).toFixed(1)} MB · {pack.enabled?"Увімкнено":"Вимкнено"}</span></div>
+          <button className="secondary" disabled={busy} onClick={()=>void togglePack(pack,group.kind)}>{pack.enabled?"Вимкнути":"Увімкнути"}</button>
+          <button className="icon-button danger" title="Видалити" disabled={busy} onClick={()=>void removePack(pack,group.kind)}><Trash2 size={16}/></button>
+        </div>)}
+      </div>
+    )}
     <div className="notice"><ShieldCheck size={18}/>
-      <span><strong>FRE SAFE DOWNLOAD</strong> · Завантаження тільки з офіційного CDN Modrinth через HTTPS, перевірка SHA-512, розміру, формату JAR та сумісності Minecraft/Fabric. Залежності перевіряються перед встановленням. Це перевірка цілісності, а не антивірус. Під час встановлення та перед запуском лаунчер перевіряє структуру JAR без Windows Defender. Це не антивірусне сканування. Жоден сканер не гарантує повної безпеки.</span>
+      <span><strong>FRE SAFE DOWNLOAD</strong> · Встановлення з Modrinth використовує HTTPS, SHA-512, обмеження розміру та перевірку ZIP/JAR. Для модів Fabric підтягуються обов’язкові залежності. Лаунчер не є антивірусом і не гарантує відсутності шкідливого Java-коду.</span>
     </div>
     <p className="muted">Власні JAR, завантажені через браузер, можна покласти в папку mods обраної збірки. Вони не отримують позначки перевіреного джерела Modrinth. Моди — сторонній виконуваний код; перед запуском перевіряй автора й репутацію проєкту.</p>
   </section>;
