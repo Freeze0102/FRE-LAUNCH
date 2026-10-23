@@ -193,6 +193,9 @@ pub async fn install_fabric_mod(app: AppHandle, instance_id: String, project_id:
         let name=verified_jar(&client,version,&directory).await?;
         added.push(name);
     }
+    // Catalog installations are checked automatically, without an extra UI action.
+    // If Defender cannot verify a file, report failure instead of claiming success.
+    scan_instance_mods(&app, &instance_id).await?;
     Ok(added)
 }
 
