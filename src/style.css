@@ -508,3 +508,18 @@ body{margin:0}
   .fre-footer>span:nth-child(2){display:none}
 }
 @media(prefers-reduced-motion:reduce){.fre-app *, .fre-app *::before,.fre-app *::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
+
+
+/* Render-failure recovery screen — unmistakably part of FRE, not a blank WebView. */
+.fre-crash-screen{min-height:100vh;background:#1b2b23;color:#f3f1e6;display:grid;place-items:center;padding:22px;font-family:"Segoe UI",Arial,sans-serif}
+.fre-crash-inner{width:min(100%,790px);border:2px solid #c8f180;padding:38px 38px 20px;box-shadow:10px 10px 0 #0009}
+.fre-crash-symbol{display:grid;place-items:center;height:60px;width:60px;color:#203027;background:#cdf188}
+.fre-crash-index{font:12px Consolas,monospace;letter-spacing:1.8px;color:#cdf188;margin-top:26px}
+.fre-crash-inner h1{font:clamp(43px,7vw,73px)/.98 Impact,"Arial Black",sans-serif;margin:13px 0}
+.fre-crash-inner h1 em{font-style:normal;color:#cdf188}
+.fre-crash-inner p{font:14px/1.6 "Segoe UI",sans-serif;max-width:540px;color:#c5d3c3}
+.fre-crash-inner pre{background:#0e1712;border-left:5px solid #ed9f83;color:#ffcfc1;padding:18px;white-space:pre-wrap;overflow:auto;max-height:220px;font:11px/1.6 Consolas,monospace}
+.fre-crash-actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:20px}
+.fre-crash-actions button{display:flex;gap:9px;align-items:center;justify-content:center;background:#cdf188;color:#1b2b23;padding:13px;border:1px solid #cdf188;font:12px Consolas,monospace;font-weight:900;cursor:pointer}
+.fre-crash-actions button:last-child{background:transparent;color:#cdf188}
+.fre-crash-footer{margin-top:34px;font:10px Consolas,monospace;color:#a0b6a7;letter-spacing:.7px;border-top:1px solid #ffffff35;padding-top:12px}
