@@ -212,6 +212,74 @@ pub async fn install_fabric_mod(app: AppHandle, instance_id: String, project_id:
     Ok(added)
 }
 
+#[derive(Clone, Serialize)]
+#[serde(rename_all="camelCase")]
+pub struct ModUpdate {
+    filename: String,
+    project_id: String,
+    version_id: String,
+    version_number: String,
+}
+
+/// Read-only update discovery. Only recognized Modrinth hashes are reported;
+/// unknown manual JARs remain untouched and no files are replaced.
+#[tauri::command]
+pub async fn check_mod_updates(app: AppHandle, instance_id: String) -> Result<Vec<ModUpdate>,String> {
+    let profile = super::instances::read(&app, &instance_id)?;
+    if profile.loader!="fabric" {return Err("Оновлення наразі перевіряються для Fabric-збірок".into());}
+    let directory = mods_dir(&app, &instance_id)?;
+    let current = list_installed_mods(app.clone(),instance_id.clone()).await?;
+    if current.len()>256 {return Err("Too many mods for one update check (max 256)".into());}
+    let mut hashes: Vec<(String,String)> = Vec::new();
+    for item in current.into_iter().filter(|m|m.enabled) {
+        let path = directory.join(&item.filename);
+        let metadata = fs::symlink_metadata(&path).await.map_err(|e|e.to_string())?;
+        if metadata.file_type().is_symlink() || !metadata.is_file() {
+            return Err(format!("Refusing symlink mod during update check: {}",item.filename));
+        }
+        if metadata.len()>MAX_MOD_BYTES {return Err(format!("Mod too large: {}",item.filename));}
+        let hash = tokio::task::spawn_blocking(move || -> Result<String,String> {
+            use std::io::Read;
+            let mut source=std::fs::File::open(path).map_err(|e|e.to_string())?;
+            let mut digest=Sha512::new();
+            let mut buffer=[0u8; 65536];
+            loop {
+                let count=source.read(&mut buffer).map_err(|e|e.to_string())?;
+                if count==0 {break;}
+                digest.update(&buffer[..count]);
+            }
+            Ok(format!("{:x}",digest.finalize()))
+        }).await.map_err(|e|e.to_string())??;
+        hashes.push((item.filename,hash));
+    }
+    if hashes.is_empty() {return Ok(Vec::new());}
+    let digest_list:Vec<&str>=hashes.iter().map(|(_,hash)|hash.as_str()).collect();
+    let payload=serde_json::json!({
+        "hashes":digest_list,"algorithm":"sha512",
+        "loaders":["fabric"],"game_versions":[profile.version]
+    });
+    let latest:Value=client()?.post("https://api.modrinth.com/v2/version_files/update")
+        .json(&payload).send().await.map_err(|e|e.to_string())?
+        .error_for_status().map_err(|e|e.to_string())?
+        .json().await.map_err(|e|e.to_string())?;
+    let mut updates=Vec::new();
+    for (filename,hash) in hashes {
+        let Some(version)=latest.get(&hash) else {continue;};
+        let is_current=version["files"].as_array().is_some_and(|files|files.iter().any(|file|
+            file["hashes"]["sha512"].as_str().is_some_and(|h|h.eq_ignore_ascii_case(&hash))
+        ));
+        if is_current {continue;}
+        let (Some(project_id),Some(version_id),Some(version_number))=(
+            version["project_id"].as_str(),version["id"].as_str(),version["version_number"].as_str()
+        )else{continue;};
+        updates.push(ModUpdate{
+            filename,project_id:project_id.into(),version_id:version_id.into(),
+            version_number:version_number.into()
+        });
+    }
+    Ok(updates)
+}
+
 #[tauri::command]
 pub async fn list_installed_mods(app: AppHandle, instance_id: String) -> Result<Vec<InstalledMod>, String> {
     let directory=mods_dir(&app,&instance_id)?;
