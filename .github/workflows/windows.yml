@@ -1,10 +1,8 @@
 name: Windows Build
+# Heavy Windows installers consume private-repository Actions minutes.
+# Run only when explicitly requested in GitHub -> Actions -> Windows Build.
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
 
 permissions:
   contents: write
@@ -22,7 +20,7 @@ concurrency:
 
 jobs:
   quarantine-flagged-release:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: write
