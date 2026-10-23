@@ -17,6 +17,7 @@
 - [ ] Microsoft OAuth and Minecraft ownership checks.
 - [ ] Fabric/Forge/NeoForge/Quilt and compatible mod installation.
 - [x] Server library and status ping (no SRV DNS or direct-connect yet).
+- [x] Safe instance-specific screenshot gallery with preview and delete.
 - [ ] Updater, complete translations, logging/privacy hardening.
 - [ ] Release verified stable installer.
 
