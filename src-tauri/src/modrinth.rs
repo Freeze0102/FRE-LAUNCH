@@ -268,6 +268,9 @@ pub struct InstalledPack {
 fn content_dir(app: &AppHandle, instance_id: &str, kind: &str) -> Result<PathBuf, String> {
     let instance = super::instances::read(app, instance_id)?;
     let path = super::instances::game_directory(app, instance_id, &instance.version)?;
+    // Never let a junction/symlink silently redirect content operations away
+    // from this instance. Also materialize standard folders if missing.
+    super::game_folders::prepare_folders(&path)?;
     Ok(path.join(pack_folder(kind)?))
 }
 
