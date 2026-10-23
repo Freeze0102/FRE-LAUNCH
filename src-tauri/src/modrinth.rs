@@ -21,8 +21,22 @@ struct SearchResults { hits: Vec<ModrinthHit> }
 
 fn http() -> Result<reqwest::Client, String> {
     reqwest::Client::builder()
-        .user_agent("FRE-LAUNCH/0.3 (https://github.com/Freeze0102/FRE-LAUNCH)")
+        .user_agent(concat!("FRE-LAUNCH/",env!("CARGO_PKG_VERSION")," (+https://github.com/Freeze0102/FRE-LAUNCH)"))
         .timeout(std::time::Duration::from_secs(35))
+        // A Modrinth CDN link must not silently redirect the launcher to
+        // an unrelated download host.
+        .redirect(reqwest::redirect::Policy::custom(|attempt| {
+            if attempt.previous().len()>4 {
+                return attempt.error("Too many Modrinth redirects");
+            }
+            let uri=attempt.url();
+            if uri.scheme()=="https" &&
+                matches!(uri.host_str(),Some("api.modrinth.com" | "cdn.modrinth.com")) {
+                attempt.follow()
+            } else {
+                attempt.error("Untrusted Modrinth redirect")
+            }
+        }))
         .build()
         .map_err(|e| e.to_string())
 }
@@ -131,6 +145,9 @@ pub async fn install_resourcepack(app: AppHandle, instance_id: String, project_i
         bytes.extend_from_slice(&chunk);
     }
     if received!=size {return Err("Downloaded size does not match Modrinth metadata".into());}
+    if !bytes.starts_with(b"PK\x03\x04") {
+        return Err("Resource pack is not a ZIP archive".into());
+    }
     if format!("{:x}", Sha512::digest(&bytes)) != expected.to_ascii_lowercase() {
         return Err("Resource pack hash validation failed".into());
     }
