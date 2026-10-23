@@ -325,7 +325,7 @@ async fn launch_inner(app: AppHandle, version: String, nickname: String, memory_
     let cached_metadata = base.join("versions").join(&version).join(format!("{version}.json"));
     // Installed games must remain launchable without contacting Mojang.
     // A manual reinstall explicitly rechecks the downloaded files.
-    let meta = if fs::try_exists(base.join("versions").join(&version).join(".installed"))
+    let mut meta = if fs::try_exists(base.join("versions").join(&version).join(".installed"))
         .await.map_err(|e| e.to_string())? && fs::try_exists(&cached_metadata).await.map_err(|e| e.to_string())? {
         let bytes = fs::read(&cached_metadata).await.map_err(|e| e.to_string())?;
         serde_json::from_slice::<Value>(&bytes).map_err(|e| e.to_string())?
@@ -336,6 +336,28 @@ async fn launch_inner(app: AppHandle, version: String, nickname: String, memory_
     if let Some(profile) = &profile {
         if profile.version != version { return Err("Instance version mismatch".into()); }
     }
+    if let Some(instance) = &profile {
+        if instance.loader == "fabric" {
+            let loader_version = instance.loader_version.as_deref()
+                .ok_or("Fabric instance has no loader version")?;
+            progress(&app, "fabric", 0, 1, format!("Preparing Fabric {loader_version}"));
+            let fabric_profile = super::fabric::load_profile(&base, &version, loader_version).await?;
+            super::fabric::merge_profile(&mut meta, &fabric_profile)?;
+            // Fabric libraries come from the official Maven repository and
+            // are cached alongside Mojang dependencies. No installer JAR is executed.
+            let http = client()?;
+            let fabric_libraries = libraries(&fabric_profile, &base)?;
+            let total = fabric_libraries.len();
+            for (index, (url, dest, hash, _)) in fabric_libraries.iter().enumerate() {
+                download_one(&http, url, dest, hash.as_deref()).await?;
+                progress(&app, "fabric", index + 1, total,
+                    format!("Fabric libraries: {}/{}", index + 1, total));
+            }
+        } else if instance.loader != "vanilla" {
+            return Err("Selected modloader is not yet supported".into());
+        }
+    }
+
     // Prefer an explicit instance override. Otherwise select a compatible
     // Java runtime from already installed JDKs and Minecraft-managed runtimes.
     let chosen_runtime = if profile.as_ref().and_then(|p| p.java_path.as_ref()).is_some() {
