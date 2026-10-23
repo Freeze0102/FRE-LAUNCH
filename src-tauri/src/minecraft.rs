@@ -31,25 +31,11 @@ fn root(app: &AppHandle) -> Result<PathBuf, String> {
 }
 
 fn client() -> Result<Client, String> {
-    Client::builder().timeout(Duration::from_secs(120)).user_agent("FRE-LAUNCH/0.2 (Minecraft launcher)").build().map_err(|e| e.to_string())
-}
-
-fn value_str<'a>(v: &'a Value, key: &str) -> Result<&'a str, String> {
-    v.get(key).and_then(Value::as_str).ok_or_else(|| format!("Missing required metadata property: {key}"))
+    super::downloads::client()
 }
 
 fn allowed_url(url: &str) -> Result<(), String> {
-    let parsed = reqwest::Url::parse(url).map_err(|e| e.to_string())?;
-    if parsed.scheme() != "https" { return Err(format!("Insecure download URL: {url}")); }
-    let host = parsed.host_str().unwrap_or("").to_ascii_lowercase();
-    if !matches!(host.as_str(),
-        "piston-meta.mojang.com" | "piston-data.mojang.com" |
-        "resources.download.minecraft.net" | "libraries.minecraft.net" |
-        "launcher.mojang.com" | "launchermeta.mojang.com" |
-        "meta.mojang.com" | "s3.amazonaws.com") {
-        return Err(format!("Untrusted download domain: {host}"));
-    }
-    Ok(())
+    super::downloads::trusted_url(url)
 }
 
 async fn fetch_json(client: &Client, url: &str) -> Result<Value, String> {
@@ -64,25 +50,7 @@ fn matches_sha(bytes: &[u8], expected: &str) -> bool {
 }
 
 async fn download_one(client: &Client, url: &str, path: &Path, sha1: Option<&str>) -> Result<(), String> {
-    allowed_url(url)?;
-    if fs::try_exists(path).await.map_err(|e| e.to_string())? {
-        if let Some(expected) = sha1 {
-            let old = fs::read(path).await.map_err(|e| e.to_string())?;
-            if matches_sha(&old, expected) { return Ok(()); }
-        } else { return Ok(()); }
-    }
-    let res = client.get(url).send().await.map_err(|e| format!("Download request failed: {e}"))?
-        .error_for_status().map_err(|e| format!("Download rejected: {e}"))?;
-    let bytes = res.bytes().await.map_err(|e| e.to_string())?;
-    if let Some(expected) = sha1 {
-        if !matches_sha(&bytes, expected) { return Err(format!("SHA1 mismatch downloading {}", path.display())); }
-    }
-    if let Some(parent) = path.parent() { fs::create_dir_all(parent).await.map_err(|e| e.to_string())?; }
-    let temporary = path.with_extension("fre-download");
-    fs::write(&temporary, &bytes).await.map_err(|e| e.to_string())?;
-    if fs::try_exists(path).await.unwrap_or(false) { fs::remove_file(path).await.map_err(|e| e.to_string())?; }
-    fs::rename(&temporary, path).await.map_err(|e| e.to_string())?;
-    Ok(())
+    super::downloads::download_one(client, url, path, sha1).await
 }
 
 fn os_rules(item: &Value) -> bool {
