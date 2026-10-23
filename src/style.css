@@ -140,3 +140,16 @@
 .create-form .server-port{width:85px;min-width:85px;flex:none}
 [data-theme="light"] .server-card{background:#f8f8ff;color:#2e3048;border-color:#dce0ed}
 @media(max-width:700px){.server-card{flex-wrap:wrap}.server-info{min-width:130px}}
+
+/* FRE MODRINTH — installed Fabric mod management */
+.installed-mods{margin-top:25px;border-top:1px solid #41435d;padding-top:19px}
+.installed-mod-row{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid #303449}
+.installed-mod-row>div{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px}
+.installed-mod-row b{font-size:12px;overflow-wrap:anywhere}
+.installed-mod-row span{font-size:10px;color:#9a9ebc}
+.installed-mod-row .secondary{white-space:nowrap}
+.fabric-options{width:100%;display:flex;flex-direction:column;gap:9px;padding-top:14px;margin-top:15px;border-top:1px solid #43445a}
+.fabric-options select{width:100%}
+.fabric-options .primary{align-self:flex-start}
+.fabric-options .muted{display:flex;gap:6px;align-items:center}
+[data-theme="light"] .installed-mod-row{border-color:#dadeec}
