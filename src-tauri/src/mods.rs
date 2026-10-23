@@ -147,10 +147,22 @@ async fn verified_jar(client: &Client, version: &Value, dir: &Path) -> Result<St
     if !format!("{:x}",Sha512::digest(&bytes)).eq_ignore_ascii_case(digest){
         return Err("Mod SHA-512 integrity check failed".into());
     }
-    fs::create_dir_all(dir).await.map_err(|e|e.to_string())?;
-    let tmp=dir.join(format!("{filename}.fre-download"));
-    fs::write(&tmp,&bytes).await.map_err(|e|e.to_string())?;
-    let result=fs::rename(&tmp,&path).await.map_err(|e|e.to_string());
+    super::game_folders::prepare_folders(dir.parent().ok_or("Invalid Minecraft folder")?)?;
+    // Use a unique create_new temp file: an existing .fre-download symlink
+    // must never be followed when installing untrusted content.
+    let tmp=dir.join(format!(".fre-{}.download",uuid::Uuid::new_v4()));
+    let result: Result<(),String> = async {
+        use tokio::io::AsyncWriteExt;
+        let mut staged=fs::OpenOptions::new().create_new(true).write(true).open(&tmp)
+            .await.map_err(|e|e.to_string())?;
+        staged.write_all(&bytes).await.map_err(|e|e.to_string())?;
+        staged.sync_all().await.map_err(|e|e.to_string())?;
+        drop(staged);
+        if fs::symlink_metadata(&path).await.is_ok() {
+            return Err("Mod file was created during download; refusing overwrite".into());
+        }
+        fs::rename(&tmp,&path).await.map_err(|e|e.to_string())
+    }.await;
     if result.is_err(){let _=fs::remove_file(&tmp).await;}
     result?;
     Ok(filename.into())
