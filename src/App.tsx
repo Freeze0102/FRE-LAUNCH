@@ -12,6 +12,7 @@ import {
   Wrench, X, Zap, Archive, ScrollText
 } from "lucide-react";
 import WorldArt from "./WorldArt";
+import { LAST_UI_CRASH } from "./ErrorBoundary";
 import { InstancesPanel } from "./Features";
 import ModsPanel from "./ModsPanel";
 import SkinStudio from "./SkinStudio";
@@ -78,6 +79,11 @@ const taglines:Record<Page,string>={
   Logs:"Тут видно, що насправді робить лаунчер.",
   Settings:"Налаштуй свій простір так, як хочеш."
 };
+const LAST_INSTALL_KEY = "fre-launch-last-install";
+function rememberInstall(version:string,status:"installing"|"complete"|"error"|"interrupted",message="") {
+  try {localStorage.setItem(LAST_INSTALL_KEY,JSON.stringify({version,status,message,time:new Date().toISOString()}));}
+  catch{/* Storage may be disabled; never interrupt downloads */}
+}
 const stages:Record<string,string>={
   metadata:"МЕТАДАНІ",client:"КЛІЄНТ",libraries:"БІБЛІОТЕКИ",
   assets:"РЕСУРСИ",fabric:"FABRIC",quilt:"QUILT",complete:"ГОТОВО"
@@ -112,6 +118,7 @@ export default function App() {
   const [java,setJava]=useState("Перевірка Java...");
   const [logs,setLogs]=useState<string[]>([]);
   const [diagnostics,setDiagnostics]=useState<Diagnostics|null>(null);
+  const [lastUiCrash,setLastUiCrash]=useState(()=>{try{return localStorage.getItem(LAST_UI_CRASH)||"";}catch{return "";}});
   const busyRef=useRef(false);
   const activeVersionRef=useRef("");
   const [showMore,setShowMore]=useState(false);
@@ -135,6 +142,19 @@ export default function App() {
     finally{setLoading(false);}
   }
   useEffect(()=>{
+    try {
+      const text=localStorage.getItem(LAST_INSTALL_KEY);
+      if(text){
+        const previous=JSON.parse(text) as {version?:string;status?:string};
+        if(previous.status==="installing") {
+          const version=previous.version||"невідомої версії";
+          setError(`Попередній сеанс обірвався під час встановлення Minecraft ${version}. Відкрито діагностику: скопіюй журнал для перевірки.`);
+          setPage("Logs");
+          rememberInstall(version,"interrupted","Unexpected process exit during download");
+          void loadDiagnostics();
+        }
+      }
+    }catch{/* Invalid cached state must not stop application startup */}
     void refreshVersions();
     void invoke<string>("java_info").then(setJava).catch(e=>setJava("Java в PATH не знайдена: "+humanError(e)));
     const a=listen<Progress>("install-progress",event=>setProgress(event.payload));
@@ -164,14 +184,17 @@ export default function App() {
     if(!version||busyRef.current)return;
     busyRef.current=true;
     activeVersionRef.current=version;
+    rememberInstall(version,"installing");
     setSelected(version);
     setTask("installing");
     setError("");setMessage("");setProgress({stage:"metadata",current:0,total:1,message:"Починаємо встановлення Minecraft..."});
     try{
       const result=await invoke<string>("install_version",{version});
+      rememberInstall(version,"complete",result);
       setMessage(result);
       if(useApp.getState().selected===version)setInstalled(true);
     }catch(e){
+      rememberInstall(version,"error",humanError(e));
       setError(humanError(e));
       setPage("Downloads");
       void loadDiagnostics();
@@ -345,6 +368,9 @@ export default function App() {
           {diagnostics&&<div className="fre-diagnostic-location"><FolderOpen size={16}/><span>{diagnostics.logPath}</span></div>}
           <div className="fre-log-label">FRE / INSTALL DIAGNOSTICS</div>
           <pre className="fre-log-output">{diagnostics?.contents||"Натисни «Читати журнал», щоб показати історію встановлень."}</pre>
+          <div className="fre-log-label">INTERFACE / LAST JS FAILURE</div>
+          <pre className="fre-log-output">{lastUiCrash||"Інтерфейс не зберіг повідомлень про попередні JavaScript-помилки."}</pre>
+          {lastUiCrash&&<div className="fre-log-toolbar"><button onClick={()=>void copyText(lastUiCrash)}><Copy size={16}/> КОПІЮВАТИ ЗБІЙ UI</button><button onClick={()=>{try{localStorage.removeItem(LAST_UI_CRASH)}catch{}setLastUiCrash("");}}><X size={16}/> ОЧИСТИТИ ЗБЕРЕЖЕНУ ПОМИЛКУ</button></div>}
           <div className="fre-log-label">MINECRAFT / LIVE OUTPUT</div>
           <pre className="fre-log-output">{logs.length?logs.join("\n"):"Minecraft ще не надсилав повідомлень."}</pre>
           <p>Якщо програма закрилася під час встановлення, після повторного запуску відкрий цю сторінку та скопіюй журнал.</p>
