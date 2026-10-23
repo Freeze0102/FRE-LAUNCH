@@ -85,6 +85,12 @@ pub fn game_directory(app: &AppHandle, id: &str, version: &str) -> Result<PathBu
     Ok(root.join("minecraft").join("instances").join(id))
 }
 
+fn game_directory_path(app: &AppHandle, id: &str) -> Result<PathBuf, String> {
+    validate_id(id)?;
+    Ok(app.path().app_data_dir().map_err(|e| e.to_string())?
+        .join("minecraft").join("instances").join(id))
+}
+
 #[tauri::command]
 pub fn list_instances(app: AppHandle) -> Result<Vec<Instance>, String> {
     let connection = db(&app)?;
@@ -113,6 +119,10 @@ pub fn create_instance(app: AppHandle, name: String, version: String) -> Result<
         loader: "vanilla".into(),
         loader_version: None,
     };
+    // Materialize the playable instance directory as soon as it is created.
+    // This makes mods, saves and resourcepacks available before the first launch.
+    let folder = game_directory_path(&app, &instance.id)?;
+    super::game_folders::prepare_folders(&folder)?;
     let connection = db(&app)?;
     connection.execute(
         "INSERT INTO instances (id,name,version,favorite,memory_mb,java_path) VALUES (?1,?2,?3,0,?4,NULL)",
