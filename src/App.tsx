@@ -390,9 +390,14 @@ export default function App() {
           </section>
           <section className="fre-control-paper"><div className="fre-module-label"><span>02 / РЕСУРСИ</span><SlidersHorizontal size={18}/></div>
             <h2>Оперативна пам'ять</h2><p>Виділена RAM: <strong>{memoryMb} MB</strong></p>
-            <input type="range" min={1024} max={16384} step={512} value={memoryMb} onChange={e=>setMemoryMb(Number(e.target.value))} className="fre-ram-range"/>
-            <div className="fre-ram-ends"><span>1 GB</span><span>16 GB</span></div>
-            <p>Збірки можуть мати власні Java та RAM.</p>
+            {activeInstanceId ? <>
+              <p>Зараз обрана окрема збірка. Її RAM зберігається в налаштуваннях збірки, а не в загальному повзунку.</p>
+              <button className="secondary" onClick={()=>setPage("Instances")}><Boxes size={16}/> Налаштувати RAM збірки в бібліотеці</button>
+            </> : <>
+              <input type="range" min={1024} max={16384} step={512} value={memoryMb} onChange={e=>setMemoryMb(Number(e.target.value))} className="fre-ram-range"/>
+              <div className="fre-ram-ends"><span>1 GB</span><span>16 GB</span></div>
+              <p>Загальна RAM для гри без окремої збірки. Зберігається автоматично.</p>
+            </>}
           </section>
           <section className="fre-control-paper"><div className="fre-module-label"><span>03 / JAVA</span><Coffee size={18}/></div><JavaPanel instanceId={activeInstanceId}/></section>
         </div>}
