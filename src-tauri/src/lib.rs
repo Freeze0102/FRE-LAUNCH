@@ -2,6 +2,7 @@ mod minecraft;
 mod downloads;
 mod fabric;
 mod servers;
+mod mods;
 mod instances;
 mod modrinth;
 mod backups;
@@ -46,7 +47,7 @@ fn detect_java() -> Result<String, String> {
 
 pub fn run() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![get_versions, detect_java, minecraft::java_info, minecraft::install_version, minecraft::is_installed, minecraft::launch_game, instances::list_instances, instances::create_instance, instances::update_instance, instances::delete_instance, modrinth::search_modrinth, modrinth::install_resourcepack, backups::create_world_backup, backups::list_world_backups, backups::restore_world_backup, accounts::list_offline_accounts, accounts::create_offline_account, accounts::delete_offline_account, java::list_java_runtimes, fabric::list_fabric_loaders, instances::set_instance_loader, servers::list_servers, servers::add_server, servers::delete_server, servers::ping_server])
+        .invoke_handler(tauri::generate_handler![get_versions, detect_java, minecraft::java_info, minecraft::install_version, minecraft::is_installed, minecraft::launch_game, instances::list_instances, instances::create_instance, instances::update_instance, instances::delete_instance, modrinth::search_modrinth, modrinth::install_resourcepack, backups::create_world_backup, backups::list_world_backups, backups::restore_world_backup, accounts::list_offline_accounts, accounts::create_offline_account, accounts::delete_offline_account, java::list_java_runtimes, fabric::list_fabric_loaders, instances::set_instance_loader, servers::list_servers, servers::add_server, servers::delete_server, servers::ping_server, mods::install_fabric_mod, mods::list_installed_mods, mods::toggle_installed_mod, mods::remove_installed_mod])
         .run(tauri::generate_context!())
         .expect("error while running FRE LAUNCH");
 }
