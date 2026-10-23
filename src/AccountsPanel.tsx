@@ -49,6 +49,6 @@ export default function AccountsPanel({nickname,onSelect}:{nickname:string;onSel
       </article>)}
     </div>
     {accounts.length===0&&<div className="small-empty"><UserRound size={32}/><h3>Додай свій перший акаунт</h3><p>Локальні профілі працюють з офлайн-сумісними середовищами.</p></div>}
-    <p className="muted"><ShieldCheck size={14}/> Microsoft OAuth ще не реалізовано. Офлайн-профіль не підтверджує придбання Minecraft і не обходить серверну авторизацію.</p>
+    <p className="muted"><ShieldCheck size={14}/> Це лише локальні офлайн-профілі — не вхід у Microsoft/Minecraft. Нікнейм сам по собі не дає доступу до твого ліцензійного акаунта. На серверах з окремою реєстрацією (/register або /login) пароль і прив'язка профілю визначаються самим сервером. Якщо нік уже зайнятий, не намагайся входити в чужий обліковий запис. Microsoft OAuth ще не реалізовано.</p>
   </section>;
 }
