@@ -245,7 +245,6 @@ pub async fn remove_installed_mod(app: AppHandle, instance_id: String, filename:
 /// Reject corrupt, excessive, or executable-bearing ZIPs before loading mods.
 /// This cannot establish that arbitrary Java bytecode is harmless.
 fn inspect_jar(path: &Path) -> Result<(), String> {
-    use std::io::Read;
     const MAX_FILES: usize = 20_000;
     const MAX_UNPACKED: u64 = 768 * 1024 * 1024;
     let file = std::fs::File::open(path).map_err(|e|e.to_string())?;
@@ -281,14 +280,39 @@ fn inspect_jar(path: &Path) -> Result<(), String> {
 }
 
 pub async fn scan_instance_mods(app: &AppHandle, instance_id: &str) -> Result<(), String> {
-    let directory=mods_dir(app,instance_id)?;
-    if !fs::try_exists(&directory).await.map_err(|e|e.to_string())? {return Ok(());}
-    let mods=list_installed_mods(app.clone(),instance_id.to_owned()).await?;
-    for item in mods.into_iter().filter(|m|m.enabled) {
-        let path=directory.join(&item.filename);
+    let directory = mods_dir(app, instance_id)?;
+    let root = directory.parent().ok_or("Missing instance directory")?;
+    // A symlinked instance or mods folder must never bypass the inspection gate.
+    for folder in [root, directory.as_path()] {
+        match fs::symlink_metadata(folder).await {
+            Ok(meta) if meta.file_type().is_symlink() || !meta.is_dir() =>
+                return Err(format!("Unsafe Minecraft directory: {}", folder.display())),
+            Ok(_) => {},
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                if folder == directory.as_path() { return Ok(()); }
+                return Err("Minecraft instance directory is missing".into());
+            },
+            Err(e) => return Err(e.to_string()),
+        }
+    }
+
+    // Inspect every enabled JAR, including manually copied files with unusual
+    // names. Never silently skip a file that Minecraft itself may try to load.
+    let mut entries = fs::read_dir(&directory).await.map_err(|e| e.to_string())?;
+    while let Some(entry) = entries.next_entry().await.map_err(|e|e.to_string())? {
+        let filename = entry.file_name().to_string_lossy().into_owned();
+        if !filename.to_ascii_lowercase().ends_with(".jar") { continue; }
+        if !valid_filename(&filename, ".jar") {
+            return Err(format!("Unsafe mod filename: {filename}. Rename or remove it before launching."));
+        }
+        let metadata = fs::symlink_metadata(entry.path()).await.map_err(|e|e.to_string())?;
+        if metadata.file_type().is_symlink() || !metadata.is_file() {
+            return Err(format!("Refusing non-regular mod entry: {filename}"));
+        }
+        let path = entry.path();
         tokio::task::spawn_blocking(move || inspect_jar(&path))
             .await.map_err(|e|e.to_string())?
-            .map_err(|e|format!("Mod {} failed internal archive inspection: {e}",item.filename))?;
+            .map_err(|e|format!("Mod {filename} failed archive inspection: {e}"))?;
     }
     Ok(())
 }
@@ -296,6 +320,40 @@ pub async fn scan_instance_mods(app: &AppHandle, instance_id: &str) -> Result<()
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn inspect_jar_rejects_non_zip() {
+        let path=std::env::temp_dir().join(format!("fre-fake-mod-{}.jar",uuid::Uuid::new_v4()));
+        std::fs::write(&path,b"not a zip archive").unwrap();
+        assert!(inspect_jar(&path).is_err());
+        std::fs::remove_file(path).unwrap();
+    }
+    #[test]
+    fn inspect_jar_accepts_normal_fabric_metadata() {
+        use std::io::Write;
+        let path=std::env::temp_dir().join(format!("fre-normal-mod-{}.jar",uuid::Uuid::new_v4()));
+        let file=std::fs::File::create(&path).unwrap();
+        let mut zip=zip::ZipWriter::new(file);
+        zip.start_file("fabric.mod.json",zip::write::SimpleFileOptions::default()).unwrap();
+        zip.write_all(br#"{"schemaVersion":1,"id":"safe-test","version":"1.0.0"}"#).unwrap();
+        zip.finish().unwrap();
+        assert!(inspect_jar(&path).is_ok());
+        std::fs::remove_file(path).unwrap();
+    }
+    #[test]
+    fn inspect_jar_rejects_embedded_executables() {
+        use std::io::Write;
+        let path=std::env::temp_dir().join(format!("fre-risky-mod-{}.jar",uuid::Uuid::new_v4()));
+        let file=std::fs::File::create(&path).unwrap();
+        let mut zip=zip::ZipWriter::new(file);
+        zip.start_file("fabric.mod.json",zip::write::SimpleFileOptions::default()).unwrap();
+        zip.write_all(b"{}").unwrap();
+        zip.start_file("payload.exe",zip::write::SimpleFileOptions::default()).unwrap();
+        zip.write_all(b"dummy").unwrap();
+        zip.finish().unwrap();
+        assert!(inspect_jar(&path).is_err());
+        std::fs::remove_file(path).unwrap();
+    }
     #[test]
     fn validates_mod_filenames(){
         assert!(valid_filename("sodium-fabric-1.21.jar",".jar"));
