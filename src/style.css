@@ -523,3 +523,13 @@ body{margin:0}
 .fre-crash-actions button{display:flex;gap:9px;align-items:center;justify-content:center;background:#cdf188;color:#1b2b23;padding:13px;border:1px solid #cdf188;font:12px Consolas,monospace;font-weight:900;cursor:pointer}
 .fre-crash-actions button:last-child{background:transparent;color:#cdf188}
 .fre-crash-footer{margin-top:34px;font:10px Consolas,monospace;color:#a0b6a7;letter-spacing:.7px;border-top:1px solid #ffffff35;padding-top:12px}
+
+
+/* Editorial cut-out treatment keeps the oversized wordmark legible over voxels. */
+.fre-feature-content h2{font-size:clamp(39px,4.2vw,68px);max-width:100%;width:max-content;padding:2px 13px 7px 0;background:var(--fre-cover);line-height:1.05}
+.fre-feature-content p{width:max-content;max-width:min(305px,100%);background:var(--fre-cover);padding:5px 10px 7px 0}
+.fre-feature-art{box-shadow:-14px 14px 0 #1b362722}
+.fre-app .fre-command-account:hover,.fre-app .fre-return:hover{transform:translateY(-1px)}
+@media(max-width:1370px){.fre-feature-content h2{font-size:clamp(38px,4.2vw,61px)}}
+@media(max-width:880px){.fre-feature-content h2{font-size:clamp(44px,6.8vw,69px)}}
+@media(max-width:630px){.fre-feature-content h2{font-size:clamp(37px,9vw,47px)}.fre-feature-content p{max-width:75%}}

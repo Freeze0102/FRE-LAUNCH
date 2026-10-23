@@ -1,8 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
- <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#995aff"/><stop offset="1" stop-color="#2c71e8"/></linearGradient><linearGradient id="fg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff"/><stop offset="1" stop-color="#b9caff"/></linearGradient></defs>
- <rect x="48" y="48" width="928" height="928" rx="234" fill="#121425"/>
- <rect x="80" y="80" width="864" height="864" rx="208" fill="url(#bg)"/>
- <path d="M270 266 H754 V382 H406 V464 H679 V576 H406 V758 H270 Z" fill="url(#fg)"/>
- <path d="M753 266 V383 H638 V266 Z" fill="#90e9ff" opacity=".8"/>
- <circle cx="780" cy="735" r="48" fill="#83f5ec"/>
+  <title>FRE LAUNCH — FIELD NOTES</title>
+  <rect width="1024" height="1024" rx="188" fill="#1a2b22"/>
+  <rect x="62" y="62" width="900" height="900" rx="128" fill="none" stroke="#c9ee83" stroke-width="22"/>
+  <path d="M220 228 H784 V361 H387 V487 H666 V620 H387 V816 H220 Z" fill="#ceef86"/>
+  <path d="M387 361 H784 L833 312 V445 H436 Z" fill="#729d5d"/>
+  <path d="M387 487 H666 L720 439 V574 H436 Z" fill="#7da363"/>
+  <path d="M784 228 L833 179 V312 L784 361 Z" fill="#487347"/>
+  <path d="M666 487 L720 439 V574 L666 620 Z" fill="#49754a"/>
+  <path d="M774 732 V680 H812 V641 H850 V680 H888 V718 H850 V757 H812 V718 H774Z" fill="#efad8c"/>
+  <path d="M702 834 H865" stroke="#eff6df" stroke-width="13"/>
+  <path d="M702 868 H828" stroke="#eff6df" stroke-width="13" opacity=".45"/>
+  <rect x="134" y="132" width="24" height="24" fill="#c9ee83"/>
+  <rect x="865" y="132" width="24" height="24" fill="#c9ee83"/>
+  <rect x="134" y="868" width="24" height="24" fill="#c9ee83"/>
 </svg>
