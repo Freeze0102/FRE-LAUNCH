@@ -201,11 +201,12 @@
    Not a glassmorphic dashboard: ink, warm paper, lime + hand-drawn voxels.
    ================================================================ */
 :root{
-  --fre-paper:#f0efe6;--fre-card:#f9f8f1;--fre-ink:#1a2721;
-  --fre-line:#b7bdb1;--fre-muted:#63736a;--fre-accent:#cdf188;
-  --fre-accent-text:#192820;--fre-cover:#d9eca8;--fre-dark:#1c2a24;
-  --fre-side:#18271f;--fre-side-text:#edf0e3;--fre-secondary:#e0e3d5;
-  --fre-shadow:none;
+  /* NIGHT CONTROL — native default, including users of the former "midnight" theme */
+  --fre-paper:#0e1512;--fre-card:#1a241f;--fre-ink:#f0f4e9;
+  --fre-line:#34483a;--fre-muted:#abbcab;--fre-accent:#c9ef7d;
+  --fre-accent-text:#16271b;--fre-cover:#253b30;--fre-dark:#14271e;
+  --fre-side:#091711;--fre-side-text:#ebf1e4;--fre-secondary:#233329;
+  --fre-shadow:0 14px 38px #00000033;
 }
 [data-theme="neon"]{
   --fre-paper:#171d1b;--fre-card:#232c27;--fre-ink:#f6eee2;
@@ -580,3 +581,98 @@ body{margin:0}
 [data-theme="light"] .install-deck{border-color:#889875}
 @media(max-width:1150px){.install-deck-body{grid-template-columns:1fr}.install-deck-path{transform:none}.install-deck-bottom{flex-wrap:wrap}}
 @media(max-width:660px){.install-deck-head{padding:23px;flex-wrap:wrap}.install-deck-body{padding:20px;gap:24px}.install-deck-bottom{padding:19px;gap:17px}.install-checkpoints{grid-template-columns:repeat(2,minmax(0,1fr))}.install-live-progress{width:130px}.install-diag-link{width:100%;justify-content:center}}
+
+
+/* FRE NIGHT CONTROL — cinematic green-black control desk.
+   Keep color-token themes switchable; only the default "midnight" becomes dark. */
+[data-theme="midnight"]{
+  --fre-paper:#0e1512;--fre-card:#1a241f;--fre-ink:#f0f4e9;
+  --fre-line:#34483a;--fre-muted:#abbcab;--fre-accent:#c9ef7d;
+  --fre-accent-text:#16271b;--fre-cover:#253b30;--fre-dark:#14271e;
+  --fre-side:#091711;--fre-side-text:#ebf1e4;--fre-secondary:#233329;
+}
+html{color-scheme:dark}
+[data-theme="light"],[data-theme="ocean"],[data-theme="emerald"]{color-scheme:light}
+.fre-workspace{background:radial-gradient(circle at 90% -20%,#263e301a,transparent 42%),var(--fre-paper)}
+.fre-main{padding-top:28px}
+.fre-page-intro{margin-bottom:20px}
+.fre-heading-row h1{font-size:clamp(35px,3.25vw,51px);line-height:1.04;letter-spacing:.5px}
+.fre-commandbar{border-bottom-color:var(--fre-line)}
+.fre-console{box-shadow:6px 6px 0 #080e0b88}
+.fre-app .primary,.fre-app .secondary,.fre-app .icon-button,.fre-app .fre-return{transition:transform .16s,border-color .16s,background .16s}
+.fre-app .primary:hover:not(:disabled),.fre-app .fre-install-cta:hover:not(:disabled){transform:translateY(-2px)}
+.fre-feature{border-color:#47644c;box-shadow:8px 8px 0 #050b0799}
+.fre-feature-content h2,.fre-feature-content p{background:var(--fre-cover)}
+.fre-app :where(button,a):focus-visible{outline:2px solid var(--fre-accent);outline-offset:3px}
+[data-theme="midnight"] .fre-feature,[data-theme="neon"] .fre-feature{
+  color:#edf6e9;background:linear-gradient(135deg,#2d4938 0%,#213b30 53%,#142720 100%);
+  border-color:#46654a;
+}
+[data-theme="midnight"] .fre-feature-content h2 em,[data-theme="neon"] .fre-feature-content h2 em{
+  color:#d4fb8a;text-shadow:2px 2px 0 #142119,-2px 2px 0 #142119;
+}
+[data-theme="midnight"] .fre-feature-content h2 em span,[data-theme="neon"] .fre-feature-content h2 em span{color:#d6edac;text-shadow:none}
+[data-theme="midnight"] .fre-cover-label,[data-theme="neon"] .fre-cover-label{color:#b3d5b4}
+[data-theme="midnight"] .fre-feature-content p,[data-theme="neon"] .fre-feature-content p{color:#d5e5d2}
+[data-theme="midnight"] .fre-feature-foot,[data-theme="neon"] .fre-feature-foot{
+  background:#1a3025e8;color:#d0e0cb;border-color:#45664f;
+}
+[data-theme="midnight"] .fre-feature-top,[data-theme="neon"] .fre-feature-top{border-color:#50705a}
+.fre-rail{overflow:hidden;min-height:0}
+.fre-identity{flex:0 0 auto}
+.fre-rail-divider{flex:0 0 auto}
+.fre-nav{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:#4d6c53 transparent;overscroll-behavior:contain;padding-bottom:8px}
+.fre-nav::-webkit-scrollbar{width:5px}
+.fre-nav::-webkit-scrollbar-thumb{background:#36513e}
+.fre-rail-foot{margin-top:0;flex:0 0 auto;gap:7px;padding:13px 20px 15px;background:#0d1b15;border-color:#334c3a}
+.fre-status-live{font-size:9px;letter-spacing:.4px}
+.fre-build-status{display:flex;align-items:center;gap:11px;justify-content:space-between;flex-wrap:wrap}
+.fre-build-status strong{font:17px/1.1 Impact,"Arial Narrow",sans-serif;letter-spacing:.7px;color:#f3f4e6}
+.fre-build-status strong span{font:9px Consolas,monospace;vertical-align:middle;color:#c9ef7d;letter-spacing:1.4px}
+.fre-build-status small{font:8px Consolas,monospace;color:#799282;letter-spacing:.6px}
+.fre-incident{display:flex;align-items:center;gap:10px;min-height:42px;max-height:52px;border-left:3px solid #eeb28f;
+  background:#293027;color:#eedfd0;margin:0 0 13px;padding:9px 10px 9px 12px;box-shadow:inset 0 0 0 1px #86674955}
+.fre-incident>svg{flex-shrink:0;color:#eeb28f}
+.fre-incident>span{flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:11px;line-height:1.4}
+.fre-incident>button{border:0;background:transparent;color:#f3e7d6;display:flex;align-items:center;gap:5px;white-space:nowrap;padding:6px;font:9px Consolas,monospace!important}
+.fre-incident>button:hover{color:#cdef83}
+.fre-diagnostics{padding:24px 27px}
+.fre-diag-header{display:flex;align-items:flex-start;justify-content:space-between;gap:15px}
+.fre-diag-header h2{font-size:clamp(27px,2.8vw,39px);margin:20px 0 7px;letter-spacing:.25px}
+.fre-diag-header p{color:var(--fre-muted);font-size:12px;line-height:1.55;margin:0 0 16px;max-width:620px}
+.fre-diag-index{margin:17px 0 0;padding:7px 10px;background:var(--fre-secondary);color:var(--fre-accent);font:10px Consolas,monospace;white-space:nowrap}
+.fre-diag-overview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:10px 0 18px}
+.fre-diag-metric{display:flex;flex-direction:column;min-width:0;min-height:123px;gap:8px;padding:16px;
+  background:var(--fre-secondary);border-top:3px solid #526b4e}
+.fre-diag-metric>span{font:10px Consolas,monospace;letter-spacing:.65px;color:var(--fre-muted)}
+.fre-diag-metric>strong{font:25px Impact,"Arial Narrow",sans-serif;letter-spacing:.45px;line-height:1.2;overflow-wrap:anywhere}
+.fre-diag-metric>strong.fre-diag-metric-small{font:12px/1.45 Consolas,monospace;font-weight:bold}
+.fre-diag-metric>small{color:var(--fre-muted);font-size:11px;line-height:1.5;overflow-wrap:anywhere}
+.fre-diagnostics .fre-log-label{margin-top:22px;color:var(--fre-muted)}
+.fre-diagnostics .fre-log-output{min-height:110px;border-left:3px solid var(--fre-accent);background:#0b1811;color:#d2efb9}
+.fre-diag-warning{display:flex;align-items:center;gap:9px;padding:13px;margin:10px 0;border-left:3px solid #eab493;background:#4b3029;color:#f8dfd1;font-size:12px}
+.fre-log-placeholder{min-height:145px;padding:20px;border:1px dashed var(--fre-line);background:var(--fre-paper);
+  display:flex;flex-direction:column;align-items:flex-start;gap:11px;justify-content:center;color:var(--fre-muted)}
+.fre-log-placeholder strong{color:var(--fre-ink);font:14px Impact,sans-serif;letter-spacing:1px}
+.fre-log-placeholder p{margin:0;max-width:610px;font-size:12px;line-height:1.7}
+.fre-log-placeholder button{display:flex;align-items:center;gap:8px;color:var(--fre-accent);background:transparent;border:0;
+  padding:7px 0;font:10px Consolas,monospace!important;letter-spacing:.7px}
+.fre-log-mini-empty{padding:17px 20px;background:var(--fre-secondary);color:var(--fre-muted);font-size:12px;border:1px solid var(--fre-line)}
+.fre-app .error{background:#402824;color:#f1ccc2;border:1px solid #955a49}
+.fre-app .notice{background:var(--fre-secondary);color:var(--fre-ink);border:1px solid var(--fre-line)}
+@media(max-width:1100px){
+  .fre-build-status{display:none}
+  .fre-rail-foot{display:flex;align-items:center;justify-content:center;padding:15px 8px}
+}
+@media(max-width:880px){.fre-diag-overview{grid-template-columns:1fr}.fre-diag-metric{min-height:100px}}
+@media(max-width:630px){
+  .fre-rail{overflow-x:auto;overflow-y:hidden}
+  .fre-nav{overflow-x:auto;overflow-y:hidden}
+  .fre-diagnostics{padding:17px 15px}
+  .fre-incident{max-height:none;flex-wrap:wrap}
+  .fre-incident>span{white-space:normal;flex-basis:calc(100% - 50px)}
+  .fre-incident>button{margin-left:auto}
+  .fre-diag-header h2{font-size:31px}
+}
+@media(prefers-reduced-motion:reduce){.fre-app button{transition:none!important}.fre-app .fre-feature-art{transform:none!important}}
+
