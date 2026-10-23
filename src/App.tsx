@@ -25,6 +25,7 @@ import ScreenshotsPanel from "./ScreenshotsPanel";
 type Version = { id: string; type: string; url: string; time: string; releaseTime: string };
 type Progress = {stage: string; current: number; total: number; message: string};
 type Diagnostics = {logPath:string; contents:string};
+type InstallPreflight = {path:string; ready:boolean; detail:string};
 type Task = "idle" | "installing" | "launching" | "running";
 type Page = "Home" | "Versions" | "Instances" | "Mods" | "Skins" | "Accounts" |
   "Servers" | "Downloads" | "Logs" | "Backups" | "Screenshots" | "Settings";
@@ -118,6 +119,7 @@ export default function App() {
   const [java,setJava]=useState("Перевірка Java...");
   const [logs,setLogs]=useState<string[]>([]);
   const [diagnostics,setDiagnostics]=useState<Diagnostics|null>(null);
+  const [preflight,setPreflight]=useState<InstallPreflight|null>(null);
   const [lastUiCrash,setLastUiCrash]=useState(()=>{try{return localStorage.getItem(LAST_UI_CRASH)||"";}catch{return "";}});
   const busyRef=useRef(false);
   const activeVersionRef=useRef("");
@@ -155,6 +157,7 @@ export default function App() {
         }
       }
     }catch{/* Invalid cached state must not stop application startup */}
+    void invoke<InstallPreflight>("install_preflight").then(setPreflight).catch(e=>setPreflight({path:"",ready:false,detail:humanError(e)}));
     void refreshVersions(true);
     void invoke<string>("java_info").then(setJava).catch(e=>setJava("Java в PATH не знайдена: "+humanError(e)));
     const a=listen<Progress>("install-progress",event=>setProgress(event.payload));
@@ -189,6 +192,9 @@ export default function App() {
     setTask("installing");
     setError("");setMessage("");setProgress({stage:"metadata",current:0,total:1,message:"Починаємо встановлення Minecraft..."});
     try{
+      const check=await invoke<InstallPreflight>("install_preflight");
+      setPreflight(check);
+      if(!check.ready)throw new Error("Немає доступу до папки Minecraft: "+check.detail+" ("+check.path+")");
       const result=await invoke<string>("install_version",{version});
       rememberInstall(version,"complete",result);
       setMessage(result);
@@ -353,6 +359,11 @@ export default function App() {
         {page==="Downloads"&&<section className="fre-diag-sheet">
           <div className="fre-module-label"><span>INSTALL MONITOR / LIVE</span><MonitorDot size={19}/></div>
           <h2>{task==="installing"?"ЙДЕ ВСТАНОВЛЕННЯ":"МОНІТОР ЗАВАНТАЖЕНЬ"}</h2>
+          {preflight&&<div className={"fre-install-preflight"+(preflight.ready?" is-ready":" is-error")}>
+            <strong>{preflight.ready?"ДИСК ДОСТУПНИЙ":"ПОМИЛКА ДОСТУПУ ДО ДИСКА"}</strong>
+            <span>{preflight.detail}</span>
+            {preflight.path&&<code>{preflight.path}</code>}
+          </div>}
           {progress?<><p>{progress.message}</p><div className="fre-diag-progress"><div style={{width:percent+"%"}}/></div>
           <div className="fre-diag-stats"><span>ЕТАП: {stages[progress.stage]??progress.stage.toUpperCase()}</span><strong>{progress.current} / {progress.total}</strong><b>{percent}%</b></div></>:<p>Немає активних завантажень. Обери версію Minecraft, щоб встановити її.</p>}
           <button className="fre-inline-btn" onClick={()=>{void loadDiagnostics();setPage("Logs");}}><Terminal size={17}/> ДІАГНОСТИКА <ArrowRight size={16}/></button>
