@@ -237,6 +237,63 @@ mod tests {
         assert_eq!(bytes,vec![0xac,0x02]);
     }
     #[test]
+    fn status_client_parses_mocked_java_server() {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all().build().expect("tokio runtime");
+        runtime.block_on(async {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.expect("bind test server");
+            let port = listener.local_addr().expect("local address").port();
+            let fake = tokio::spawn(async move {
+                let (mut socket, _) = listener.accept().await.expect("accept client");
+                let length = read_varint(&mut socket).await.expect("request length");
+                let mut handshake = vec![0u8; length as usize];
+                socket.read_exact(&mut handshake).await.expect("handshake");
+                assert_eq!(read_varint(&mut socket).await.expect("status length"),1);
+                assert_eq!(read_varint(&mut socket).await.expect("status request packet id"),0);
+                let json = serde_json::json!({
+                    "version":{"name":"1.21.4"},
+                    "players":{"online":3,"max":30},
+                    "description":{"text":"Привіт", "extra":[{"text":" світ"}]}
+                }).to_string();
+                let mut payload = vec![0u8];
+                encode_varint(json.len() as u32,&mut payload);
+                payload.extend_from_slice(json.as_bytes());
+                let mut response=Vec::new();
+                encode_varint(payload.len() as u32,&mut response);
+                response.extend_from_slice(&payload);
+                socket.write_all(&response).await.expect("send response");
+            });
+            let state=status_request("127.0.0.1",port).await.expect("read Java status");
+            assert!(state.online);
+            assert_eq!(state.version.as_deref(),Some("1.21.4"));
+            assert_eq!(state.players_online,Some(3));
+            assert_eq!(state.max_players,Some(30));
+            assert_eq!(state.description.as_deref(),Some("Привіт світ"));
+            fake.await.expect("mock server");
+        });
+    }
+    #[test]
+    fn status_rejects_oversized_packets() {
+        let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().expect("tokio");
+        runtime.block_on(async {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.expect("bind");
+            let port=listener.local_addr().expect("port").port();
+            let fake=tokio::spawn(async move {
+                let (mut stream,_) = listener.accept().await.expect("connection");
+                let length=read_varint(&mut stream).await.expect("handshake length");
+                let mut data=vec![0;length as usize];
+                stream.read_exact(&mut data).await.expect("handshake data");
+                stream.read_exact(&mut [0u8;2]).await.expect("status request");
+                let mut invalid=Vec::new();
+                encode_varint(1_048_577,&mut invalid);
+                stream.write_all(&invalid).await.expect("send invalid length");
+            });
+            let result=status_request("127.0.0.1",port).await;
+            assert!(result.is_err());
+            fake.await.expect("fake server");
+        });
+    }
+    #[test]
     fn description_components() {
         let value:Value=serde_json::json!({"text":"Привіт", "extra":[{"text":" світ"}]});
         assert_eq!(text_component(&value,0),"Привіт світ");
