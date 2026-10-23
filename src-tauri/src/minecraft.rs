@@ -157,6 +157,35 @@ fn extract_natives(archives: &[PathBuf], dest: &Path) -> Result<(), String> {
     Ok(())
 }
 
+// Ancient Minecraft versions require virtual or legacy resource directories.
+// Asset object names are untrusted metadata: reject parent components.
+async fn materialize_legacy_assets(base: &Path, index_name: &str, index_data: &Value, game_dir: Option<&Path>) -> Result<(), String> {
+    validate_version(index_name)?;
+    let virtual_assets = index_data["virtual"].as_bool().unwrap_or(false);
+    let map_resources = index_data["map_to_resources"].as_bool().unwrap_or(false);
+    if !virtual_assets && !(map_resources && game_dir.is_some()) {return Ok(());}
+    let objects = index_data["objects"].as_object().ok_or("Missing legacy asset objects")?;
+    for (logical_name, details) in objects {
+        let relative = safe_relative(logical_name)?;
+        let hash = details["hash"].as_str().ok_or("Missing asset SHA-1")?;
+        if hash.len()!=40 || !hash.bytes().all(|byte|byte.is_ascii_hexdigit()) {
+            return Err("Invalid legacy asset hash".into());
+        }
+        let object = base.join("assets").join("objects").join(&hash[..2]).join(hash);
+        let virtual_dir = base.join("assets").join("virtual").join(index_name);
+        for target_base in [virtual_assets.then_some(virtual_dir), if map_resources {game_dir.map(|dir|dir.join("resources"))}else{None}]
+            .into_iter().flatten() {
+            let target = target_base.join(&relative);
+            if let Some(parent) = target.parent(){fs::create_dir_all(parent).await.map_err(|e|e.to_string())?;}
+            if fs::try_exists(&target).await.map_err(|e|e.to_string())? {
+                if super::downloads::verify_file(&target,hash).await? {continue;}
+            }
+            fs::copy(&object,&target).await.map_err(|e|format!("Legacy resource {}: {e}",logical_name))?;
+        }
+    }
+    Ok(())
+}
+
 async fn install(app: &AppHandle, version: &str) -> Result<Value, String> {
     let http = client()?;
     let base = root(app)?;
@@ -213,6 +242,7 @@ async fn install(app: &AppHandle, version: &str) -> Result<Value, String> {
                 progress(app,"assets",finished,count,format!("Ресурси: {finished}/{count}"));
             }
         }
+        materialize_legacy_assets(&base, id, &index_data, None).await?;
     }
 
     let natives_dest = base.join("instances").join(version).join("natives");
@@ -384,6 +414,15 @@ async fn launch_inner(app: AppHandle, version: String, nickname: String, memory_
         super::instances::game_directory(&app, id, &version)?
     } else { base.join("instances").join(&version) };
     fs::create_dir_all(&dir).await.map_err(|e| e.to_string())?;
+    if let (Some(index_name), Some(_)) = (meta["assetIndex"]["id"].as_str(),meta["assetIndex"]["url"].as_str()) {
+        validate_version(index_name)?;
+        let asset_index = base.join("assets").join("indexes").join(format!("{index_name}.json"));
+        if fs::try_exists(&asset_index).await.map_err(|e|e.to_string())? {
+            let bytes = fs::read(asset_index).await.map_err(|e|e.to_string())?;
+            let index_data: Value = serde_json::from_slice(&bytes).map_err(|e|e.to_string())?;
+            materialize_legacy_assets(&base,index_name,&index_data,Some(&dir)).await?;
+        }
+    }
     let mut cp = Vec::new();
     for (_, path, _, native) in libraries(&meta, &base)? {
         if !native { cp.push(path.to_string_lossy().to_string()); }
