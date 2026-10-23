@@ -13,6 +13,8 @@ pub struct Instance {
     pub favorite: bool,
     pub memory_mb: u32,
     pub java_path: Option<String>,
+    pub loader: String,
+    pub loader_version: Option<String>,
 }
 
 fn db_file(app: &AppHandle) -> Result<PathBuf, String> {
@@ -34,6 +36,18 @@ pub(super) fn db(app: &AppHandle) -> Result<Connection, String> {
              java_path TEXT
          );"
     ).map_err(|e| e.to_string())?;
+    // Upgrade databases created by older FRE LAUNCH builds without losing worlds.
+    let schema_version: i64 = connection.pragma_query_value(None, "user_version", |row| row.get(0))
+        .map_err(|e| e.to_string())?;
+    if schema_version < 1 {
+        connection.execute_batch(
+            "BEGIN IMMEDIATE;
+             ALTER TABLE instances ADD COLUMN loader TEXT NOT NULL DEFAULT 'vanilla';
+             ALTER TABLE instances ADD COLUMN loader_version TEXT;
+             PRAGMA user_version=1;
+             COMMIT;"
+        ).map_err(|e| format!("Instance schema migration failed: {e}"))?;
+    }
     Ok(connection)
 }
 
@@ -49,13 +63,15 @@ fn row_instance(row: &rusqlite::Row<'_>) -> rusqlite::Result<Instance> {
         favorite: row.get::<_, i64>(3)? != 0,
         memory_mb: row.get::<_, u32>(4)?,
         java_path: row.get(5)?,
+        loader: row.get(6)?,
+        loader_version: row.get(7)?,
     })
 }
 
 pub fn read(app: &AppHandle, id: &str) -> Result<Instance, String> {
     validate_id(id)?;
     db(app)?.query_row(
-        "SELECT id,name,version,favorite,memory_mb,java_path FROM instances WHERE id=?1",
+        "SELECT id,name,version,favorite,memory_mb,java_path,loader,loader_version FROM instances WHERE id=?1",
         params![id], row_instance,
     ).map_err(|_| "Instance does not exist".to_string())
 }
@@ -73,7 +89,7 @@ pub fn game_directory(app: &AppHandle, id: &str, version: &str) -> Result<PathBu
 pub fn list_instances(app: AppHandle) -> Result<Vec<Instance>, String> {
     let connection = db(&app)?;
     let mut statement = connection.prepare(
-        "SELECT id,name,version,favorite,memory_mb,java_path FROM instances ORDER BY favorite DESC,name COLLATE NOCASE ASC"
+        "SELECT id,name,version,favorite,memory_mb,java_path,loader,loader_version FROM instances ORDER BY favorite DESC,name COLLATE NOCASE ASC"
     ).map_err(|e| e.to_string())?;
     let results = statement.query_map([], row_instance).map_err(|e| e.to_string())?;
     results.map(|row| row.map_err(|e| e.to_string())).collect()
@@ -94,6 +110,8 @@ pub fn create_instance(app: AppHandle, name: String, version: String) -> Result<
         favorite: false,
         memory_mb: 4096,
         java_path: None,
+        loader: "vanilla".into(),
+        loader_version: None,
     };
     let connection = db(&app)?;
     connection.execute(
@@ -125,6 +143,27 @@ pub fn update_instance(app: AppHandle, id: String, name: String, favorite: bool,
         params![id,name,if favorite {1} else {0},memory_mb,path],
     ).map_err(|e| e.to_string())?;
     if changed == 0 { return Err("Instance does not exist".into()); }
+    read(&app, &id)
+}
+
+/// Selects an actual supported loader; the Fabric metadata profile is validated at launch.
+#[tauri::command]
+pub fn set_instance_loader(app: AppHandle, id: String, loader: String, loader_version: Option<String>) -> Result<Instance, String> {
+    validate_id(&id)?;
+    let version = match loader.as_str() {
+        "vanilla" => None,
+        "fabric" => {
+            let selected = loader_version.as_deref().ok_or("Choose a Fabric loader version")?;
+            super::minecraft::validate_version(selected)?;
+            Some(selected.to_owned())
+        }
+        _ => return Err("This modloader is not yet implemented".into()),
+    };
+    let changed = db(&app)?.execute(
+        "UPDATE instances SET loader=?2, loader_version=?3 WHERE id=?1",
+        params![id,loader,version],
+    ).map_err(|e| e.to_string())?;
+    if changed == 0 {return Err("Instance not found".into());}
     read(&app, &id)
 }
 
