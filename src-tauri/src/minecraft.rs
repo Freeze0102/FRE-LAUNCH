@@ -586,7 +586,15 @@ async fn launch_inner(app: AppHandle, version: String, nickname: String, memory_
     args.extend(game_args.iter().map(|s| game_arg_replace(s, &base, &version, &dir, &nickname, &uuid, &meta)));
 
     let mut command = Command::new(java_bin);
-    command.args(&args).current_dir(&dir).stdout(Stdio::piped()).stderr(Stdio::piped()).kill_on_drop(true);
+    // The game must not be terminated when the Tauri window or its runtime exits.
+    // Keep streaming logs while the launcher is open, but do not tie game lifetime to it.
+    command.args(&args).current_dir(&dir).stdout(Stdio::piped()).stderr(Stdio::piped()).kill_on_drop(false);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        // Start Java in an independent process group without a console window.
+        command.creation_flags(0x00000200 | 0x08000000);
+    }
     let mut child = command.spawn().map_err(|e| format!("Не вдалося запустити Java: {e}"))?;
     let pid = child.id().unwrap_or(0);
     let _ = app.emit("game-status", "running");
