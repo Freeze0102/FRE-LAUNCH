@@ -11,6 +11,7 @@ type ModVersion = {id:string;name:string;version_number:string;game_versions:str
 type ModDetails = {project:{title:string;body:string;description:string;icon_url:string|null;downloads:number;project_type:string;categories:string[]};versions:ModVersion[]};
 type InstalledMod = {filename: string; enabled: boolean; bytes: number};
 type PackType = "resourcepack" | "shader";
+type ModUpdate = {filename:string;projectId:string;versionId:string;versionNumber:string};
 
 export default function ModsPanel({version, instanceId}: {version: string; instanceId: string}) {
   const [query,setQuery]=useState("");
@@ -30,13 +31,15 @@ export default function ModsPanel({version, instanceId}: {version: string; insta
   const [installed,setInstalled]=useState<InstalledMod[]>([]);
   const [resourcepacks,setResourcepacks]=useState<InstalledMod[]>([]);
   const [shaderpacks,setShaderpacks]=useState<InstalledMod[]>([]);
+  const [modUpdates,setModUpdates]=useState<ModUpdate[]>([]);
+  const [checkingUpdates,setCheckingUpdates]=useState(false);
   const [loading,setLoading]=useState(false);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
   const [message,setMessage]=useState("");
 
   async function refreshMods() {
-    if (!instanceId) {setSelectedInstance(null);setInstalled([]);setResourcepacks([]);setShaderpacks([]);return;}
+    if (!instanceId) {setSelectedInstance(null);setInstalled([]);setResourcepacks([]);setShaderpacks([]);setModUpdates([]);return;}
     try {
       const [profiles,mods,resources,shaders]=await Promise.all([
         invoke<Instance[]>("list_instances"),
@@ -48,7 +51,7 @@ export default function ModsPanel({version, instanceId}: {version: string; insta
       setInstalled(mods);setResourcepacks(resources);setShaderpacks(shaders);
     } catch(err){setError(String(err));}
   }
-  useEffect(()=>{void refreshMods();},[instanceId]);
+  useEffect(()=>{setModUpdates([]);void refreshMods();},[instanceId]);
 
   async function search(pageOffset=0) {
     const request=++searchSequence.current;
@@ -70,13 +73,13 @@ export default function ModsPanel({version, instanceId}: {version: string; insta
     return ()=>window.clearTimeout(handle);
   },[query,kind,version,onlyCompatible,selectedInstance?.loader,sort]);
 
-  async function openProject(hit:ModrinthHit) {
+  async function openProject(hit:ModrinthHit, preferredVersionId?:string) {
     setOpened(hit);setDetails(null);setChosenVersion("");setShowAllVersions(false);setDetailBusy(true);setError("");
     try {
       const data=await invoke<ModDetails>("modrinth_project_details",{projectId:hit.project_id});
       setDetails(data);
       const matches=data.versions.filter(v=>v.game_versions.includes(version)&& (kind!=="mod"||v.loaders.includes(selectedInstance?.loader||"fabric")));
-      setChosenVersion(matches[0]?.id||"");
+      setChosenVersion(matches.find(v=>v.id===preferredVersionId)?.id||matches[0]?.id||"");
     } catch(e){setError(String(e));}
     finally{setDetailBusy(false);}
   }
@@ -138,6 +141,23 @@ export default function ModsPanel({version, instanceId}: {version: string; insta
     finally{setBusy(false);}
   }
 
+  async function checkUpdates(){
+    if(!instanceId)return;
+    setCheckingUpdates(true);setError("");setMessage("");
+    try{
+      const found=await invoke<ModUpdate[]>("check_mod_updates",{instanceId});
+      setModUpdates(found);
+      setMessage(found.length?`Знайдено ${found.length} доступних оновлень. Перед встановленням нового JAR вимкни старий, щоб не виник конфлікт версій.`:"Для відомих Modrinth-модів нових сумісних оновлень не знайдено.");
+    }catch(err){setError(String(err));}
+    finally{setCheckingUpdates(false);}
+  }
+  async function browseUpdate(update:ModUpdate){
+    setView("browse");setKind("mod");
+    setMessage("Перед встановленням нової версії вимкни старий JAR у «Моя бібліотека». Лаунчер не видаляє старі моди автоматично.");
+    const hit:ModrinthHit={project_id:update.projectId,slug:"",title:update.filename,
+      description:"Перевірене через Modrinth оновлення",icon_url:null,downloads:0,project_type:"mod"};
+    await openProject(hit,update.versionId);
+  }
   async function togglePack(pack:InstalledMod, packKind:PackType){
     setBusy(true);setError("");setMessage("");
     try{
@@ -249,11 +269,22 @@ export default function ModsPanel({version, instanceId}: {version: string; insta
     </>}
     {view==="library"&&!instanceId&&<p className="muted">Обери збірку в бібліотеці Minecraft, щоб керувати її встановленими модами й ресурсами.</p>}
     {view==="library"&&!!instanceId&&<div className="installed-mods">
-      <div className="panel-heading"><h3>Встановлені моди</h3><button className="icon-button" title="Оновити" onClick={()=>void refreshMods()}><RefreshCw size={16}/></button></div>
+      <div className="panel-heading"><h3>Встановлені моди</h3>
+        <div className="fre-content-actions">
+          <button className="secondary" disabled={busy||checkingUpdates||selectedInstance?.loader!=="fabric"}
+            onClick={()=>void checkUpdates()}>{checkingUpdates?"Перевірка…":"Перевірити оновлення"}</button>
+          <button className="icon-button" title="Оновити список файлів" onClick={()=>void refreshMods()}><RefreshCw size={16}/></button>
+        </div>
+      </div>
       {installed.length===0&&<p className="muted">Немає встановлених модів у цій збірці.</p>}
       {installed.map(mod=><div className="installed-mod-row" key={mod.filename}>
-        <div><b>{mod.filename}</b><span>{(mod.bytes/1024/1024).toFixed(1)} MB · {mod.enabled?"Увімкнено":"Вимкнено"}</span></div>
-        <button className="secondary" disabled={busy} onClick={()=>void toggle(mod)}>{mod.enabled?"Вимкнути":"Увімкнути"}</button>
+        <div><b>{mod.filename}</b><span>{(mod.bytes/1024/1024).toFixed(1)} MB · {mod.enabled?"Увімкнено":"Вимкнено"}</span>
+          {modUpdates.filter(u=>u.filename===mod.filename).map(update=>
+            <button className="fre-update-link" key={update.versionId}
+              onClick={()=>void browseUpdate(update)}>Доступне оновлення: {update.versionNumber} → Переглянути</button>
+          )}
+        </div>
+        <button className="secondary" disabled={busy} onClick={()=>void toggle(mod)>{mod.enabled?"Вимкнути":"Увімкнути"}</button>
         <button className="icon-button danger" title="Видалити" disabled={busy} onClick={()=>void remove(mod)}><Trash2 size={16}/></button>
       </div>)}
     </div>}
