@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Package, DownloadCloud, Search, ShieldCheck, Trash2, RefreshCw, ArrowLeft, CheckCircle2, Info } from "lucide-react";
+import { Package, DownloadCloud, Search, ShieldCheck, Trash2, RefreshCw, ArrowLeft, CheckCircle2, Info, ExternalLink } from "lucide-react";
 import type { Instance } from "./Features";
 
 type ModrinthHit = {
@@ -127,6 +127,13 @@ export default function ModsPanel({version, instanceId}: {version: string; insta
       </select>
       <button className="primary" onClick={()=>void search(0)} disabled={loading}>{loading?"Шукаю...":"Знайти"}</button>
     </div>
+    <div className="toolbar" style={{marginTop:12,alignItems:"center"}}>
+      <span className="muted">Джерела:</span>
+      <strong>Modrinth · встановлення в лаунчері</strong>
+      <button className="secondary" onClick={()=>window.open("https://www.curseforge.com/minecraft/search?search="+encodeURIComponent(query.trim()||"mods"),"_blank","noopener,noreferrer")}>
+        CurseForge · знайти більше <ExternalLink size={15}/>
+      </button>
+    </div>
     <label className="muted" style={{display:"flex",alignItems:"center",gap:8,marginTop:12}}>
       <input type="checkbox" checked={onlyCompatible} onChange={e=>setOnlyCompatible(e.target.checked)}/>
       Показувати лише проєкти для Minecraft {version||"обраної версії"}
@@ -192,7 +199,7 @@ export default function ModsPanel({version, instanceId}: {version: string; insta
       </div>)}
     </div>}
     <div className="notice"><ShieldCheck size={18}/>
-      <span><strong>FRE SAFE DOWNLOAD</strong> · Завантаження тільки з офіційного CDN Modrinth через HTTPS, перевірка SHA-512, розміру, формату JAR та сумісності Minecraft/Fabric. Залежності перевіряються перед встановленням. Це перевірка цілісності, а не антивірус. Під час встановлення та перед запуском Minecraft лаунчер автоматично перевіряє моди, якщо доступний Microsoft Defender. Жоден сканер не гарантує повної безпеки.</span>
+      <span><strong>FRE SAFE DOWNLOAD</strong> · Завантаження тільки з офіційного CDN Modrinth через HTTPS, перевірка SHA-512, розміру, формату JAR та сумісності Minecraft/Fabric. Залежності перевіряються перед встановленням. Це перевірка цілісності, а не антивірус. Під час встановлення та перед запуском лаунчер перевіряє структуру JAR без Windows Defender. Це не антивірусне сканування. Жоден сканер не гарантує повної безпеки.</span>
     </div>
     <p className="muted">Власні JAR, завантажені через браузер, можна покласти в папку mods обраної збірки. Вони не отримують позначки перевіреного джерела Modrinth. Моди — сторонній виконуваний код; перед запуском перевіряй автора й репутацію проєкту.</p>
   </section>;
