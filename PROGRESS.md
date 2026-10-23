@@ -12,6 +12,11 @@ Version: **0.4.0 Alpha** — feature branch `feat/launcher-reliability-fabric`.
 - Portable Temurin JRE installation with SHA-256 checksum validation; versions 8, 11, 17, 21, 25.
 - React interface for modloaders, mods, Java installs and server management.
 
+## Added in screenshot gallery branch
+- Instance-scoped PNG screenshot list/preview, download and confirmed deletion.
+- Reject unsafe filename traversal, symbolic links, oversized screenshots and PNG dimensions.
+- New localized gallery navigation and responsive layout.
+
 ## Existing from 0.3.0 Alpha
 - Original dark launcher UI with themes, skin editor, local profiles, SQLite game instances.
 - Mojang version manifest, Java process launch, live logs, saved world backups, resource packs.
