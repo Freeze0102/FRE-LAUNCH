@@ -1,4 +1,4 @@
-use futures::stream::{self, StreamExt};
+use futures::{stream::{self, StreamExt}, FutureExt};
 use reqwest::Client;
 use serde::Serialize;
 use serde_json::Value;
@@ -9,6 +9,12 @@ use tokio::{fs, io::{AsyncBufReadExt, BufReader}, process::Command};
 use uuid::Uuid;
 
 static RUNNING: AtomicBool = AtomicBool::new(false);
+static INSTALLING: AtomicBool = AtomicBool::new(false);
+
+struct InstallGuard;
+impl Drop for InstallGuard {
+    fn drop(&mut self) { INSTALLING.store(false, Ordering::Release); }
+}
 const MANIFEST: &str = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
 
 #[derive(Clone, Serialize)]
@@ -262,8 +268,34 @@ async fn install(app: &AppHandle, version: &str) -> Result<Value, String> {
 #[tauri::command]
 pub async fn install_version(app: AppHandle, version: String) -> Result<String, String> {
     validate_version(&version)?;
-    install(&app, &version).await?;
-    Ok(format!("Minecraft {version} installed successfully"))
+    if RUNNING.load(Ordering::Acquire) {
+        return Err("Зупини гру перед перевіркою файлів Minecraft".into());
+    }
+    if INSTALLING.compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire).is_err() {
+        return Err("Встановлення Minecraft вже виконується. Дочекайся його завершення.".into());
+    }
+    let _guard=InstallGuard;
+    super::diagnostics::write(&app,"INSTALL_START",&format!("Minecraft {version}"));
+    // Convert Rust panics within the install future into an ordinary Tauri error.
+    // This does not catch native OS crashes or out-of-memory termination.
+    let outcome=std::panic::AssertUnwindSafe(install(&app, &version)).catch_unwind().await;
+    match outcome {
+        Ok(Ok(_)) => {
+            super::diagnostics::write(&app,"INSTALL_OK",&format!("Minecraft {version}"));
+            Ok(format!("Minecraft {version} успішно встановлено"))
+        },
+        Ok(Err(message)) => {
+            super::diagnostics::write(&app,"INSTALL_ERROR",&format!("{version}: {message}"));
+            Err(format!("Не вдалося встановити Minecraft {version}: {message}"))
+        },
+        Err(panic) => {
+            let details=panic.downcast_ref::<String>().map(String::as_str)
+                .or_else(||panic.downcast_ref::<&str>().copied())
+                .unwrap_or("unknown internal error");
+            super::diagnostics::write(&app,"INSTALL_PANIC",&format!("{version}: {details}"));
+            Err(format!("Внутрішня помилка встановлення Minecraft {version}. Відкрий «Діагностика» та скопіюй лог."))
+        }
+    }
 }
 
 #[tauri::command]
