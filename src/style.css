@@ -1480,3 +1480,10 @@ input:focus-visible,button:focus-visible,select:focus-visible,textarea:focus-vis
 .fre-app .fre-sidebar-instance:hover{background:#324238;border-color:#3d784e}
 .fre-app .fre-sidebar-instance.is-active{border-color:#4cbd73;background:#203b2b}
 .fre-app .fre-sidebar-instance:hover .fre-sidebar-avatar{filter:brightness(1.15)}
+
+/* Diagnostic block shown when Java exits abnormally; paths remain local. */
+.fre-game-crash-card{padding:16px 19px;margin:0 0 20px;background:#34282c;border:1px solid #94616c;border-radius:12px;color:#e7d3d8;overflow-wrap:anywhere}
+.fre-game-crash-card h3{display:flex;align-items:center;gap:9px;color:#ffc5c9;font-size:16px;margin:0 0 10px}
+.fre-game-crash-card p{font-size:12px;line-height:1.55;margin:8px 0}
+.fre-game-crash-card code{font-size:11px;color:#f7c7cf;user-select:text;word-break:break-all}
+.fre-game-crash-card .secondary{display:flex;align-items:center;gap:8px;font-size:11px;padding:9px 12px;margin-top:11px}
