@@ -46,6 +46,11 @@ export function InstancesPanel({version,active,setActive,setVersion,setMemory,na
   const [worldFilter,setWorldFilter]=useState("");
   const [createOpen,setCreateOpen]=useState(false);
   const [createName,setCreateName]=useState("");
+  const [createStep,setCreateStep]=useState<"choose"|"custom">("choose");
+  const [createVersion,setCreateVersion]=useState(version);
+  const [createLoader,setCreateLoader]=useState<"vanilla"|"fabric"|"quilt">("vanilla");
+  const [availableVersions,setAvailableVersions]=useState<string[]>([]);
+  const [createError,setCreateError]=useState("");
   const [editName,setEditName]=useState("");
   const [editRam,setEditRam]=useState(4096);
   const [editJava,setEditJava]=useState("");
@@ -69,6 +74,14 @@ export function InstancesPanel({version,active,setActive,setVersion,setMemory,na
     catch(err){setError(String(err));}
   },[]);
   useEffect(()=>{void refresh();},[refresh]);
+  useEffect(()=>{
+    if(!createOpen)return;
+    let mounted=true;
+    void invoke<{id:string;type:string}[]>("get_versions")
+      .then(results=>{if(mounted)setAvailableVersions(results.filter(item=>item.type==="release").slice(0,40).map(item=>item.id));})
+      .catch(()=>{});
+    return()=>{mounted=false;};
+  },[createOpen]);
   const refreshFiles=useCallback(async()=>{
     if(!selected){setFiles([]);return;}
     setLoadingFiles(true);
@@ -95,14 +108,25 @@ export function InstancesPanel({version,active,setActive,setVersion,setMemory,na
     setActive(item.id);setVersion(item.version);setMemory(item.memoryMb);
   }
   async function create(){
-    if(!createName.trim()||!version)return;
-    setBusy(true);setError("");setNotice("");
+    const targetVersion=createVersion||version;
+    if(!createName.trim()||!targetVersion)return;
+    setBusy(true);setCreateError("");setError("");setNotice("");
     try{
-      const instance=await invoke<Instance>("create_instance",{name:createName.trim(),version});
-      setCreateOpen(false);setCreateName("");
-      await refresh();
-      open(instance);
-    }catch(err){setError(String(err));}
+      let instance=await invoke<Instance>("create_instance",{name:createName.trim(),version:targetVersion});
+      if(createLoader!=="vanilla"){
+        try{
+          const loaders=await invoke<{version:string;stable:boolean}[]>(createLoader==="fabric"?"list_fabric_loaders":"list_quilt_loaders",{gameVersion:targetVersion});
+          const loaderVersion=loaders.find(item=>item.stable)?.version||loaders[0]?.version;
+          if(!loaderVersion)throw Error("Для цієї версії Minecraft модлоадер не знайдено.");
+          instance=await invoke<Instance>("set_instance_loader",{id:instance.id,loader:createLoader,loaderVersion});
+        }catch(e){
+          setNotice("Збірку створено, але модлоадер не налаштовано: "+String(e)+". Налаштуй його на сторінці збірки.");
+        }
+      }
+      setCreateOpen(false);setCreateName("");setCreateStep("choose");
+      setCreateLoader("vanilla");
+      await refresh();open(instance);
+    }catch(err){setCreateError(String(err));}
     finally{setBusy(false);}
   }
   async function favorite(item:Instance){
@@ -189,12 +213,34 @@ export function InstancesPanel({version,active,setActive,setVersion,setMemory,na
         </article>)}
       </div>
       {createOpen&&<div className="fre-library-modal-backdrop" role="presentation">
-        <div className="fre-library-modal" role="dialog" aria-modal="true" aria-label="Створити збірку">
-          <header><h2>Створити збірку</h2><button onClick={()=>setCreateOpen(false)} aria-label="Закрити"><X size={19}/></button></header>
-          <p>Новий профіль матиме власні папки модів, світів, ресурсів і налаштувань.</p>
-          <label>Назва</label><input className="input" autoFocus maxLength={48} placeholder="Моя збірка" value={createName} onChange={e=>setCreateName(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")void create();}}/>
-          <label>Версія Minecraft</label><div className="fre-library-modal-version"><Layers3 size={16}/><span>{version||"Не обрано"}</span><button onClick={()=>{setCreateOpen(false);navigateVersions();}}>Обрати іншу <ArrowRight size={14}/></button></div>
-          <footer><button className="secondary" onClick={()=>setCreateOpen(false)}>Скасувати</button><button className="primary" disabled={!createName.trim()||!version||busy} onClick={()=>void create()}><Plus size={16}/> Створити профіль</button></footer>
+        <div className="fre-library-modal fre-create-wizard" role="dialog" aria-modal="true" aria-label="Створити збірку">
+          <header><h2>Створити збірку</h2><button onClick={()=>{setCreateOpen(false);setCreateStep("choose");}} aria-label="Закрити"><X size={19}/></button></header>
+          {createStep==="choose"?<>
+            <p>Уже знаєш, у що хочеш пограти?</p>
+            <button className="fre-wizard-search" onClick={()=>{setCreateOpen(false);navigateMods();}}><Search size={18}/> Шукати моди й модпаки у Modrinth <ArrowRight size={16}/></button>
+            <h3>Вибери спосіб створення</h3>
+            <button className="fre-wizard-option" onClick={()=>{setCreateStep("custom");setCreateVersion(version);setCreateError("");}}>
+              <span><Layers3 size={20}/></span><span><b>Власна збірка</b><small>Створи збірку з потрібною версією Minecraft і модлоадером.</small></span><ArrowRight size={17}/></button>
+            <button className="fre-wizard-option" onClick={()=>{setCreateOpen(false);navigateMods();}}>
+              <span><Package size={20}/></span><span><b>Знайти мод або модпак</b><small>Переглянути каталог Modrinth. Автоматичне встановлення .mrpack ще в розробці.</small></span><ArrowRight size={17}/></button>
+            <div className="fre-wizard-soon"><FolderOpen size={16}/> Імпорт готових .mrpack і перенесення чужих збірок поки не підтримуються.</div>
+          </>:<>
+            <button className="fre-wizard-back" onClick={()=>setCreateStep("choose")}><ArrowLeft size={15}/> Вибір типу</button>
+            <label>Назва</label><input className="input" autoFocus maxLength={48} placeholder="Моя збірка" value={createName} onChange={e=>setCreateName(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")void create();}}/>
+            <label>Версія Minecraft</label>
+            <select className="fre-wizard-version" value={createVersion} onChange={e=>setCreateVersion(e.target.value)}>
+              {[...new Set([createVersion,version,...availableVersions].filter(Boolean))].map(item=><option key={item} value={item}>{item}</option>)}
+            </select>
+            <label>Модлоадер</label>
+            <div className="fre-wizard-loaders">
+              {(["vanilla","fabric","quilt"] as const).map(loader=><button key={loader} onClick={()=>setCreateLoader(loader)} className={createLoader===loader?"selected":""}>
+                {loader==="vanilla"?"Vanilla":loader==="fabric"?"Fabric":"Quilt"}{createLoader===loader&&<Check size={15}/>}
+              </button>)}
+            </div>
+            <p>Після створення профіль отримає власні папки для світів, модів, ресурс-паків і налаштувань.</p>
+            {createError&&<p className="error">{createError}</p>}
+            <footer><button className="secondary" onClick={()=>setCreateStep("choose")}>Назад</button><button className="primary" disabled={!createName.trim()||!createVersion||busy} onClick={()=>void create()}><Plus size={16}/> {busy?"Створення…":"Створити профіль"}</button></footer>
+          </>}
         </div>
       </div>}
     </>:<>
