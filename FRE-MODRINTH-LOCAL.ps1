@@ -26,6 +26,9 @@ py -3 -m pip install 'Pillow>=11,<13'
 if ($LASTEXITCODE -ne 0) { throw 'Pillow dependency installation failed.' }
 py -3 "$converter" "$destination" --upstream-sha $revision
 if ($LASTEXITCODE -ne 0) { throw 'Customization failed, source remains in FRE-Modrinth-Source for inspection.' }
+Write-Host 'Verifying nickname auth, locale coverage and app identity...' -ForegroundColor Cyan
+py -3 "$projectRoot\scripts\modrinth-fork\verify.py" "$destination"
+if ($LASTEXITCODE -ne 0) { throw 'FRE LAUNCH verification failed; refusing Windows compilation.' }
 Write-Host "FRE LAUNCH modified Modrinth GPLv3 source: $destination" -ForegroundColor Green
 Write-Host 'Separate old FRE LAUNCH profiles and worlds have not been changed.'
 if ($BuildWindows) {
