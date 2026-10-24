@@ -17,7 +17,7 @@ if (Test-Path $destination) {
 Get-Command git -ErrorAction Stop | Out-Null
 Get-Command py -ErrorAction Stop | Out-Null
 Write-Host 'Cloning official Modrinth desktop source at pinned commit...' -ForegroundColor Cyan
-git clone --no-checkout --filter=blob:none https://github.com/modrinth/code.git "$destination"
+git clone --no-checkout --filter=blob:none --depth=1 https://github.com/modrinth/code.git "$destination"
 if ($LASTEXITCODE -ne 0) { throw 'Git clone failed' }
 git -C "$destination" fetch --no-tags --depth=1 origin $sourceSha
 if ($LASTEXITCODE -ne 0) { throw 'Pinned upstream commit fetch failed' }
