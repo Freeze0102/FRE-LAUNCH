@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import "./play-page.css";
 
-export type DiscoverHit={project_id:string;title:string;description:string;icon_url:string|null;downloads:number;author?:string;project_type:string;slug?:string};
+export type DiscoverHit={project_id:string;title:string;description:string;icon_url:string|null;featured_gallery?:string|null;downloads:number;author?:string;project_type:string;slug?:string};
 type Instance={id:string;name:string;version:string;loader:string;memoryMb:number;favorite:boolean;loaderVersion:string|null};
 type Release={id:string;type:string;releaseTime:string};
 type Destination="Versions"|"Instances"|"Mods"|"Servers"|"Downloads"|"Settings"|"Accounts";
@@ -171,8 +171,13 @@ export default function PlayPage({
       <section className="freplay-discovery">
         <div className="freplay-section-head"><h2>Відкрити модпаки</h2><button onClick={()=>onPage("Mods")}>Переглянути всі <ArrowRight size={14}/></button></div>
         <div className="freplay-packs">{featured.map(hit=><button key={hit.project_id} onClick={()=>onOpenProject(hit)} className="freplay-pack">
-          <span className="freplay-pack-image">{hit.icon_url?<img src={hit.icon_url} alt=""/>:<Package size={29}/>}</span>
-          <b>{hit.title}</b><small>{hit.author?"від "+hit.author:hit.description}</small>
+          <span className="freplay-pack-image">
+            {hit.featured_gallery?<img className="freplay-pack-banner" src={hit.featured_gallery} alt="" loading="lazy"/>:
+             hit.icon_url?<img className="freplay-pack-banner freplay-pack-fallback" src={hit.icon_url} alt="" loading="lazy"/>:<Package size={32}/>}
+          </span>
+          <span className="freplay-pack-meta">{hit.icon_url&&<img src={hit.icon_url} alt="" className="freplay-pack-logo" loading="lazy"/>}
+            <span><b>{hit.title}</b><small>{hit.author?"від "+hit.author:hit.description}</small></span>
+          </span>
           <em><Download size={12}/> {hit.downloads.toLocaleString("uk-UA")}</em>
         </button>)}
         {!featured.length&&<div className="freplay-no-packs">Проєкти Modrinth відобразяться, коли каталог стане доступним.</div>}</div>
