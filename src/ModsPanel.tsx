@@ -244,6 +244,7 @@ export default function ModsPanel({version, instanceId, initialProject, onServer
     <main className="fre-discover-main">
     {error&&<div className="error">{error}</div>}
     {message&&<div className="notice"><ShieldCheck size={16}/>{message}</div>}
+    {busy&&packProgress&&<div className="notice" role="status"><DownloadCloud size={16}/>{packProgress.message} ({packProgress.current}/{packProgress.total})</div>}
     {view==="browse"&&<>
     {!opened&&<nav className="fre-discover-categories" aria-label="Категорії Modrinth">
       {[{id:"modpack",label:"Модпаки"},{id:"mod",label:"Моди"},{id:"resourcepack",label:"Ресурс-паки"},{id:"datapack",label:"Датапаки"},{id:"shader",label:"Шейдери"}].map(category=>
@@ -287,7 +288,7 @@ export default function ModsPanel({version, instanceId, initialProject, onServer
               <><h3>Вибір версії</h3><p>Вибери праворуч версію, сумісну з Minecraft та модлоадером твоєї збірки.</p></>}
           </div>
           <div className="fre-mod-detail-versions">
-            <h3>Версії для {version}</h3>
+            <h3>{opened.project_type==="modpack"?"Версії модпака":"Версії для "+version}</h3>
             <p className="muted">{selectedInstance?.loader??"Fabric"} · {compatibleVersions.length} сумісних версій</p>
             <label className="muted"><input type="checkbox" checked={showAllVersions} onChange={e=>setShowAllVersions(e.target.checked)}/> Показати всі версії</label>
             <div className="fre-mod-version-scroll">{shownVersions.slice(0,70).map(v=>{
@@ -298,8 +299,8 @@ export default function ModsPanel({version, instanceId, initialProject, onServer
               </button>;
             })}</div>
             {!compatibleVersions.length&&<p className="muted">Немає сумісної версії. Можеш переглянути інші, але встановлення несумісних заблоковано.</p>}
-            <button className="primary" disabled={busy||!chosenVersion||!selectedInstance||!["mod","resourcepack","shader"].includes(opened.project_type)||(opened.project_type==="mod"&&selectedInstance.loader!=="fabric")} onClick={()=>void installSelected()}>
-              <DownloadCloud size={17}/> {busy?"Встановлення…":"Встановити у збірку"}
+            <button className="primary" disabled={busy||!chosenVersion||(opened.project_type!=="modpack"&&!selectedInstance)||!["modpack","mod","resourcepack","shader"].includes(opened.project_type)||(opened.project_type==="mod"&&selectedInstance?.loader!=="fabric")} onClick={()=>void installSelected()}>
+              <DownloadCloud size={17}/> {busy?"Встановлення…":opened.project_type==="modpack"?"Встановити модпак":"Встановити у збірку"}
             </button>
           </div>
         </div>
@@ -311,8 +312,8 @@ export default function ModsPanel({version, instanceId, initialProject, onServer
         <div className="mod-copy"><button className="fre-mod-open" onClick={()=>void openProject(hit)}><h3>{hit.title}</h3></button>{hit.author&&<div className="fre-mod-author">від {hit.author}</div>}<p>{hit.description}</p><small><DownloadCloud size={13}/>{hit.downloads.toLocaleString("uk-UA")} завантажень {hit.categories?.slice(0,2).map(cat=><span className="fre-mod-tag" key={cat}>{cat}</span>)}</small></div>
         <div className="fre-mod-card-actions">
           <button className="secondary" onClick={()=>void openProject(hit)}>Відкрити</button>
-          {(kind==="mod"||kind==="resourcepack"||kind==="shader")
-            ? <button className="secondary" disabled={busy || !selectedInstance || (kind==="mod"&&selectedInstance.loader!=="fabric")} title={kind==="mod"&&selectedInstance?.loader!=="fabric"?"Потрібна Fabric-збірка":"Встановити"} onClick={()=>void install(hit)}>{busy?"...":"Встановити"}</button>
+          {(kind==="modpack"||kind==="mod"||kind==="resourcepack"||kind==="shader")
+            ? <button className="secondary" disabled={busy || (kind!=="modpack"&&!selectedInstance) || (kind==="mod"&&selectedInstance?.loader!=="fabric")} title={kind==="mod"&&selectedInstance?.loader!=="fabric"?"Потрібна Fabric-збірка":"Встановити"} onClick={()=>void install(hit)}>{busy?"...":kind==="modpack"?"Встановити збірку":"Встановити"}</button>
             : <span className="muted">Перегляд</span>}
         </div>
       </article>)}
