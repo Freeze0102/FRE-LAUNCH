@@ -180,6 +180,24 @@ fn write_staged(stage:&Path,relative:&Path,bytes:&[u8])->Result<(),String>{
     std::io::Write::write_all(&mut file,bytes).map_err(|e|e.to_string())?;
     file.sync_all().map_err(|e|e.to_string())
 }
+fn move_staged_files(from:&Path,to:&Path)->Result<(),String>{
+    for entry in fs::read_dir(from).map_err(|e|e.to_string())?{
+        let entry=entry.map_err(|e|e.to_string())?;
+        let metadata=fs::symlink_metadata(entry.path()).map_err(|e|e.to_string())?;
+        if metadata.file_type().is_symlink(){return Err("Небезпечне посилання в папці підготовки".into());}
+        let destination=to.join(entry.file_name());
+        if metadata.is_dir(){
+            fs::create_dir_all(&destination).map_err(|e|e.to_string())?;
+            move_staged_files(&entry.path(),&destination)?;
+        }else if metadata.is_file(){
+            if fs::symlink_metadata(&destination).is_ok(){
+                return Err("Конфлікт імені файлу в новій збірці".into());
+            }
+            fs::rename(entry.path(),destination).map_err(|e|format!("Помилка перенесення файлу: {e}"))?;
+        }else{return Err("Невідомий тип файлу в збірці".into());}
+    }
+    Ok(())
+}
 fn choose_loader(dep:&HashMap<String,String>)->Result<(&'static str,Option<String>),String>{
     if dep.contains_key("forge")||dep.contains_key("neoforge")||dep.contains_key("neo-forge"){
         return Err("Цей модпак потребує Forge/NeoForge. Ці модлоадери ще не підтримуються FRE LAUNCH.".into());
@@ -273,16 +291,9 @@ pub async fn install_modrinth_modpack(app:AppHandle,project_id:String,version_id
         let id=created.id.clone();
         let placement=(||->Result<super::instances::Instance,String>{
             let dir=super::instances::game_directory(&app,&id,&created.version)?;
-            // The freshly created UUID directory cannot contain prior user data.
-            fs::remove_dir(&dir.join("mods")).ok();
-            fs::remove_dir(&dir.join("saves")).ok();
-            fs::remove_dir(&dir.join("resourcepacks")).ok();
-            fs::remove_dir(&dir.join("shaderpacks")).ok();
-            fs::remove_dir(&dir.join("logs")).ok();
-            fs::remove_dir(&dir.join("config")).ok();
-            // Empty initialization directories are re-created after staging.
-            fs::remove_dir(&dir).map_err(|e|format!("Неможливо підготувати новий профіль: {e}"))?;
-            fs::rename(&stage,&dir).map_err(|e|format!("Неможливо перемістити файли збірки: {e}"))?;
+            // The newly created instance has only default folders; never delete them.
+            // Move only staged, verified content into that dedicated directory.
+            move_staged_files(&stage,&dir)?;
             super::game_folders::prepare_folders(&dir)?;
             let instance=super::instances::set_instance_loader(app.clone(),id.clone(),loader.into(),loader_version)?;
             Ok(instance)
