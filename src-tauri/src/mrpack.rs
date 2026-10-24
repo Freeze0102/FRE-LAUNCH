@@ -243,6 +243,30 @@ pub async fn install_modrinth_modpack(app:AppHandle,project_id:String,version_id
     }
     install_verified_archive(app,bytes,project["title"].as_str().unwrap_or("Модпак")).await
 }
+/// Import a user-selected .mrpack from disk without reading its contents into React.
+/// The native dialog constrains the selection, and Rust enforces size/type again.
+#[tauri::command]
+pub async fn install_local_mrpack(app:AppHandle,path:String)
+    ->Result<super::instances::Instance,String>{
+    let selected=Path::new(&path);
+    if selected.extension().and_then(|s|s.to_str()).map(|s|s.eq_ignore_ascii_case("mrpack"))!=Some(true){
+        return Err("Обери файл із розширенням .mrpack".into());
+    }
+    let metadata=tokio::fs::symlink_metadata(selected).await
+        .map_err(|_|"Обраний файл недоступний".to_string())?;
+    if !metadata.is_file()||metadata.file_type().is_symlink(){
+        return Err("Шлях .mrpack має вказувати на звичайний файл".into());
+    }
+    if metadata.len()==0||metadata.len()>MAX_PACK{
+        return Err("Файл .mrpack порожній або перевищує 128 МБ".into());
+    }
+    let suggested=selected.file_stem().and_then(|s|s.to_str()).unwrap_or("Модпак").to_string();
+    notify(&app,0,1,"Читання вибраного .mrpack");
+    let bytes=tokio::fs::read(selected).await.map_err(|e|format!("Помилка читання .mrpack: {e}"))?;
+    if bytes.len() as u64!=metadata.len(){return Err("Файл змінився під час читання".into());}
+    install_verified_archive(app,bytes,&suggested).await
+}
+
 async fn install_verified_archive(app:AppHandle,bytes:Vec<u8>,suggested_name:&str)
     ->Result<super::instances::Instance,String>{
     let client=client()?;
