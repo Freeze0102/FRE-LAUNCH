@@ -109,7 +109,7 @@ export default function SkinStudio() {
     try {
       if(!dataUrl.startsWith("data:image/png;base64,"))throw Error("Некоректний PNG");
       localStorage.setItem(STORAGE_SKIN,dataUrl);
-      const next=[{id:crypto.randomUUID(),name,image:dataUrl},...savedSkins].slice(0,8);
+      const next=[{id:Date.now().toString(36)+"-"+Math.random().toString(36).slice(2),name,image:dataUrl},...savedSkins].slice(0,8);
       localStorage.setItem(STORAGE_GALLERY,JSON.stringify(next));
       setSavedSkins(next);
       setSkin(dataUrl);setCustom(true);setError("");
