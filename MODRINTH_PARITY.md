@@ -4,7 +4,7 @@ Our goal is a close reproduction of the **Modrinth App desktop interaction model
 
 ## Layout implemented in source
 
-- [x] Narrow dark sidebar with Home, Discover, Skins, Library, quick instance shortcuts, and additional utility pages. No separate servers page.
+- [x] Narrow dark sidebar with Home, Discover, Skins, Library, quick instance shortcuts, and a Minecraft multiplayer-server list (IP, favorite, Java status ping). No commercial hosting section.
 - [x] Home cards of actual popular Modrinth modpacks and mods, with project-detail deep links and download counts.
 - [x] Discover tabs for Modpacks, Mods, Resource Packs and Shaders, sorting, compatible game-version filtering, project listings with icon, title, author and tags.
 - [x] Project details: icon, text, download count, version list, description/versions tabs, safe Markdown formatting.
@@ -24,7 +24,7 @@ Our goal is a close reproduction of the **Modrinth App desktop interaction model
 - [ ] Microsoft persistent multi-account sign-in and refresh token storage; a properly authorized Microsoft client ID is required to make login operational.
 - [ ] Skins uploaded to a real Minecraft profile or synchronized to a Microsoft account; skins here are only local preview/editor assets.
 - [ ] Automatic launcher updates from unmerged source commits. The built-in updater checks published GitHub releases only.
-- [ ] Modrinth cloud functions, cross-device settings synchronization, friends, hosting, app-account functionality.
+- [ ] Modrinth cloud functions, cross-device settings synchronization, friends, **commercial server hosting**, app-account functionality.
 - [ ] Full rich world settings, screenshot annotations and every optional preference present in current Modrinth App.
 
 ## How to verify each new build without GitHub Actions
