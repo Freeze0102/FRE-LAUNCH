@@ -1,0 +1,65 @@
+name: Prepare FRE LAUNCH Modrinth Source Fork
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/modrinth-fork.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: fre-launch-modrinth-source-fork
+  cancel-in-progress: false
+jobs:
+  prepare-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout current FRE LAUNCH tooling, preserve main
+        uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download the pinned GPLv3 Modrinth source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir upstream
+          git -C upstream init -q
+          git -C upstream remote add origin https://github.com/modrinth/code.git
+          git -C upstream fetch --no-tags --depth=1 origin 4ccf4d51804627cd0687ce7dfd5004f20c267acc
+          git -C upstream checkout --detach FETCH_HEAD
+          test "$(git -C upstream rev-parse HEAD)" = "4ccf4d51804627cd0687ce7dfd5004f20c267acc"
+          git -C upstream switch --orphan fre-launch-source
+          git -C upstream rm -r --cached . >/dev/null
+      - name: Remove hosting, advertisements and protected branding
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check 'Pillow>=11,<13'
+          python -m py_compile scripts/modrinth-fork/prepare.py
+          python scripts/modrinth-fork/prepare.py upstream --upstream-sha 4ccf4d51804627cd0687ce7dfd5004f20c267acc
+          test -f upstream/apps/app-frontend/LICENSE
+          test -f upstream/apps/app/LICENSE
+          test -f upstream/FRE_LAUNCH_FORK.md
+          if grep -q 'to="/hosting/manage"' upstream/apps/app-frontend/src/App.vue; then exit 1; fi
+          if grep -q '<Promotion v-if="showAd"' upstream/apps/app-frontend/src/app/shell/sidebar/index.vue; then exit 1; fi
+          if test -d upstream/.github/assets; then exit 1; fi
+      - name: Commit modified source into a new branch only
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code "https://github.com/${TARGET_REPO}.git" refs/heads/modrinth-fork >/dev/null 2>&1; then
+            echo 'Fork branch already exists; refusing to overwrite changes.' >&2
+            exit 1
+          fi
+          cd upstream
+          git config user.name 'fre-launch-source-bot'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'FRE LAUNCH fork of GPLv3 Modrinth desktop source, stripped of hosting/ads/branding'
+          git -c http.extraheader="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)" push "https://github.com/${TARGET_REPO}.git" HEAD:refs/heads/modrinth-fork
+          echo 'Customized desktop source published to the modrinth-fork branch.' >> "$GITHUB_STEP_SUMMARY"
