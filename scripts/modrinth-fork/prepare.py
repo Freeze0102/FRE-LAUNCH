@@ -206,6 +206,10 @@ def customize(root,revision):
         "Minecraft account sign-in still needs verification for third-party clients.\n",encoding="utf-8"
     )
     replace_art(root)
+    from feature_local_accounts import apply as add_local_accounts
+    from feature_ukrainian import apply as finish_ukrainian
+    add_local_accounts(root)
+    finish_ukrainian(root)
     print("Prepared distinct FRE LAUNCH source fork from",revision)
 
 
