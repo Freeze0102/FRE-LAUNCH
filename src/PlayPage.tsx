@@ -10,7 +10,7 @@ import "./play-page.css";
 export type DiscoverHit={project_id:string;title:string;description:string;icon_url:string|null;downloads:number;author?:string;project_type:string;slug?:string};
 type Instance={id:string;name:string;version:string;loader:string;memoryMb:number;favorite:boolean;loaderVersion:string|null};
 type Release={id:string;type:string;releaseTime:string};
-type Destination="Versions"|"Instances"|"Mods"|"Downloads"|"Settings"|"Accounts";
+type Destination="Versions"|"Instances"|"Mods"|"Servers"|"Downloads"|"Settings"|"Accounts";
 type Props={
   versions:Release[];loading:boolean;selected:string;selectedKind:string;
   installed:boolean;isBusy:boolean;installAction:string;activeInstanceId:string;
@@ -183,6 +183,7 @@ export default function PlayPage({
         <h3>Швидкі дії</h3>
         <button onClick={()=>onPage("Versions")}><Layers3 size={16}/> Версії Minecraft <ArrowRight size={13}/></button>
         <button onClick={()=>onPage("Mods")}><Compass size={16}/> Пошук контенту <ArrowRight size={13}/></button>
+        <button onClick={()=>onPage("Servers")}><Play size={16}/> Ігрові сервери <ArrowRight size={13}/></button>
         <button onClick={()=>onPage("Settings")}><Settings2 size={16}/> Налаштування <ArrowRight size={13}/></button>
       </section>
       <section className="freplay-info"><ShieldCheck size={16}/><p>FRE LAUNCH — незалежний Minecraft-лаунчер. Світи й моди зберігаються у твоїх локальних збірках.</p></section>
