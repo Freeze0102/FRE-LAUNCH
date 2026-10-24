@@ -94,6 +94,42 @@ pub fn open_game_folder(app:AppHandle,instance_id:Option<String>,version:String,
     Ok(target.display().to_string())
 }
 
+
+/// Read-only list of actual Minecraft worlds in an instance.
+/// Do not recurse into worlds or follow symlinks/reparse points.
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+pub struct WorldSummary {
+    pub name: String,
+    pub last_modified: u64,
+    pub bytes_on_disk: u64,
+}
+#[tauri::command]
+pub fn list_instance_worlds(app:AppHandle,instance_id:String)->Result<Vec<WorldSummary>,String>{
+    use std::time::UNIX_EPOCH;
+    let instance=super::instances::read(&app,&instance_id)?;
+    let base=game_root(&app,Some(&instance_id),&instance.version)?;
+    prepare_folders(&base)?;
+    let saves=base.join("saves");
+    ensure_real_folder(&saves)?;
+    let mut worlds=Vec::new();
+    for entry in fs::read_dir(saves).map_err(|e|e.to_string())?.take(300) {
+        let entry=entry.map_err(|e|e.to_string())?;
+        let meta=fs::symlink_metadata(entry.path()).map_err(|e|e.to_string())?;
+        if !meta.is_dir() || meta.file_type().is_symlink(){continue;}
+        let level=entry.path().join("level.dat");
+        let Ok(level_meta)=fs::symlink_metadata(level) else {continue;};
+        if !level_meta.is_file() || level_meta.file_type().is_symlink(){continue;}
+        let name=entry.file_name().to_string_lossy().into_owned();
+        if name.is_empty()||name.chars().any(char::is_control){continue;}
+        let last_modified=level_meta.modified().ok().and_then(|m|m.duration_since(UNIX_EPOCH).ok())
+            .map(|duration|duration.as_secs()).unwrap_or(0);
+        worlds.push(WorldSummary{name,last_modified,bytes_on_disk:level_meta.len()});
+    }
+    worlds.sort_by(|a,b|b.last_modified.cmp(&a.last_modified).then_with(||a.name.cmp(&b.name)));
+    Ok(worlds)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
