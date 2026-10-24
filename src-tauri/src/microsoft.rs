@@ -248,6 +248,33 @@ pub async fn microsoft_poll_login() -> Result<PollStatus,String> {
 }
 
 #[tauri::command]
+pub async fn microsoft_restore_login()->Result<Option<MicrosoftAccount>,String>{
+    if let Some(existing)=microsoft_current_account()?{return Ok(Some(existing));}
+    let Some(saved)=saved_refresh()? else{return Ok(None);};
+    let client=http()?;
+    let response=client.post("https://login.microsoftonline.com/consumers/oauth2/v2.0/token")
+        .form(&[
+            ("client_id",saved.client_id.as_str()),
+            ("grant_type","refresh_token"),
+            ("refresh_token",saved.refresh_token.as_str()),
+            ("scope","XboxLive.signin offline_access"),
+        ]).send().await.map_err(|_|"Microsoft недоступний для відновлення сесії")?;
+    if !response.status().is_success(){
+        if response.status().as_u16()==400||response.status().as_u16()==401{
+            let _=delete_refresh();
+        }
+        return Err("Не вдалося відновити Microsoft-вхід. Увійди ще раз.".into());
+    }
+    let json:Value=response.json().await.map_err(|_|"Неправильна відповідь Microsoft")?;
+    let access=json["access_token"].as_str().ok_or("Не вистачає Microsoft-токена")?;
+    let restored=exchange_for_minecraft(&client,access).await?;
+    let account=MicrosoftAccount{name:restored.name.clone(),id:restored.id.clone()};
+    *session().lock().map_err(|_|"Стан авторизації недоступний")?=Some(restored);
+    if let Some(rotated)=json["refresh_token"].as_str(){let _=store_refresh(&saved.client_id,rotated);}
+    Ok(Some(account))
+}
+
+#[tauri::command]
 pub fn microsoft_current_account() -> Result<Option<MicrosoftAccount>,String> {
     let guard=session().lock().map_err(|_|"Стан авторизації недоступний")?;
     Ok(guard.as_ref().filter(|s|Instant::now()<s.expires_at)
