@@ -38,7 +38,21 @@ def verify(root):
         for key,ua in mapping.items():
             assert ukrainian[key][field]==ua, f"{label}: {key} translation missing"
             en=english[key][field]
-            names=lambda value:set(re.findall(r"\{([A-Za-z][A-Za-z0-9_]*)",value))
+            def names(value):
+                # ICU plural/select branches also use braces for literal choices.
+                # Only outer substitutions correspond to interpolation variables.
+                used=set()
+                depth=0
+                for i,char in enumerate(value):
+                    if char=="{":
+                        if depth==0:
+                            match=re.match(r"[A-Za-z][A-Za-z0-9_]*",value[i+1:])
+                            if match:
+                                used.add(match.group(0))
+                        depth+=1
+                    elif char=="}":
+                        depth=max(0,depth-1)
+                return used
             if names(en)!=names(ua):
                 raise AssertionError(f"{key}: ICU variables mismatch: {names(en)} != {names(ua)}")
     for key,(ua,en) in NEW.items():
