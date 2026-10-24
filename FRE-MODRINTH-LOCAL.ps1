@@ -13,9 +13,23 @@ if (-not (Test-Path $converter)) { throw 'Full FRE LAUNCH repository not found.'
 if (Test-Path $destination) { throw "Refusing to overwrite $destination. Rename your old generated source first." }
 Get-Command git -ErrorAction Stop | Out-Null
 Get-Command py -ErrorAction Stop | Out-Null
-Write-Host 'Fetching pinned original Modrinth source via Git submodule...' -ForegroundColor Cyan
-git -C "$projectRoot" submodule update --init --depth 1 vendor/modrinth
-if ($LASTEXITCODE -ne 0) { throw 'Modrinth source fetch failed.' }
+Write-Host 'Fetching pinned original Modrinth source...' -ForegroundColor Cyan
+$gitDirectory = Join-Path $projectRoot '.git'
+if (Test-Path $gitDirectory) {
+    git -C "$projectRoot" submodule update --init --depth 1 vendor/modrinth
+    if ($LASTEXITCODE -ne 0) { throw 'Pinned Modrinth Git submodule fetch failed.' }
+} else {
+    # GitHub's "Download ZIP" excludes submodules. Download the same verified
+    # upstream revision directly in that case, with no new branch or Actions.
+    if (-not (Test-Path $upstream)) {
+        git clone --no-checkout --filter=blob:none https://github.com/modrinth/code.git "$upstream"
+        if ($LASTEXITCODE -ne 0) { throw 'Cannot clone pinned Modrinth source.' }
+    }
+    git -C "$upstream" fetch --no-tags --depth 1 origin $revision
+    if ($LASTEXITCODE -ne 0) { throw 'Cannot fetch exact upstream source revision.' }
+    git -C "$upstream" checkout --detach $revision
+    if ($LASTEXITCODE -ne 0) { throw 'Cannot check out pinned upstream source.' }
+}
 $actual = (git -C "$upstream" rev-parse HEAD).Trim()
 if ($actual -ne $revision) { throw "Refusing unverified Modrinth source: $actual" }
 Write-Host 'Copying upstream desktop source without modifying your old launcher...' -ForegroundColor Cyan
