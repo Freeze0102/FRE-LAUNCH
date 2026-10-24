@@ -356,9 +356,10 @@ export default function App() {
     busyRef.current=true;
     setTask("launching");setError("");setMessage("");setLogs([]);setGameCrash(null);
     try{
-      const response=await invoke<string>("launch_game",{version:playVersion,nickname,memoryMb:playMemory,instanceId:playInstance||null,useMicrosoft});
-      setMessage(response);
-      setTask("running");
+      // The Rust game-status event is authoritative. A short-lived Java process may
+      // exit before invoke() resolves, so never overwrite an "idle/crashed"
+      // event by blindly marking the game running here.
+      await invoke<string>("launch_game",{version:playVersion,nickname,memoryMb:playMemory,instanceId:playInstance||null,useMicrosoft});
     }catch(e){
       setError(humanError(e));
       setTask("idle");
