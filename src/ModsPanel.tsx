@@ -173,6 +173,7 @@ export default function ModsPanel({version, instanceId, initialProject, onServer
         setMessage(kind==="shader"?`${response}. Для шейдерів потрібен Iris/інший сумісний завантажувач.`:response);
         await refreshMods();
       } else if (kind==="mod") {
+        if(!selectedInstance)throw Error("Спочатку вибери Fabric-збірку.");
         if (selectedInstance.loader!=="fabric")throw Error("Для встановлення модів вибери Fabric у налаштуваннях збірки.");
         const added=await invoke<string[]>("install_fabric_mod",{instanceId,projectId:hit.project_id});
         setMessage(`Встановлено ${added.length} модів разом із потрібними залежностями: ${added.join(", ")}`);
