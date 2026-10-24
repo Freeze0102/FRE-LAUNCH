@@ -4,7 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeSanitize from "rehype-sanitize";
-import { Package, DownloadCloud, Search, ShieldCheck, Trash2, RefreshCw, ArrowLeft, CheckCircle2, Info, ExternalLink, Library, Filter, X, Server } from "lucide-react";
+import { Package, DownloadCloud, Search, ShieldCheck, Trash2, RefreshCw, ArrowLeft, CheckCircle2, Info, ExternalLink, Library, Filter, X, Server, Upload } from "lucide-react";
 import type { Instance } from "./Features";
 import "./discover-page.css";
 
@@ -38,9 +38,10 @@ const categoryLists:Record<string,{id:string;label:string}[]>={
     {id:"utility",label:"Утиліти"},{id:"worldgen",label:"Генерація світу"}]
 };
 
-export default function ModsPanel({version, instanceId, initialProject, onServers, onPackInstalled}: {
+export default function ModsPanel({version, instanceId, initialProject, onServers, onPackInstalled, onImportPack, importBusy}: {
   version: string; instanceId: string; initialProject?: ModrinthHit | null;
   onServers?:()=>void;
+  onImportPack:()=>void;importBusy:boolean;
   onPackInstalled?:(instance:{id:string;name:string;version:string;memoryMb:number})=>void;
 }) {
   const [query,setQuery]=useState("");
@@ -239,9 +240,13 @@ export default function ModsPanel({version, instanceId, initialProject, onServer
     <div className="fre-discover-heading">
       <div><h2>{view==="library"?"Встановлений контент":opened?"Проєкт Modrinth":"Пошук контенту"}</h2>
         <p>{view==="library"?"Файли активної збірки":"Моди, модпаки, ресурс-паки, датапаки та шейдери з Modrinth"}</p></div>
+      <div className="fre-discover-actions">
+        <button className="fre-discover-import" disabled={importBusy||busy} onClick={onImportPack}>
+          <Upload size={16}/> Імпортувати .mrpack
+        </button>
       <button className="fre-discover-installed" onClick={()=>{setView(view==="library"?"browse":"library");setOpened(null);}}>
         <Library size={16}/> {view==="library"?"Пошук контенту":`Встановлено ${instanceId?"("+(installed.length+resourcepacks.length+shaderpacks.length)+")":""}`}
-      </button>
+      </button></div>
     </div>
     <div className="fre-discover-shell">
     <main className="fre-discover-main">
@@ -270,7 +275,7 @@ export default function ModsPanel({version, instanceId, initialProject, onServer
       <span className="fre-discover-filter-count">{loading?"Пошук…":hits.length+" результатів"}</span>
       <button className="fre-discover-link" onClick={()=>window.open("https://www.curseforge.com/minecraft/search?search="+encodeURIComponent(query.trim()||"mods"),"_blank","noopener,noreferrer")}>CurseForge <ExternalLink size={13}/></button>
     </div>}
-    {!opened&&!instanceId&&<p className="muted">Щоб установити проєкт, спершу обери збірку в бібліотеці.</p>}
+    {!opened&&!instanceId&&kind!=="modpack"&&<p className="muted">Для встановлення модів або ресурсів спершу обери збірку в бібліотеці. Модпаки встановлюються в новий профіль.</p>}
     {!opened&&categoryFilter&&<button className="fre-discover-active-category" onClick={()=>setCategoryFilter("")}>{categoryLists[kind]?.find(x=>x.id===categoryFilter)?.label||categoryFilter} <X size={12}/></button>}
     {opened&&<section className="fre-mod-detail">
       <button className="secondary" onClick={()=>{setOpened(null);setDetails(null);setError("");}}><ArrowLeft size={16}/> До каталогу</button>
