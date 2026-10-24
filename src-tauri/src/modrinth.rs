@@ -18,6 +18,8 @@ pub struct ModrinthHit {
     pub author: Option<String>,
     #[serde(default)]
     pub categories: Vec<String>,
+    #[serde(default)]
+    pub featured_gallery: Option<String>,
 }
 
 #[derive(Deserialize)]
