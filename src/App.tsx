@@ -9,8 +9,8 @@ import {
 import InstallDeck from "./InstallDeck";
 import GameFolders from "./GameFolders";
 import UpdateCenter from "./UpdateCenter";
-import HomeDashboard from "./HomeDashboard";
-import type {DiscoverHit} from "./HomeDashboard";
+import PlayPage from "./PlayPage";
+import type {DiscoverHit} from "./PlayPage";
 import { LAST_UI_CRASH } from "./ErrorBoundary";
 import { InstancesPanel } from "./InstanceLibrary";
 import ModsPanel from "./ModsPanel";
@@ -275,13 +275,22 @@ export default function App() {
       setTask("idle");
     }
   }
-  async function launch() {
-    if(!selected||busyRef.current||task==="running")return;
-    if(!installed){await installVersion(selected);return;}
+  async function launch(target?:{id:string;version:string;memoryMb:number}) {
+    const playVersion=target?.version??selected;
+    const playInstance=target?.id??activeInstanceId;
+    const playMemory=target?.memoryMb??memoryMb;
+    if(!playVersion||busyRef.current||task==="running")return;
+    if(target){
+      setSelected(playVersion);setActiveInstanceId(playInstance);setMemoryMb(playMemory);
+    }
+    try{
+      const ready=target?await invoke<boolean>("is_installed",{version:playVersion}):installed;
+      if(!ready){await installVersion(playVersion);return;}
+    }catch(e){setError("Не вдалося перевірити Minecraft: "+humanError(e));return;}
     busyRef.current=true;
     setTask("launching");setError("");setMessage("");setLogs([]);
     try{
-      const response=await invoke<string>("launch_game",{version:selected,nickname,memoryMb,instanceId:activeInstanceId||null,useMicrosoft:useMicrosoft&&!!microsoftAccount});
+      const response=await invoke<string>("launch_game",{version:playVersion,nickname,memoryMb:playMemory,instanceId:playInstance||null,useMicrosoft:useMicrosoft&&!!microsoftAccount});
       setMessage(response);
       setTask("running");
     }catch(e){
@@ -355,16 +364,16 @@ export default function App() {
         </div>
       </header>
       <main className="fre-main">
-        <div className="fre-page-intro">
+        {!["Home","Instances","Mods","Skins"].includes(page)&&<div className="fre-page-intro">
           <div className="fre-kicker"><span className="fre-small-line"/> MINECRAFT JAVA <span className="fre-kicker-dot">•</span> {activeLabel} / 11</div>
           <div className="fre-heading-row"><div><h1>{titles[page]}</h1><p>{taglines[page]}</p></div>
             {page!=="Home"&&<button className="fre-return" onClick={()=>setPage("Home")}><House size={16}/> Грати <ArrowRight size={15}/></button>}
           </div>
-        </div>
+        </div>}
         {error&&<div className="fre-incident" role="alert"><AlertTriangle size={16}/><span title={error}>{error}</span><button onClick={()=>setPage("Logs")}><Terminal size={14}/> ЖУРНАЛ <ArrowRight size={13}/></button><button onClick={()=>setError("")} title="Приховати повідомлення" aria-label="Приховати повідомлення"><X size={16}/></button></div>}
         {message&&<div className="fre-flash" role="status"><Check size={17}/><span>{message}</span><button onClick={()=>setMessage("")} title="Закрити"><X size={16}/></button></div>}
 
-        {page==="Home"&&<HomeDashboard
+        {page==="Home"&&<PlayPage
           versions={versions}
           loading={loading}
           selected={selected}
@@ -379,6 +388,9 @@ export default function App() {
           recoveryMode={recoveryMode}
           onPage={dest=>{if(dest==="Mods")setFeaturedProject(null);setPage(dest);}}
           onLaunch={()=>void launch()}
+          onLaunchInstance={item=>void launch(item)}
+          onOpenInstance={(id,version,memory)=>{setLibraryFocusId(id);setActiveInstanceId(id);setSelected(version);setMemoryMb(memory);setPage("Instances");}}
+          microsoftConnected={!!microsoftAccount}
           onVersion={id=>{setSelected(id);setActiveInstanceId("");}}
           onSelectInstance={(id,version,memory)=>{setActiveInstanceId(id);setSelected(version);setMemoryMb(memory);}}
           onRefresh={()=>void refreshVersions()}
