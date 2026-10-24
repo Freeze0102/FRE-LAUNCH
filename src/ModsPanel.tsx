@@ -259,10 +259,12 @@ export default function ModsPanel({version, instanceId}: {version: string; insta
       {hits.map(hit=><article className="mod-card" key={hit.project_id}>
         {hit.icon_url ? <img className="mod-icon" src={hit.icon_url} alt=""/> : <span className="mod-icon fallback"><Package size={24}/></span>}
         <div className="mod-copy"><button className="fre-mod-open" onClick={()=>void openProject(hit)}><h3>{hit.title}</h3></button><p>{hit.description}</p><small><DownloadCloud size={13}/>{hit.downloads.toLocaleString("uk-UA")} завантажень</small></div>
-        <button className="secondary" onClick={()=>void openProject(hit)}>Детальніше</button>
-        {(kind==="mod"||kind==="resourcepack"||kind==="shader")
-          ? <button className="secondary" disabled={busy || !selectedInstance || (kind==="mod"&&selectedInstance.loader!=="fabric")} title={kind==="mod"&&selectedInstance?.loader!=="fabric"?"Потрібна Fabric-збірка":"Встановити"} onClick={()=>void install(hit)}>{busy?"...":"Встановити"}</button>
-          : <span className="muted">Перегляд</span>}
+        <div className="fre-mod-card-actions">
+          <button className="secondary" onClick={()=>void openProject(hit)}>Детальніше</button>
+          {(kind==="mod"||kind==="resourcepack"||kind==="shader")
+            ? <button className="secondary" disabled={busy || !selectedInstance || (kind==="mod"&&selectedInstance.loader!=="fabric")} title={kind==="mod"&&selectedInstance?.loader!=="fabric"?"Потрібна Fabric-збірка":"Встановити"} onClick={()=>void install(hit)}>{busy?"...":"Встановити"}</button>
+            : <span className="muted">Перегляд</span>}
+        </div>
       </article>)}
     </div>}
     {!opened&&<div className="toolbar" style={{justifyContent:"space-between",marginTop:12}}>
