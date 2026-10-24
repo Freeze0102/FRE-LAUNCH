@@ -66,8 +66,8 @@ export default function ServersPanel(){
     catch{setError("Не вдалося скопіювати адресу.");}
   }
   return <section className="panel">
-    <div className="panel-heading"><h3>FRE SERVER HUB</h3><Server size={21}/></div>
-    <p>Зберігай Minecraft Java сервери й перевіряй доступність, пінг, версію та кількість гравців.</p>
+    <div className="panel-heading"><h3>Ігрові сервери Minecraft</h3><Server size={21}/></div>
+    <p>Сервери, на яких ти граєш: BedWars, SkyWars, Survival, MiniGames тощо. Додавай адресу, перевіряй онлайн, пінг та кількість гравців. Це не хостинг і не оренда серверів.</p>
     <div className="server-form">
       <div className="form-field"><label>Назва</label><input className="input" maxLength={64} placeholder="Мій сервер" value={name} onChange={e=>setName(e.target.value)}/></div>
       <div className="form-field"><label>Адреса</label><input className="input" maxLength={253} placeholder="play.example.net" value={address} onChange={e=>setAddress(e.target.value)}/></div>
@@ -88,6 +88,6 @@ export default function ServersPanel(){
         <div className="server-actions"><button className="secondary" disabled={pending} onClick={()=>void ping(s)}><RefreshCw size={15}/> Перевірити</button><button className="icon-button" title="Копіювати адресу" onClick={()=>void copy(s)}><Copy size={16}/></button><button className="icon-button" title="Редагувати" onClick={()=>edit(s)}><Pencil size={16}/></button><button className="icon-button danger" title="Видалити" onClick={()=>void remove(s)}><Trash2 size={16}/></button></div>
       </article>;
     })}</div>
-    <p className="muted">Стандартний Minecraft Java status ping. Сервери з SRV-записами чи захистом можуть помилково здаватися недоступними. Ця функція не виконує авторизацію.</p>
+    <p className="muted">Щоб підключитися до сервера, натисни кнопку копіювання адреси, запусти Minecraft і вибери «Мережева гра → Пряме підключення». Стан сервера визначається стандартним Java status ping; SRV-записи й захист іноді впливають на результат. Для входу може знадобитися твій Minecraft-акаунт або реєстрація на самому сервері.</p>
   </section>;
 }
