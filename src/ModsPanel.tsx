@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeSanitize from "rehype-sanitize";
 import { Package, DownloadCloud, Search, ShieldCheck, Trash2, RefreshCw, ArrowLeft, CheckCircle2, Info, ExternalLink } from "lucide-react";
 import type { Instance } from "./Features";
 
@@ -228,7 +231,7 @@ export default function ModsPanel({version, instanceId}: {version: string; insta
         </nav>
         <div className="fre-mod-detail-layout">
           <div className="fre-mod-detail-description">
-            {detailTab==="about"?<><h3><Info size={17}/> Про проєкт</h3><p>{details.project.body||details.project.description}</p></>:
+            {detailTab==="about"?<><h3><Info size={17}/> Про проєкт</h3><div className="fre-prose"><ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]} components={{a:({node: _node,...props})=><a {...props} target="_blank" rel="noopener noreferrer"/>}}>{details.project.body||details.project.description}</ReactMarkdown></div></>:
               <><h3>Вибір версії</h3><p>Вибери праворуч версію, сумісну з Minecraft та модлоадером твоєї збірки.</p></>}
           </div>
           <div className="fre-mod-detail-versions">
