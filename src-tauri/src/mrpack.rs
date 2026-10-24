@@ -123,27 +123,31 @@ fn parse_pack(bytes:Vec<u8>)->Result<(Index,Vec<(PathBuf,Vec<u8>)>),String>{
         return Err("Непідтримувана версія формату .mrpack".into());
     }
     if index.files.len()>MAX_FILES{return Err("Занадто багато файлів у модпаку".into());}
-    let mut overrides=Vec::new();
+    // Modrinth client-overrides are layered above shared overrides.
+    // Reject duplicates inside one layer, but permit a client-layer replacement.
+    let mut overlays:HashMap<String,(u8,PathBuf,Vec<u8>)>=HashMap::new();
     let mut total=0u64;
-    let mut seen=HashSet::new();
     for n in 0..zip.len(){
         let mut file=zip.by_index(n).map_err(|e|e.to_string())?;
         let full=file.name();
         let mode=file.unix_mode().unwrap_or(0);
         if mode & 0o170000==0o120000{return Err("ZIP містить символьне посилання".into());}
-        // Validate even entries we do not extract, against zip-slip and duplicates.
         let clean=full.trim_end_matches('/');
         let _=safe_relative(clean)?;
         if file.is_dir(){continue;}
         total=total.checked_add(file.size()).ok_or("Переповнення ZIP")?;
         if total>MAX_UNCOMPRESSED{return Err("Архів перевищує ліміт розпакування".into());}
-        let rel=if let Some(s)=full.strip_prefix("client-overrides/"){
-            Some(s)
-        }else{full.strip_prefix("overrides/")};
+        let (rel,priority)=if let Some(s)=full.strip_prefix("client-overrides/"){
+            (Some(s),2u8)
+        }else if let Some(s)=full.strip_prefix("overrides/"){
+            (Some(s),1u8)
+        }else{(None,0u8)};
         if let Some(rel)=rel {
             let dest=safe_relative(rel)?;
             let key=dest.to_string_lossy().to_ascii_lowercase();
-            if !seen.insert(key){return Err("У модпаку дублюються шляхи overrides".into());}
+            if overlays.get(&key).is_some_and(|(existing,..)|*existing==priority){
+                return Err("У модпаку повторюється файл в одній папці overrides".into());
+            }
             let lower=rel.to_ascii_lowercase();
             if [".exe",".dll",".bat",".cmd",".ps1",".vbs",".scr",".msi",".com"]
                 .iter().any(|ext|lower.ends_with(ext)){
@@ -152,10 +156,19 @@ fn parse_pack(bytes:Vec<u8>)->Result<(Index,Vec<(PathBuf,Vec<u8>)>),String>{
             if file.size()>64*1024*1024{return Err("Один override-файл більший за 64 МБ".into());}
             let mut data=Vec::new();
             file.read_to_end(&mut data).map_err(|e|format!("Помилка ZIP: {e}"))?;
-            overrides.push((dest,data));
+            if overlays.get(&key).is_none_or(|(existing,..)|priority>*existing){
+                overlays.insert(key,(priority,dest,data));
+            }
         }
     }
-    let mut combined=seen;
+    let mut keys=overlays.keys().cloned().collect::<Vec<_>>();
+    keys.sort();
+    let mut combined=HashSet::new();
+    let overrides=keys.into_iter().map(|key|{
+        combined.insert(key.clone());
+        let (_,path,content)=overlays.remove(&key).expect("overlay key existed");
+        (path,content)
+    }).collect::<Vec<_>>();
     let mut total_download=0u64;
     for entry in &index.files {
         let path=safe_relative(&entry.path)?;
