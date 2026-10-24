@@ -4,7 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import {
-  ArrowRight, AlertTriangle, Boxes, Check, ChevronRight, CircleHelp, Coffee, Copy, Download, FolderOpen, HardDriveDownload, House, Images, Layers3, ListFilter, Orbit, Play, Puzzle, RefreshCw, Search, Server, Settings2, ShieldCheck, Shirt, SlidersHorizontal, Terminal, UserRound, Wrench, X, Archive, ScrollText
+  ArrowRight, AlertTriangle, Boxes, Check, ChevronRight, CircleHelp, Coffee, Copy, Download, FolderOpen, HardDriveDownload, House, Images, Layers3, ListFilter, Orbit, Play, Puzzle, RefreshCw, Search, Settings2, ShieldCheck, Shirt, SlidersHorizontal, Terminal, UserRound, Wrench, X, Archive, ScrollText
 } from "lucide-react";
 import InstallDeck from "./InstallDeck";
 import GameFolders from "./GameFolders";
@@ -18,7 +18,6 @@ const SkinStudio = lazy(() => import("./SkinStudio"));
 import BackupsPanel from "./BackupsPanel";
 import AccountsPanel from "./AccountsPanel";
 import JavaPanel from "./JavaPanel";
-import ServersPanel from "./ServersPanel";
 import ScreenshotsPanel from "./ScreenshotsPanel";
 
 type Version = { id: string; type: string; url: string; time: string; releaseTime: string };
@@ -39,7 +38,7 @@ function previousInstall():LastInstall|null {
 type InstallPreflight = {path:string; ready:boolean; detail:string};
 type Task = "idle" | "installing" | "launching" | "running";
 type Page = "Home" | "Versions" | "Instances" | "Mods" | "Skins" | "Accounts" |
-  "Servers" | "Downloads" | "Logs" | "Backups" | "Screenshots" | "Settings";
+  "Downloads" | "Logs" | "Backups" | "Screenshots" | "Settings";
 type Store = {
   page: Page; setPage:(page:Page)=>void;
   selected:string; setSelected:(version:string)=>void;
@@ -76,21 +75,20 @@ function themesafe(theme:unknown):string {
 
 const menus = [
   {name:"Home",label:"Головна",icon:House,index:"01"},
-  {name:"Instances",label:"Мої збірки",icon:Boxes,index:"02"},
-  {name:"Mods",label:"Каталог модів",icon:Puzzle,index:"03"},
+  {name:"Mods",label:"Пошук модів",icon:Puzzle,index:"02"},
+  {name:"Instances",label:"Бібліотека збірок",icon:Boxes,index:"03"},
   {name:"Versions",label:"Версії Minecraft",icon:Layers3,index:"04"},
   {name:"Skins",label:"Скіни",icon:Shirt,index:"05"},
-  {name:"Servers",label:"Сервери",icon:Server,index:"06"},
-  {name:"Screenshots",label:"Скріншоти",icon:Images,index:"07"},
-  {name:"Backups",label:"Резервні копії",icon:Archive,index:"08"},
-  {name:"Accounts",label:"Облікові записи",icon:UserRound,index:"09"},
-  {name:"Downloads",label:"Завантаження",icon:Download,index:"10"},
-  {name:"Logs",label:"Діагностика",icon:ScrollText,index:"11"},
-  {name:"Settings",label:"Налаштування",icon:Settings2,index:"12"}
+  {name:"Screenshots",label:"Скріншоти",icon:Images,index:"06"},
+  {name:"Backups",label:"Резервні копії",icon:Archive,index:"07"},
+  {name:"Accounts",label:"Облікові записи",icon:UserRound,index:"08"},
+  {name:"Downloads",label:"Завантаження",icon:Download,index:"09"},
+  {name:"Logs",label:"Діагностика",icon:ScrollText,index:"10"},
+  {name:"Settings",label:"Налаштування",icon:Settings2,index:"11"}
 ] as const;
 const titles:Record<Page,string>={
   Home:"Головна",Versions:"Версії Minecraft",Instances:"Мої збірки",
-  Mods:"Каталог модів",Skins:"Скіни",Servers:"Сервери",
+  Mods:"Пошук модів",Skins:"Скіни",
   Screenshots:"Скріншоти",Backups:"Резервні копії",Accounts:"Облікові записи",
   Downloads:"Завантаження",Logs:"Діагностика",Settings:"Налаштування"
 };
@@ -100,10 +98,9 @@ const taglines:Record<Page,string>={
   Instances:"Твої збережені збірки Minecraft.",
   Mods:"Знайди та встанови вміст для обраної збірки.",
   Skins:"Переглядай і редагуй скіни персонажа.",
-  Servers:"Збережені сервери та перевірка підключення.",
   Screenshots:"Знімки екрана з обраної збірки.",
   Backups:"Створення та відновлення резервних копій світів.",
-  Accounts:"Локальні профілі гравців.",
+  Accounts:"Minecraft-акаунти й локальні профілі.",
   Downloads:"Стан встановлення та завантаження файлів.",
   Logs:"Журнал роботи, помилки та діагностика Windows.",
   Settings:"Зовнішній вигляд, Java та оперативна пам'ять."
@@ -292,7 +289,7 @@ export default function App() {
     <aside className="fre-rail">
       <button className="fre-identity" onClick={()=>setPage("Home")} title="На головну">
         <span className="fre-identity-mark">F</span>
-        <span className="fre-identity-word"><b>FRE LAUNCH</b><small>Minecraft Java Edition</small></span>
+        <span className="fre-identity-word"><b>FRE <em>LAUNCH</em></b><small>Minecraft Java Edition</small></span>
       </button>
       <div className="fre-rail-divider"><span>НАВІГАЦІЯ</span></div>
       <nav className="fre-nav" aria-label="Розділи лаунчера">
@@ -327,7 +324,7 @@ export default function App() {
       </header>
       <main className="fre-main">
         <div className="fre-page-intro">
-          <div className="fre-kicker"><span className="fre-small-line"/> MINECRAFT JAVA <span className="fre-kicker-dot">•</span> {activeLabel} / 12</div>
+          <div className="fre-kicker"><span className="fre-small-line"/> MINECRAFT JAVA <span className="fre-kicker-dot">•</span> {activeLabel} / 11</div>
           <div className="fre-heading-row"><div><h1>{titles[page]}</h1><p>{taglines[page]}</p></div>
             {page!=="Home"&&<button className="fre-return" onClick={()=>setPage("Home")}><House size={16}/> Грати <ArrowRight size={15}/></button>}
           </div>
@@ -376,8 +373,7 @@ export default function App() {
         {page==="Instances"&&<div className="fre-module"><InstancesPanel version={selected} active={activeInstanceId} setActive={setActiveInstanceId} setVersion={setSelected} setMemory={setMemoryMb} navigateHome={()=>setPage("Home")}/></div>}
         {page==="Mods"&&<div className="fre-module"><ModsPanel version={selected} instanceId={activeInstanceId}/></div>}
         {page==="Skins"&&<div className="fre-module"><Suspense fallback={<div className="fre-log-mini-empty">Завантажуємо 3D-студію скінів…</div>}><SkinStudio/></Suspense></div>}
-        {page==="Servers"&&<div className="fre-module"><ServersPanel/></div>}
-        {page==="Screenshots"&&<div className="fre-module"><ScreenshotsPanel instanceId={activeInstanceId}/></div>}
+              {page==="Screenshots"&&<div className="fre-module"><ScreenshotsPanel instanceId={activeInstanceId}/></div>}
         {page==="Backups"&&<div className="fre-module"><BackupsPanel instanceId={activeInstanceId} instanceName={activeInstanceId?"ВИБРАНА ЗБІРКА":""}/></div>}
         {page==="Accounts"&&<div className="fre-module"><AccountsPanel nickname={nickname} onSelect={setNickname}/></div>}
 
