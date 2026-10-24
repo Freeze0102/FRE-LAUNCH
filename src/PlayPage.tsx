@@ -38,9 +38,12 @@ function instanceIcon(instance:Instance,overrides:Record<string,IconSpec>):IconS
     color:COLOR_OPTIONS[[...instance.id].reduce((n,c)=>n+c.charCodeAt(0),0)%COLOR_OPTIONS.length]
   };
 }
-function Art({instance,overrides,large=false}:{instance:Instance;overrides:Record<string,IconSpec>;large?:boolean}){
+function Art({instance,overrides,sources,large=false}:{instance:Instance;overrides:Record<string,IconSpec>;sources:Record<string,string>;large?:boolean}){
   const art=instanceIcon(instance,overrides);
-  return <span className={"freplay-art"+(large?" large":"")} style={{background:art.color}} aria-hidden="true"><span>{art.symbol}</span></span>;
+  const url=!overrides[instance.id]?sources[instance.id]:null;
+  return <span className={"freplay-art"+(large?" large":"")} style={{background:art.color}} aria-hidden="true">
+    {url?<img className="freplay-art-image" src={url} alt="" loading="lazy"/>:<span>{art.symbol}</span>}
+  </span>;
 }
 export default function PlayPage({
   versions,loading,selected,installed,isBusy,installAction,activeInstanceId,nickname,microsoftConnected,
@@ -53,6 +56,7 @@ export default function PlayPage({
   const [groups,setGroups]=useState<Group[]>(()=>readJson("fre-play-groups",[]));
   const [members,setMembers]=useState<Record<string,string>>(()=>readJson("fre-play-group-members",{}));
   const [icons,setIcons]=useState<Record<string,IconSpec>>(()=>readJson("fre-play-icons",{}));
+  const [packArt]=useState<Record<string,string>>(()=>readJson("fre-play-instance-art",{}));
   const [selectedGroup,setSelectedGroup]=useState("");
   const [showNewGroup,setShowNewGroup]=useState(false);
   const [newGroupName,setNewGroupName]=useState("");
@@ -102,7 +106,7 @@ export default function PlayPage({
         {jump.length?<div className="freplay-jump-list">
           {jump.map(item=><article key={item.id} className={"freplay-jump-row"+(activeInstanceId===item.id?" active":"")}>
             <button className="freplay-jump-main" onClick={()=>onOpenInstance(item.id,item.version,item.memoryMb)}>
-              <Art instance={item} overrides={icons}/>
+              <Art instance={item} overrides={icons} sources={packArt}/>
               <span className="freplay-jump-name"><b>{item.name}</b><small>{prettyLoader(item)} {item.version} · <Clock3 size={11}/> Збірка Minecraft</small></span>
             </button>
             <button className="freplay-jump-play" disabled={isBusy} onClick={()=>onLaunchInstance(item)}>
@@ -144,7 +148,7 @@ export default function PlayPage({
         {visible.length?<div className={"freplay-cards "+(layout==="list"?"list":"")}>
           {visible.map(item=><article className="freplay-card" key={item.id}>
             <button className="freplay-card-open" onClick={()=>onOpenInstance(item.id,item.version,item.memoryMb)}>
-              <Art instance={item} overrides={icons} large/>
+              <Art instance={item} overrides={icons} sources={packArt} large/>
               <span className="freplay-card-label"><b>{item.name}</b><small>{prettyLoader(item)} {item.version}</small></span>
             </button>
             <div className="freplay-card-toolbar">
@@ -205,7 +209,7 @@ export default function PlayPage({
     {editing&&editingIcon&&<div className="freplay-modal-bg" onMouseDown={e=>{if(e.target===e.currentTarget)setEditIconId("");}}>
       <div className="freplay-modal freplay-icon-editor" role="dialog" aria-modal="true" aria-label="Редактор значка збірки">
         <header><h3>Значок: {editing.name}</h3><button onClick={()=>setEditIconId("")} aria-label="Закрити"><X size={18}/></button></header>
-        <div className="freplay-icon-preview"><Art instance={editing} overrides={icons} large/></div>
+        <div className="freplay-icon-preview"><Art instance={editing} overrides={icons} sources={packArt} large/></div>
         <label>Колір значка</label><div className="freplay-colors">{COLOR_OPTIONS.map(color=><button key={color} style={{background:color}} className={editingIcon.color===color?"chosen":""} title={color} onClick={()=>setIcons(old=>({...old,[editing.id]:{...editingIcon,color}}))}/>)}</div>
         <label>Символ</label><div className="freplay-symbols">{ICON_OPTIONS.map(symbol=><button className={editingIcon.symbol===symbol?"chosen":""} key={symbol} onClick={()=>setIcons(old=>({...old,[editing.id]:{...editingIcon,symbol}}))}>{symbol}</button>)}</div>
         <footer><button onClick={()=>setIcons(old=>{const next={...old};delete next[editing.id];return next;})}><Trash2 size={14}/> Стандартний</button><button className="freplay-green" onClick={()=>setEditIconId("")}><Check size={15}/> Готово</button></footer>
