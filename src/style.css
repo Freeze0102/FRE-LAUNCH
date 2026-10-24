@@ -1432,3 +1432,14 @@ input:focus-visible,button:focus-visible,select:focus-visible,textarea:focus-vis
 .fl-featured-placeholder{grid-column:1/-1;min-height:108px;display:grid;place-items:center;border:1px dashed #41454a;border-radius:10px;color:#afb2bc;font-size:12px;text-align:center;padding:18px}
 @media(max-width:1200px){.fl-featured-track{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:630px){.fl-featured-track{grid-template-columns:1fr 1fr;gap:8px}.fl-featured-cover{min-height:95px}.fl-featured-cover img{max-width:66px;max-height:66px}.fl-featured-content{padding:10px}}
+
+/* Sidebar quick-profile section matching Modrinth's compact desktop rail. */
+.fre-app .fre-sidebar-divider{width:33px;height:1px;background:#41444d;flex-shrink:0;align-self:center;margin:7px 0 10px}
+.fre-app .fre-sidebar-instance{min-height:43px;height:43px;width:44px;min-width:44px;align-self:center;color:#bdc9bf;background:#29372e;border:1px solid #455248;border-radius:10px}
+.fre-app .fre-sidebar-instance:hover{background:#365741;color:#b7f9c2}
+.fre-app .fre-sidebar-instance.is-active{border-color:#4fbd78}
+.fre-app .fre-sidebar-add{width:44px;min-width:44px;height:42px;min-height:42px;align-self:center;background:#2a2d35;border:1px dashed #464951;border-radius:10px;color:#bdc6c8}
+.fre-app .fre-sidebar-add:hover{border-color:#70e59b;background:#274536;color:#81f3ac}
+.fre-app .fre-sidebar-other{opacity:.72}
+.fre-app .fre-sidebar-other:hover,.fre-app .fre-sidebar-other.is-active{opacity:1}
+@media(max-width:630px){.fre-app .fre-sidebar-divider{display:none}.fre-app .fre-sidebar-instance,.fre-app .fre-sidebar-add{flex:0 0 40px;min-width:40px;height:40px;min-height:40px}}
