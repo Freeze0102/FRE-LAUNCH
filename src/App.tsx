@@ -155,6 +155,13 @@ export default function App() {
     return defaults;
   });
   const [sidebarInstances,setSidebarInstances]=useState<{id:string;name:string;version:string;memoryMb:number;favorite:boolean}[]>([]);
+  const [sidebarArt,setSidebarArt]=useState<Record<string,{symbol:string;color:string}>>({});
+  useEffect(()=>{
+    try{
+      const v=JSON.parse(localStorage.getItem("fre-play-icons")||"{}");
+      if(v&&typeof v==="object")setSidebarArt(v);
+    }catch{}
+  },[page]);
   const [libraryFocusId,setLibraryFocusId]=useState("");
   const [featuredProject,setFeaturedProject]=useState<DiscoverHit|null>(null);
   const [microsoftAccount,setMicrosoftAccount]=useState<MicrosoftAccount|null>(null);
@@ -352,7 +359,7 @@ export default function App() {
           key={item.id} className={"fre-nav-link fre-sidebar-instance"+(activeInstanceId===item.id&&page==="Instances"?" is-active":"")}
           onClick={()=>{setActiveInstanceId(item.id);setSelected(item.version);setMemoryMb(item.memoryMb);setLibraryFocusId(item.id);setPage("Instances");}}
           title={item.name+" · "+item.version} aria-label={"Відкрити збірку "+item.name}>
-          <Boxes size={20}/>
+          <span className="fre-sidebar-avatar" style={{background:(sidebarArt[item.id]?.color||"#355947")}}>{sidebarArt[item.id]?.symbol||item.name.slice(0,2).toUpperCase()}</span>
         </button>)}
         <button className="fre-nav-link fre-sidebar-add" title="Створити збірку" aria-label="Створити збірку"
           onClick={()=>{setLibraryFocusId("");setPage("Instances");}}><Plus size={21}/></button>
