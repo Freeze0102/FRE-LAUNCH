@@ -163,6 +163,7 @@ export default function App() {
     }catch{}
   },[page]);
   const [libraryFocusId,setLibraryFocusId]=useState("");
+  const [createInstanceRequest,setCreateInstanceRequest]=useState(0);
   const [featuredProject,setFeaturedProject]=useState<DiscoverHit|null>(null);
   const [microsoftAccount,setMicrosoftAccount]=useState<MicrosoftAccount|null>(null);
   const [useMicrosoft,setUseMicrosoft]=useState(false);
@@ -362,7 +363,7 @@ export default function App() {
           <span className="fre-sidebar-avatar" style={{background:(sidebarArt[item.id]?.color||"#355947")}}>{sidebarArt[item.id]?.symbol||item.name.slice(0,2).toUpperCase()}</span>
         </button>)}
         <button className="fre-nav-link fre-sidebar-add" title="Створити збірку" aria-label="Створити збірку"
-          onClick={()=>{setLibraryFocusId("");setPage("Instances");}}><Plus size={21}/></button>
+          onClick={()=>{setLibraryFocusId("");setCreateInstanceRequest(v=>v+1);setPage("Instances");}}><Plus size={21}/></button>
         <div className="fre-sidebar-divider" aria-hidden="true"/>
         {menus.filter(item=>item.name==="Accounts"||item.name==="Settings").map(({name,label,icon:Icon,index})=><button key={name}
           className={"fre-nav-link fre-sidebar-other"+(page===name?" is-active":"")}
@@ -418,6 +419,7 @@ export default function App() {
           onPage={dest=>{if(dest==="Mods")setFeaturedProject(null);setPage(dest);}}
           onLaunch={()=>void launch()}
           onLaunchInstance={item=>void launch(item)}
+          onCreateInstance={()=>{setLibraryFocusId("");setCreateInstanceRequest(v=>v+1);setPage("Instances");}}
           onOpenInstance={(id,version,memory)=>{setLibraryFocusId(id);setActiveInstanceId(id);setSelected(version);setMemoryMb(memory);setPage("Instances");}}
           microsoftConnected={!!microsoftAccount}
           onVersion={id=>{setSelected(id);setActiveInstanceId("");}}
@@ -444,7 +446,7 @@ export default function App() {
 
         {task==="installing" && progress && <div className="fre-install-activity" aria-live="polite"><div><span>ПРОЦЕС: {stages[progress.stage]??progress.stage.toUpperCase()}</span><strong>{progress.message}</strong></div><span className="fre-install-percent">{percent}%</span><div className="fre-install-track"><div style={{width:percent+"%"}}/></div><button onClick={()=>setPage("Downloads")}>ДЕТАЛІ <ArrowRight size={14}/></button></div>}
 
-        {page==="Instances"&&<div className="fre-module"><InstancesPanel version={selected} active={activeInstanceId} setActive={setActiveInstanceId} setVersion={setSelected} setMemory={setMemoryMb} navigateHome={()=>setPage("Home")} navigateMods={()=>{setFeaturedProject(null);setPage("Mods");}} navigateVersions={()=>setPage("Versions")} onPlayInstance={item=>void launch(item)} showWorlds={featureSettings.showWorlds} showFiles={featureSettings.showFiles} requestedId={libraryFocusId}/></div>}
+        {page==="Instances"&&<div className="fre-module"><InstancesPanel version={selected} active={activeInstanceId} setActive={setActiveInstanceId} setVersion={setSelected} setMemory={setMemoryMb} navigateHome={()=>setPage("Home")} navigateMods={()=>{setFeaturedProject(null);setPage("Mods");}} navigateVersions={()=>setPage("Versions")} onPlayInstance={item=>void launch(item)} showWorlds={featureSettings.showWorlds} showFiles={featureSettings.showFiles} createRequest={createInstanceRequest} requestedId={libraryFocusId}/></div>}
         {page==="Mods"&&<div className="fre-module"><ModsPanel version={selected} instanceId={activeInstanceId} initialProject={featuredProject?{...featuredProject,slug:featuredProject.slug||""}:null} onServers={()=>setPage("Servers")}/></div>}
         {page==="Skins"&&<div className="fre-module"><Suspense fallback={<div className="fre-log-mini-empty">Завантажуємо 3D-студію скінів…</div>}><SkinStudio/></Suspense></div>}
          {page==="Servers"&&<div className="fre-module"><ServersPanel/></div>}
