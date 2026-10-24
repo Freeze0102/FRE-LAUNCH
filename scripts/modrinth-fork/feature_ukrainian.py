@@ -211,6 +211,10 @@ def apply(root):
             raise RuntimeError(f"Locale name collision: {key}")
         ua[key]={"message":uk}
         ea[key]={"message":en}
+    # App settings must show the fork name rather than the upstream trademark.
+    for catalog in (ea, ua):
+        if "app.settings.app-version" in catalog:
+            catalog["app.settings.app-version"]["message"] = "FRE LAUNCH {version}"
     for path, content in [(app_en,ea),(app_uk,ua),(ui_uk,uu)]:
         path.write_text(json.dumps(content,ensure_ascii=False,indent=2,sort_keys=True)+"\n",encoding="utf-8")
     print(f"Ukrainian translations completed: app={app}, UI={ui}, new profiles={len(NEW)}. "
