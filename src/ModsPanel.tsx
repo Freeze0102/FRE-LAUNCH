@@ -288,7 +288,7 @@ export default function ModsPanel({version, instanceId}: {version: string; insta
               onClick={()=>void browseUpdate(update)}>Доступне оновлення: {update.versionNumber} → Переглянути</button>
           )}
         </div>
-        <button className="secondary" disabled={busy} onClick={()=>void toggle(mod)>{mod.enabled?"Вимкнути":"Увімкнути"}</button>
+        <button className="secondary" disabled={busy} onClick={()=>void toggle(mod)}>{mod.enabled?"Вимкнути":"Увімкнути"}</button>
         <button className="icon-button danger" title="Видалити" disabled={busy} onClick={()=>void remove(mod)}><Trash2 size={16}/></button>
       </div>)}
     </div>}
