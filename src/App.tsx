@@ -5,7 +5,7 @@ import { open as selectLocalFile } from "@tauri-apps/plugin-dialog";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import {
-  ArrowRight, AlertTriangle, Boxes, Check, CircleHelp, Coffee, Copy, Download, FolderOpen, HardDriveDownload, House, Images, Layers3, ListFilter, Orbit, Package, Play, Plus, Puzzle, RefreshCw, Search, Server, Settings2, ShieldCheck, Shirt, Terminal, UserRound, X, Archive, ScrollText
+  ArrowRight, ChevronLeft, ChevronRight, AlertTriangle, Boxes, Check, CircleHelp, Coffee, Copy, Download, FolderOpen, HardDriveDownload, House, Images, Layers3, ListFilter, Orbit, Package, Play, Plus, Compass, RefreshCw, Search, Server, Settings2, ShieldCheck, Shirt, Terminal, UserRound, X, Archive, ScrollText
 } from "lucide-react";
 import InstallDeck from "./InstallDeck";
 import GameFolders from "./GameFolders";
@@ -83,7 +83,7 @@ function themesafe(theme:unknown):string {
 
 const menus = [
   {name:"Home",label:"Грати",icon:Play,index:"01"},
-  {name:"Mods",label:"Пошук контенту",icon:Puzzle,index:"02"},
+  {name:"Mods",label:"Пошук контенту",icon:Compass,index:"02"},
   {name:"Skins",label:"Скіни",icon:Shirt,index:"03"},
   {name:"Screenshots",label:"Скріншоти",icon:Images,index:"04"},
   {name:"Servers",label:"Ігрові сервери",icon:Server,index:"05"},
@@ -96,7 +96,7 @@ const menus = [
   {name:"Settings",label:"Налаштування",icon:Settings2,index:"12"}
 ] as const;
 const titles:Record<Page,string>={
-  Home:"Головна",Versions:"Версії Minecraft",Instances:"Мої збірки",
+  Home:"Грати",Versions:"Версії Minecraft",Instances:"Мої збірки",
   Mods:"Пошук модів",Skins:"Скіни",Servers:"Ігрові сервери",
   Screenshots:"Скріншоти",Backups:"Резервні копії",Accounts:"Облікові записи",
   Downloads:"Завантаження",Logs:"Діагностика",Settings:"Налаштування"
@@ -143,6 +143,29 @@ function progressPercent(progress:Progress|null){
 
 export default function App() {
   const {page,setPage,selected,setSelected,nickname,setNickname,memoryMb,setMemoryMb,activeInstanceId,setActiveInstanceId,theme,setTheme}=useApp();
+  const navigationPages=useRef<Page[]>(["Home"]);
+  const navigationIndex=useRef(0);
+  const [navigationState,setNavigationState]=useState({back:false,forward:false});
+  useEffect(()=>{
+    const pages=navigationPages.current;
+    const index=navigationIndex.current;
+    if(pages[index]!==page){
+      pages.splice(index+1);
+      pages.push(page);
+      navigationIndex.current=pages.length-1;
+    }
+    setNavigationState({
+      back:navigationIndex.current>0,
+      forward:navigationIndex.current<pages.length-1,
+    });
+  },[page]);
+  function goInHistory(direction:-1|1){
+    const next=navigationIndex.current+direction;
+    if(next<0||next>=navigationPages.current.length)return;
+    navigationIndex.current=next;
+    setNavigationState({back:next>0,forward:next<navigationPages.current.length-1});
+    setPage(navigationPages.current[next]);
+  }
   const [versions,setVersions]=useState<Version[]>([]);
   const [featureSettings,setFeatureSettings]=useState<FeatureSettings>(()=>{
     const defaults={showSkins:true,showScreenshots:true,showWorlds:true,showFiles:true};
@@ -422,7 +445,7 @@ export default function App() {
         <button className="fre-nav-link fre-sidebar-add" title="Створити збірку" aria-label="Створити збірку"
           onClick={()=>{setLibraryFocusId("");setCreateInstanceRequest(v=>v+1);setPage("Instances");}}><Plus size={21}/></button>
         <div className="fre-sidebar-divider" aria-hidden="true"/>
-        {menus.filter(item=>item.name==="Accounts"||item.name==="Settings").map(({name,label,icon:Icon,index})=><button key={name}
+        {menus.filter(item=>item.name==="Settings").map(({name,label,icon:Icon,index})=><button key={name}
           className={"fre-nav-link fre-sidebar-other"+(page===name?" is-active":"")}
           onClick={()=>setPage(name)}
           aria-current={page===name?"page":undefined}
@@ -432,6 +455,9 @@ export default function App() {
         </button>)}
       </nav>
       <UpdateCenter/>
+      <AccountSwitcher nickname={nickname} isMicrosoft={useMicrosoft&&!!microsoftAccount}
+        microsoft={microsoftAccount} onSelectOffline={selectOffline}
+        onSelectMicrosoft={selectMicrosoftAccount} onAccounts={()=>setPage("Accounts")}/>
       <div className="fre-rail-foot">
         <span className="fre-status-live"><i/> Minecraft Java Edition</span>
         <div className="fre-build-status"><strong>0.5.7 <span>ALPHA</span></strong><small>ТЕСТОВА ВЕРСІЯ</small></div>
@@ -439,15 +465,18 @@ export default function App() {
     </aside>
     <div className="fre-workspace">
       <header className="fre-commandbar">
-        <div className="fre-command-left"><span className="fre-command-square"><Orbit size={17}/></span>
-          <span>FRE LAUNCH</span><span className="fre-command-slash">/</span><b>{titles[page]}</b>
+        <div className="fre-command-left">
+          <div className="fre-history-controls" aria-label="Історія навігації">
+            <button disabled={!navigationState.back} onClick={()=>goInHistory(-1)} title="Назад" aria-label="Назад"><ChevronLeft size={17}/></button>
+            <button disabled={!navigationState.forward} onClick={()=>goInHistory(1)} title="Вперед" aria-label="Вперед"><ChevronRight size={17}/></button>
+          </div>
+          <span className="fre-command-path-root">FRE LAUNCH</span>
+          <span className="fre-command-slash">›</span><b>{titles[page]}</b>
         </div>
         <div className="fre-command-right">
           {recoveryMode&&<span title="Відновлення після аварійного завершення: WebView2 без GPU-прискорення" className="fre-safe-mode-tag">RECOVERY</span>}
           <button className="fre-command-java" onClick={()=>setPage("Settings")} title="Стан Java"><Coffee size={16}/><span>{java.startsWith("Java в PATH")?"JAVA НЕ ЗНАЙДЕНА":"JAVA READY"}</span></button>
-          <AccountSwitcher nickname={nickname} isMicrosoft={useMicrosoft&&!!microsoftAccount}
-            microsoft={microsoftAccount} onSelectOffline={selectOffline}
-            onSelectMicrosoft={selectMicrosoftAccount} onAccounts={()=>setPage("Accounts")}/>
+
         </div>
       </header>
       <main className="fre-main">
