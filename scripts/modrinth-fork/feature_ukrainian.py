@@ -172,6 +172,7 @@ UI = {
 }
 NEW = {
 "fre-launch.welcome-screen.title":("Вітаємо у FRE LAUNCH","Welcome to FRE LAUNCH"),
+"fre-launch.skins.local-notice":("Це локальний нік, а не Microsoft-акаунт. Тут можна переглядати скіни, але їх застосування через Minecraft Services потребує ліцензійного акаунта.","This is a local nickname, not a Microsoft account. You can preview skins here, but applying an online skin requires a licensed Minecraft account."),
 "fre-launch.offline.title":("Локальний нік","Local nickname"),
 "fre-launch.offline.placeholder":("Введи нік","Your nickname"),
 "fre-launch.offline.create":("Створити","Create"),
