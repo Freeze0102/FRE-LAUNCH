@@ -16,7 +16,7 @@ type InstalledMod = {filename: string; enabled: boolean; bytes: number};
 type PackType = "resourcepack" | "shader";
 type ModUpdate = {filename:string;projectId:string;versionId:string;versionNumber:string};
 
-export default function ModsPanel({version, instanceId}: {version: string; instanceId: string}) {
+export default function ModsPanel({version, instanceId, initialProject}: {version: string; instanceId: string; initialProject?: ModrinthHit | null}) {
   const [query,setQuery]=useState("");
   const [view,setView]=useState<"browse"|"library">("browse");
   const [kind,setKind]=useState("mod");
@@ -87,7 +87,14 @@ export default function ModsPanel({version, instanceId}: {version: string; insta
     } catch(e){setError(String(e));}
     finally{setDetailBusy(false);}
   }
-  const compatibleVersions=details?.versions.filter(v=>v.game_versions.includes(version)&&
+  useEffect(()=>{
+    if(!initialProject)return;
+    setView("browse");
+    setKind(initialProject.project_type);
+    void openProject(initialProject);
+    // Navigating to a different home discovery card changes the project ID.
+  },[initialProject?.project_id]);
+    const compatibleVersions=details?.versions.filter(v=>v.game_versions.includes(version)&&
     (opened?.project_type!=="mod"||v.loaders.includes(selectedInstance?.loader||"fabric")))??[];
   const shownVersions=showAllVersions?details?.versions??[]:compatibleVersions;
   async function installSelected() {
