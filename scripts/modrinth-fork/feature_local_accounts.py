@@ -125,12 +125,12 @@ export async function create_offline_user(name) {
         class="flex flex-col gap-2 rounded-xl border border-solid border-surface-5 bg-button-bg p-3"
         @submit.prevent="createProfile"
     >
-        <label for="fre-offline-nickname" class="text-sm font-semibold text-primary">
+        <label :for="nicknameId" class="text-sm font-semibold text-primary">
             {{ formatMessage(messages.title) }}
         </label>
         <div class="flex items-center gap-2">
             <input
-                id="fre-offline-nickname"
+                :id="nicknameId"
                 v-model.trim="nickname"
                 type="text"
                 autocomplete="off"
@@ -157,12 +157,13 @@ export async function create_offline_user(name) {
 <script setup lang="ts">
 import { PlusIcon, SpinnerIcon } from '@modrinth/assets'
 import { Button, defineMessages, injectNotificationManager, useVIntl } from '@modrinth/ui'
-import { computed, ref } from 'vue'
+import { computed, ref, useId } from 'vue'
 import { create_offline_user } from '@/helpers/auth'
 
 const emit = defineEmits<{ created: [] }>()
 const { formatMessage } = useVIntl()
 const { handleError } = injectNotificationManager()
+const nicknameId = useId()
 const nickname = ref('')
 const busy = ref(false)
 const valid = computed(() => /^[A-Za-z0-9_]{1,16}$/.test(nickname.value))
@@ -172,6 +173,7 @@ async function createProfile() {
     try {
         await create_offline_user(nickname.value)
         nickname.value = ''
+        window.dispatchEvent(new Event('fre-launch-offline-account-created'))
         emit('created')
     } catch (error) {
         handleError(error)
@@ -192,16 +194,28 @@ const messages = defineMessages({
 """,encoding="utf-8")
     p=root/"apps/app-frontend/src/features/minecraft-accounts/accounts-card.vue"
     exactly(p,'\t\t</Button>\n\t</div>\n\t<Accordion',
-        '\t\t</Button>\n\t\t<OfflineProfileCreator @created="onOfflineCreated" />\n\t</div>\n\t<Accordion')
+        '\t\t</Button>\n\t\t<OfflineProfileCreator />\n\t</div>\n\t<Accordion')
     exactly(p, '\t\t\t\t\t{{ formatMessage(messages.addAccount) }}\n\t\t\t\t</Button>\n',
         '\t\t\t\t\t{{ formatMessage(messages.addAccount) }}\n\t\t\t\t</Button>\n'
-        '\t\t\t\t<OfflineProfileCreator @created="onOfflineCreated" />\n')
+        '\t\t\t\t<OfflineProfileCreator />\n')
     exactly(p, "import type { Ref } from 'vue'",
         "import OfflineProfileCreator from './offline-profile-creator.vue'\nimport type { Ref } from 'vue'")
+    exactly(p, "import { computed, onUnmounted, ref } from 'vue'",
+        "import { computed, onMounted, onUnmounted, ref } from 'vue'")
     exactly(p, "async function login() {\n",
-        "async function onOfflineCreated() {\n\tawait refreshValues()\n\temit('change')\n}\n\nasync function login() {\n")
+        "function onOfflineAccountCreated() {\n\tvoid refreshValues().then(() => emit('change'))\n}\n\nonMounted(() => window.addEventListener('fre-launch-offline-account-created', onOfflineAccountCreated))\nonUnmounted(() => window.removeEventListener('fre-launch-offline-account-created', onOfflineAccountCreated))\n\nasync function login() {\n")
     p=root/"apps/app-frontend/src/app/shell/sidebar/index.vue"
     exactly(p,'\t\t\t\t\t\tv-show="hasLoggedIntoMinecraft"\n',"")
+
+    # The first-run welcome screen now supports nickname creation without
+    # requiring a Microsoft sign-in or a pre-existing instance.
+    welcome=root/"apps/app-frontend/src/components/ui/WelcomeScreen.vue"
+    exactly(welcome,"import modrinthSocialIcon from '../../assets/welcome/modrinth-social-icon.png'",
+        "import OfflineProfileCreator from '@/features/minecraft-accounts/offline-profile-creator.vue'\n"
+        "import modrinthSocialIcon from '../../assets/welcome/modrinth-social-icon.png'")
+    exactly(welcome,
+        '\t\t\t\t\t</span>\n\t\t\t\t</div>\n\t\t\t</div>',
+        '\t\t\t\t\t</span>\n\t\t\t\t\t<OfflineProfileCreator class="w-full" />\n\t\t\t\t</div>\n\t\t\t</div>')
 
     # Explicitly mark local vs Microsoft accounts using a durable marker
     # already carried by Credentials; do not include auth token in the UI.
