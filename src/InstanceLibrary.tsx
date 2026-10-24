@@ -21,7 +21,7 @@ type Tab="content"|"worlds"|"files"|"settings"|"logs";
 type Props={
   version:string;active:string;setActive:(id:string)=>void;
   setVersion:(v:string)=>void;setMemory:(mb:number)=>void;
-  navigateHome:()=>void;navigateMods:()=>void;navigateVersions:()=>void;requestedId?:string;
+  navigateHome:()=>void;navigateMods:()=>void;navigateVersions:()=>void;onPlayInstance:(item:Instance)=>void;requestedId?:string;
 };
 const categories:{id:Category;label:string}[]=[
   {id:"mods",label:"Моди"},{id:"resourcepacks",label:"Ресурс-паки"},{id:"shaderpacks",label:"Шейдери"}
@@ -31,7 +31,7 @@ function loaderLabel(instance:Instance){
 }
 function sizeLabel(bytes:number){return bytes>=1048576?(bytes/1048576).toFixed(1)+" MB":Math.round(bytes/1024)+" KB";}
 
-export function InstancesPanel({version,active,setActive,setVersion,setMemory,navigateHome,navigateMods,navigateVersions,requestedId}:Props){
+export function InstancesPanel({version,active,setActive,setVersion,setMemory,navigateHome,navigateMods,navigateVersions,onPlayInstance,requestedId}:Props){
   const [instances,setInstances]=useState<Instance[]>([]);
   const [search,setSearch]=useState("");
   const [sort,setSort]=useState("name");
@@ -200,18 +200,23 @@ export function InstancesPanel({version,active,setActive,setVersion,setMemory,na
         <button className="fre-instance-back" onClick={()=>setSelected(null)}><ArrowLeft size={16}/> Бібліотека</button>
         <header className="fre-instance-detail-head">
           <span className={"fre-instance-detail-cover fre-loader-"+current.loader}><Boxes size={38}/></span>
-          <div><h2>{current.name}</h2><p>Minecraft {current.version} · {loaderLabel(current)} {current.loaderVersion||""}</p></div>
-          <button className="secondary" onClick={()=>void favorite(current)} title="Обране"><Star size={16} fill={current.favorite?"currentColor":"none"}/></button>
-          <button className="primary" onClick={()=>{setActive(current.id);setVersion(current.version);setMemory(current.memoryMb);navigateHome();}}><Play size={17} fill="currentColor"/> До запуску</button>
+          <div><h2>{current.name}</h2><p><Layers3 size={14}/> {loaderLabel(current)} {current.version} <span className="fre-instance-head-dot">•</span> {current.memoryMb/1024} GB RAM</p></div>
+          <button className="fre-instance-head-settings" onClick={()=>setTab("settings")} title="Налаштування збірки" aria-label="Налаштування збірки"><Settings2 size={21}/></button>
+          <button className="fre-instance-head-favorite" onClick={()=>void favorite(current)} title={current.favorite?"Прибрати з обраного":"У вибране"}><Star size={17} fill={current.favorite?"currentColor":"none"}/></button>
+          <button className="fre-instance-head-play" onClick={()=>onPlayInstance(current)}><Play size={20} fill="currentColor"/> Грати</button>
         </header>
         <nav className="fre-instance-tabs" aria-label="Налаштування збірки">
           {([
-            ["content","Вміст",Package],["worlds","Світи",Archive],["files","Файли",FolderOpen],
+            ["content","Вміст",Package],["files","Файли",FolderOpen],["worlds","Світи",Archive],
             ["logs","Журнали",FileText],["settings","Налаштування",Settings2]
           ] as const).map(([key,label,Icon])=><button key={key} className={tab===key?"active":""} onClick={()=>setTab(key)}><Icon size={16}/>{label}</button>)}
         </nav>
         {tab==="content"&&<div className="fre-instance-content">
-          <div className="fre-instance-content-head"><h3>Встановлений контент</h3><div><button className="secondary" onClick={navigateMods}><Plus size={15}/> Додати контент</button><button className="secondary" title="Оновити список" aria-label="Оновити список" onClick={()=>void refreshFiles()} disabled={loadingFiles}><RefreshCw size={16}/></button></div></div>
+          <div className="fre-instance-content-head"><h3>Додатковий контент</h3><div>
+            <button className="secondary" onClick={()=>void openFolder(current,category==="mods"?"mods":category)}><FolderOpen size={15}/> Завантажити файли</button>
+            <button className="fre-instance-browse-content" onClick={navigateMods}><Plus size={15}/> Пошук контенту</button>
+            <button className="secondary" title="Оновити список" aria-label="Оновити список" onClick={()=>void refreshFiles()} disabled={loadingFiles}><RefreshCw size={16}/></button>
+          </div></div>
           <div className="fre-instance-content-filters">{categories.map(x=><button className={category===x.id?"active":""} onClick={()=>setCategory(x.id)} key={x.id}>{x.label}</button>)}</div>
           <div className="fre-instance-content-search"><Search size={16}/><input value={fileFilter} onChange={e=>setFileFilter(e.target.value)} placeholder="Шукати встановлені файли..."/></div>
           <div className="fre-instance-content-table">
