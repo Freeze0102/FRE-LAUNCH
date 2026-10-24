@@ -484,7 +484,7 @@ export default function App() {
           onCreateInstance={()=>{setLibraryFocusId("");setCreateInstanceRequest(v=>v+1);setPage("Instances");}}
           onImportPack={()=>void importMrpack()} importBusy={importingPack||isBusy}
           onOpenInstance={(id,version,memory)=>{setLibraryFocusId(id);setActiveInstanceId(id);setSelected(version);setMemoryMb(memory);setPage("Instances");}}
-          microsoftConnected={!!microsoftAccount}
+          microsoftConnected={!!microsoftAccount&&useMicrosoft}
           onVersion={id=>{setSelected(id);setActiveInstanceId("");}}
           onSelectInstance={(id,version,memory)=>{setActiveInstanceId(id);setSelected(version);setMemoryMb(memory);}}
           onRefresh={()=>void refreshVersions()}
