@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeSanitize from "rehype-sanitize";
-import { Package, DownloadCloud, Search, ShieldCheck, Trash2, RefreshCw, ArrowLeft, CheckCircle2, Info, ExternalLink, Library } from "lucide-react";
+import { Package, DownloadCloud, Search, ShieldCheck, Trash2, RefreshCw, ArrowLeft, CheckCircle2, Info, ExternalLink, Library, Filter, X, Server } from "lucide-react";
 import type { Instance } from "./Features";
 import "./discover-page.css";
 
@@ -16,11 +16,32 @@ type ModDetails = {project:{title:string;body:string;description:string;icon_url
 type InstalledMod = {filename: string; enabled: boolean; bytes: number};
 type PackType = "resourcepack" | "shader";
 type ModUpdate = {filename:string;projectId:string;versionId:string;versionNumber:string};
+const categoryLists:Record<string,{id:string;label:string}[]>={
+  modpack:[
+    {id:"adventure",label:"Пригоди"},{id:"challenging",label:"Складні"},{id:"combat",label:"Бої"},
+    {id:"kitchen-sink",label:"Усе разом"},{id:"lightweight",label:"Легкі"},{id:"magic",label:"Магія"},
+    {id:"multiplayer",label:"Мультиплеєр"},{id:"optimization",label:"Оптимізація"},
+    {id:"quests",label:"Квести"},{id:"technology",label:"Технології"}],
+  mod:[
+    {id:"adventure",label:"Пригоди"},{id:"decoration",label:"Декорації"},{id:"economy",label:"Економіка"},
+    {id:"equipment",label:"Спорядження"},{id:"food",label:"Їжа"},{id:"game-mechanics",label:"Механіки"},
+    {id:"library",label:"Бібліотеки"},{id:"magic",label:"Магія"},{id:"mobs",label:"Моби"},
+    {id:"optimization",label:"Оптимізація"},{id:"storage",label:"Сховище"},
+    {id:"technology",label:"Технології"},{id:"utility",label:"Утиліти"},{id:"worldgen",label:"Генерація світу"}],
+  resourcepack:[
+    {id:"16x",label:"16x"},{id:"32x",label:"32x"},{id:"64x",label:"64x"},
+    {id:"realistic",label:"Реалізм"},{id:"simplistic",label:"Мінімалізм"},
+    {id:"themed",label:"Тематичні"},{id:"vanilla-like",label:"Стандартний стиль"}],
+  shader:[{id:"realistic",label:"Реалізм"},{id:"fantasy",label:"Фентезі"},{id:"vanilla-like",label:"Vanilla+"}],
+  datapack:[{id:"adventure",label:"Пригоди"},{id:"game-mechanics",label:"Механіки"},{id:"mobs",label:"Моби"},
+    {id:"utility",label:"Утиліти"},{id:"worldgen",label:"Генерація світу"}]
+};
 
-export default function ModsPanel({version, instanceId, initialProject}: {version: string; instanceId: string; initialProject?: ModrinthHit | null}) {
+export default function ModsPanel({version, instanceId, initialProject, onServers}: {version: string; instanceId: string; initialProject?: ModrinthHit | null; onServers?:()=>void}) {
   const [query,setQuery]=useState("");
   const [view,setView]=useState<"browse"|"library">("browse");
-  const [kind,setKind]=useState("mod");
+  const [kind,setKind]=useState("modpack");
+  const [categoryFilter,setCategoryFilter]=useState("");
   const [hits,setHits]=useState<ModrinthHit[]>([]);
   const [onlyCompatible,setOnlyCompatible]=useState(true);
   const [sort,setSort]=useState("relevance");
@@ -64,7 +85,7 @@ export default function ModsPanel({version, instanceId, initialProject}: {versio
     try {
       const results=await invoke<ModrinthHit[]>("search_modrinth", {
         query:query.trim(),version:onlyCompatible ? version || null : null,
-        projectType:kind,offset:pageOffset,sort,
+        projectType:kind,offset:pageOffset,sort,category:categoryFilter||null,
         loader:onlyCompatible && kind==="mod" && selectedInstance?.loader!=="vanilla"
           ? selectedInstance?.loader || null : null,
       });
@@ -76,7 +97,7 @@ export default function ModsPanel({version, instanceId, initialProject}: {versio
   useEffect(()=>{
     const handle=window.setTimeout(()=>{void search(0);},350);
     return ()=>window.clearTimeout(handle);
-  },[query,kind,version,onlyCompatible,selectedInstance?.loader,sort]);
+  },[query,kind,categoryFilter,version,onlyCompatible,selectedInstance?.loader,sort]);
 
   async function openProject(hit:ModrinthHit, preferredVersionId?:string) {
     setOpened(hit);setDetails(null);setChosenVersion("");setShowAllVersions(false);setDetailTab("about");setDetailBusy(true);setError("");
@@ -205,7 +226,8 @@ export default function ModsPanel({version, instanceId, initialProject}: {versio
     {view==="browse"&&<>
     {!opened&&<nav className="fre-discover-categories" aria-label="Категорії Modrinth">
       {[{id:"modpack",label:"Модпаки"},{id:"mod",label:"Моди"},{id:"resourcepack",label:"Ресурс-паки"},{id:"datapack",label:"Датапаки"},{id:"shader",label:"Шейдери"}].map(category=>
-        <button key={category.id} className={kind===category.id?"active":""} onClick={()=>setKind(category.id)}>{category.label}</button>)}
+        <button key={category.id} className={kind===category.id?"active":""} onClick={()=>{setKind(category.id);setCategoryFilter("");}}>{category.label}</button>)}
+      {onServers&&<button onClick={onServers}><Server size={13}/> Сервери</button>}
     </nav>}
     {!opened&&<div className="toolbar fre-discover-search">
       <div className="search"><Search size={18}/><input placeholder="Шукати контент..." value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")void search(0);}}/></div>
