@@ -5,7 +5,7 @@ import type { Instance } from "./Features";
 
 type ModrinthHit = {
   project_id: string; slug: string; title: string; description: string;
-  icon_url: string | null; downloads: number; project_type: string;
+  icon_url: string | null; downloads: number; project_type: string; author?:string; categories?:string[];
 };
 type ModVersion = {id:string;name:string;version_number:string;game_versions:string[];loaders:string[];date_published:string};
 type ModDetails = {project:{title:string;body:string;description:string;icon_url:string|null;downloads:number;project_type:string;categories:string[]};versions:ModVersion[]};
@@ -27,6 +27,7 @@ export default function ModsPanel({version, instanceId}: {version: string; insta
   const [detailBusy,setDetailBusy]=useState(false);
   const [chosenVersion,setChosenVersion]=useState("");
   const [showAllVersions,setShowAllVersions]=useState(false);
+  const [detailTab,setDetailTab]=useState<"about"|"versions">("about");
   const [selectedInstance,setSelectedInstance]=useState<Instance|null>(null);
   const [installed,setInstalled]=useState<InstalledMod[]>([]);
   const [resourcepacks,setResourcepacks]=useState<InstalledMod[]>([]);
@@ -74,7 +75,7 @@ export default function ModsPanel({version, instanceId}: {version: string; insta
   },[query,kind,version,onlyCompatible,selectedInstance?.loader,sort]);
 
   async function openProject(hit:ModrinthHit, preferredVersionId?:string) {
-    setOpened(hit);setDetails(null);setChosenVersion("");setShowAllVersions(false);setDetailBusy(true);setError("");
+    setOpened(hit);setDetails(null);setChosenVersion("");setShowAllVersions(false);setDetailTab("about");setDetailBusy(true);setError("");
     try {
       const data=await invoke<ModDetails>("modrinth_project_details",{projectId:hit.project_id});
       setDetails(data);
@@ -180,26 +181,25 @@ export default function ModsPanel({version, instanceId}: {version: string; insta
     finally{setBusy(false);}
   }
 
-  return <section className="panel">
-    <div className="panel-heading"><h3>FRE MODRINTH</h3><Package size={20}/></div>
-    <p>Каталог Modrinth: моди Fabric, ресурс-паки та шейдери встановлюються в окрему збірку з перевіркою файлів. Модпаки поки доступні для перегляду.</p>
+  return <section className="panel fre-modrinth-page">
+    <div className="fre-discover-heading"><div><h2>Знайти контент</h2><p>Каталог модів, модпаків, ресурс-паків та шейдерів Minecraft</p></div><Package size={20}/></div>
     <nav className="fre-content-tabs" aria-label="Каталог та встановлені ресурси">
-      <button className={view==="browse"?"active":""} onClick={()=>setView("browse")}>Шукати контент</button>
+      <button className={view==="browse"?"active":""} onClick={()=>{setView("browse");setOpened(null);}}>Огляд</button>
       <button className={view==="library"?"active":""} onClick={()=>setView("library")}>
-        Моя бібліотека {instanceId? `(${installed.length+resourcepacks.length+shaderpacks.length})`:""}
+        Встановлено {instanceId? `(${installed.length+resourcepacks.length+shaderpacks.length})`:""}
       </button>
     </nav>
     {error&&<div className="error">{error}</div>}
     {message&&<div className="notice"><ShieldCheck size={16}/>{message}</div>}
     {view==="browse"&&<>
-    <div className="toolbar">
+    {!opened&&<nav className="fre-discover-categories" aria-label="Категорії Modrinth">
+      {[{id:"modpack",label:"Модпаки"},{id:"mod",label:"Моди"},{id:"resourcepack",label:"Ресурс-паки"},{id:"shader",label:"Шейдери"}].map(category=>
+        <button key={category.id} className={kind===category.id?"active":""} onClick={()=>setKind(category.id)}>{category.label}</button>)}
+    </nav>}
+    {!opened&&<div className="toolbar">
       <div className="search"><Search size={18}/><input placeholder="Знайти Sodium, Lithium, Fabric API..." value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")void search(0);}}/></div>
-      <select value={kind} onChange={e=>setKind(e.target.value)}>
-        <option value="mod">Моди</option>
-        <option value="resourcepack">Ресурс-паки</option>
-        <option value="shader">Шейдери</option>
-        <option value="modpack">Модпаки</option>
-      </select>
+      </div>}
+    {!opened&&<div className="fre-discover-filters">
       <select value={sort} onChange={e=>setSort(e.target.value)} aria-label="Сортування результатів">
         <option value="relevance">За відповідністю</option>
         <option value="downloads">Найпопулярніші</option>
