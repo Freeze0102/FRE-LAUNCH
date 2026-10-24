@@ -14,6 +14,10 @@ pub struct ModrinthHit {
     pub icon_url: Option<String>,
     pub downloads: u64,
     pub project_type: String,
+    #[serde(default)]
+    pub author: Option<String>,
+    #[serde(default)]
+    pub categories: Vec<String>,
 }
 
 #[derive(Deserialize)]
