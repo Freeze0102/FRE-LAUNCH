@@ -13,6 +13,9 @@ export default function AccountsPanel({nickname,onSelect,microsoft,onMicrosoftSe
     try{return localStorage.getItem("fre-ms-client-id")||"";}catch{return "";}
   });
   const [challenge,setChallenge]=useState<DeviceChallenge|null>(null);
+  const [hasBuiltInId,setHasBuiltInId]=useState(false);
+  const [showDeveloperOptions,setShowDeveloperOptions]=useState(false);
+  useEffect(()=>{void invoke<boolean>("microsoft_login_configuration").then(setHasBuiltInId).catch(()=>{});},[]);
   const [authBusy,setAuthBusy]=useState(false);
   const [authError,setAuthError]=useState("");
   const checking=useRef(false);
@@ -47,8 +50,8 @@ export default function AccountsPanel({nickname,onSelect,microsoft,onMicrosoftSe
   async function beginMicrosoft(){
     setAuthBusy(true);setAuthError("");setChallenge(null);
     try{
-      const code=await invoke<DeviceChallenge>("microsoft_begin_login",{clientId:clientId.trim()});
-      try{localStorage.setItem("fre-ms-client-id",clientId.trim());}catch{/* public app identifier only */}
+      const code=await invoke<DeviceChallenge>("microsoft_begin_login",{clientId:showDeveloperOptions?clientId.trim()||null:null});
+      if(showDeveloperOptions)try{localStorage.setItem("fre-ms-client-id",clientId.trim());}catch{/* public app identifier only */}
       setChallenge(code);
     }catch(e){setAuthError(String(e));}
     finally{setAuthBusy(false);}
@@ -89,10 +92,16 @@ export default function AccountsPanel({nickname,onSelect,microsoft,onMicrosoftSe
       </div>
       {microsoft?<div className="fre-ms-signed"><UserCheck size={23}/><div><strong>{microsoft.name}</strong><small>Microsoft Minecraft · {microsoft.id}</small></div><button className="secondary" disabled={authBusy} onClick={()=>void logoutMicrosoft()}><LogOut size={15}/> Вийти</button></div>:
         <div className="fre-ms-login">
-          <label className="field-label">Microsoft Application (Client) ID</label>
-          <div className="fre-ms-form"><input className="input" value={clientId} onChange={e=>setClientId(e.target.value)} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" autoComplete="off"/>
-            <button className="primary" disabled={authBusy||!/^[-0-9a-fA-F]{36}$/.test(clientId.trim())} onClick={()=>void beginMicrosoft()}><LogIn size={16}/> {authBusy?"Підключення…":"Увійти"}</button></div>
-          <p className="muted">Потрібен Client ID власного публічного застосунку, якому Minecraft дозволив доступ до Minecraft Services. Звичайний акаунт Microsoft або випадковий Client ID самі по собі не підійдуть.</p>
+          <div className="fre-ms-form">
+            <button className="primary" disabled={authBusy||(!hasBuiltInId&&!showDeveloperOptions)} onClick={()=>void beginMicrosoft()}><LogIn size={16}/> {authBusy?"Підключення…":"Увійти через Microsoft"}</button>
+            <button className="secondary" onClick={()=>setShowDeveloperOptions(v=>!v)}>Для розробника</button>
+          </div>
+          {hasBuiltInId?<p className="muted">Відкриється офіційна сторінка Microsoft у браузері. Підтвердь вхід за одноразовим кодом — пароль залишається у Microsoft.</p>:<p className="muted">У поточну збірку FRE LAUNCH ще не додано схвалений Minecraft Client ID. Без нього справжній вхід у Minecraft не працюватиме. Розробник повинен схвалити застосунок і встановити FRE_MS_CLIENT_ID під час збірки.</p>}
+          {showDeveloperOptions&&<div className="fre-ms-dev-options">
+            <label className="field-label">Власний Minecraft-схвалений Application Client ID</label>
+            <input className="input" value={clientId} onChange={e=>setClientId(e.target.value)} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" autoComplete="off"/>
+            <p className="muted">Тільки для перевірки своєї реєстрації застосунку. Вхід через звичайний Client ID без дозволу Minecraft Services завершиться 403.</p>
+          </div>}
           {challenge&&<div className="fre-ms-challenge">
             <span>Підтвердь вхід у Microsoft</span><strong>{challenge.userCode}</strong>
             <p>Відкрий офіційний сайт Microsoft, введи цей код і підтвердь вхід. Перевірка виконується автоматично.</p>
@@ -105,7 +114,7 @@ export default function AccountsPanel({nickname,onSelect,microsoft,onMicrosoftSe
             <a href="https://help.minecraft.net/hc/en-us/articles/16254801392141" target="_blank" rel="noopener noreferrer">Дозвіл Minecraft на Client ID <ExternalLink size={12}/></a>
           </div>
         </div>}
-      <p className="fre-ms-caution">Безпека: токени Microsoft/Minecraft існують тільки в пам'яті процесу; при перезапуску лаунчера треба увійти заново. Ні паролі, ні токени не записуються у файл, SQLite чи localStorage.</p>
+      <p className="fre-ms-caution">Пароль не потрапляє в FRE LAUNCH. Токен Minecraft не передається інтерфейсу. Під час успішного входу лаунчер намагається зберегти ключ оновлення в Windows Credential Manager; автоматичне відновлення сесії після перезапуску ще проходить доопрацювання.</p>
     </div>
     <h3 className="fre-offline-title">Офлайн-профілі</h3>
     <p>Додавай локальні імена Minecraft. Вони не є Microsoft-акаунтами та не дають ліцензійного доступу.</p>
