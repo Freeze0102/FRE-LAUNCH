@@ -1,3 +1,13 @@
+## Minecraft crash and Microsoft login pass
+
+- [x] Minecraft now reports nonzero Java process exit code, shows log/crash-report paths and classifies common mod/Java/OOM errors. This does **not** establish the cause of a particular user's crash without the actual latest.log or report.
+- [x] First launch of an uninstalled Minecraft version installs and proceeds to Play rather than silently stopping after the download.
+- [x] Microsoft device-code verification opens a trusted browser page. Developer Client ID entry is behind advanced settings, and a genuinely Minecraft-approved Client ID can be compiled into the Windows app with `FRE_MS_CLIENT_ID`.
+- [x] Windows Credential Manager stores the refresh token for an authenticated user; the launcher attempts to restore on startup and before a game launch/skin upload. The Java Minecraft bearer token stays in Rust memory.
+- [ ] **Unblocked end-user Microsoft login:** requires FRE LAUNCH's own approved Minecraft Services Client ID; none has been verified in a real login. A generic Entra ID is insufficient.
+- [ ] Crash reproducer: still needs the specific modpack name, Minecraft version, and the crash report to determine why Minecraft terminated.
+- [ ] Real Windows TypeScript/Rust build, Microsoft sign-in, and Java crash-handling regression tests on user hardware.
+
 ## Source-code comparison (24 October 2026)
 
 Studied public Modrinth App source files directly, not merely screenshots:
@@ -26,7 +36,7 @@ Reference: user-supplied Windows recording of Modrinth App 0.22.0 (not a website
 - [x] Vanilla multiplayer server IP/status/favorites list remains available; no commercial hosting UI.
 - [x] Kept the local skin gallery, 3D preview and editor as FRE-owned features.
 
-**Remaining differences from Modrinth:** pixel-perfect Windows screenshot comparison across all screens, real .mrpack import/install, all official default skin variants and licensed Minecraft cape selection, cloud sync, complete language translations, fully authorized persistent Microsoft accounts, automatic mod update replacement, Forge/NeoForge installers, exact file upload/drag-drop behavior, and full native Windows controls.
+**Remaining differences from Modrinth:** pixel-perfect Windows screenshot comparison across all screens, real .mrpack import/install, all official default skin variants and licensed Minecraft cape selection, cloud sync, complete language translations, fully verified/approved Microsoft application registration and account sign-in, automatic mod update replacement, Forge/NeoForge installers, exact file upload/drag-drop behavior, and full native Windows controls.
 
 **Build status:** Changes have been committed to GitHub but **not compiled or launched on the user's Windows machine in this edit**. A prior Cargo resolver error caused by the nonexistent reqwest "form" feature was fixed in Cargo.toml; a new local Rust check is required before calling this working. The previously reported Defender detection on v0.5.5 remains unresolved; do not disable Defender or restore flagged installers.
 
@@ -53,8 +63,8 @@ Our goal is a close reproduction of the **Modrinth App desktop interaction model
 - [ ] Modpack creation/installation and `.mrpack` import/export.
 - [ ] Forge / NeoForge instance installation.
 - [ ] Complete dependency resolver and atomic in-place mod updates.
-- [ ] Microsoft persistent multi-account sign-in and refresh token storage; a properly authorized Microsoft client ID is required to make login operational.
-- [ ] Skins uploaded to a real Minecraft profile or synchronized to a Microsoft account; skins here are only local preview/editor assets.
+- [x] One Microsoft account: refresh-token storage in Windows Credential Manager and attempted automatic session restoration (not yet tested on an approved live Minecraft application). Multi-account management remains unimplemented.
+- [x] Minecraft skin API upload and default reset in Rust, available only with a valid Microsoft/Minecraft session; does not synchronize skins across locally saved profile cards.
 - [ ] Automatic launcher updates from unmerged source commits. The built-in updater checks published GitHub releases only.
 - [ ] Modrinth cloud functions, cross-device settings synchronization, friends, **commercial server hosting**, app-account functionality.
 - [ ] Full rich world settings, screenshot annotations and every optional preference present in current Modrinth App.
