@@ -39,7 +39,7 @@ fn crash_hint(text:&str)->&'static str{
         "Помилка Mixin: можливий конфлікт модів чи невідповідність їхніх версій."
     }else if text.contains("NoClassDefFoundError")||text.contains("ClassNotFoundException"){
         "Бракує класу/залежності або встановлено несумісну версію мода."
-    }else if text.contains("GLFW error")||text.contains("OpenGL")||text.contains("Failed to create window"){
+    }else if text.contains("GLFW error")||text.contains("Unsupported OpenGL")||text.contains("Failed to create window"){
         "Можлива помилка відеодрайвера або OpenGL. Перевір драйвери відеокарти."
     }else{
         "Minecraft завершився аварійно. Перевір crash-report та latest.log; точну причину встановлює журнал."
@@ -774,6 +774,12 @@ mod tests {
         });
         assert!(!critical_cache_ready(&base,version,&meta).await.unwrap());
         fs::remove_dir_all(base).await.unwrap();
+    }
+    #[test]
+    fn game_crash_hints_prioritize_real_errors(){
+        assert!(crash_hint("MixinApplyError: mod conflict").contains("Mixin"));
+        assert!(crash_hint("java.lang.OutOfMemoryError: Java heap space").contains("RAM"));
+        assert!(crash_hint("Renderer OpenGL 4.6; unknown exception").contains("журнал"));
     }
     #[test]
     fn java_version_detection() {
