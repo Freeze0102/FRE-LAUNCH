@@ -19,7 +19,10 @@
     "i18next": "^24.0.0",
     "react-i18next": "^15.0.0",
     "three": "^0.173.0",
-    "skinview3d": "^3.4.2"
+    "skinview3d": "^3.4.2",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "rehype-sanitize": "^6.0.0"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.0.0",
