@@ -28,3 +28,4 @@ fs2 = "0.4"
 semver = "1"
 keyring = { version = "3", features = ["windows-native"] }
 webbrowser = "1"
+tauri-plugin-dialog = "2"
