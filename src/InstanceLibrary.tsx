@@ -79,6 +79,7 @@ export function InstancesPanel({version,active,setActive,setVersion,setMemory,na
     catch(err){setError(String(err));}
   },[]);
   useEffect(()=>{void refresh();},[refresh]);
+  useEffect(()=>{if(requestedId)void refresh();},[requestedId,refresh]);
   useEffect(()=>{
     if(!createOpen)return;
     let mounted=true;
