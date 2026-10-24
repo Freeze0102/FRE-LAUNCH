@@ -481,7 +481,7 @@ export default function App() {
           onLaunch={()=>void launch()}
           onLaunchInstance={item=>void launch(item)}
           onCreateInstance={()=>{setLibraryFocusId("");setCreateInstanceRequest(v=>v+1);setPage("Instances");}}
-          onImportPack={()=>void importMrpack()} importBusy={importingPack}
+          onImportPack={()=>void importMrpack()} importBusy={importingPack||isBusy}
           onOpenInstance={(id,version,memory)=>{setLibraryFocusId(id);setActiveInstanceId(id);setSelected(version);setMemoryMb(memory);setPage("Instances");}}
           microsoftConnected={!!microsoftAccount}
           onVersion={id=>{setSelected(id);setActiveInstanceId("");}}
@@ -508,8 +508,8 @@ export default function App() {
 
         {task==="installing" && progress && <div className="fre-install-activity" aria-live="polite"><div><span>ПРОЦЕС: {stages[progress.stage]??progress.stage.toUpperCase()}</span><strong>{progress.message}</strong></div><span className="fre-install-percent">{percent}%</span><div className="fre-install-track"><div style={{width:percent+"%"}}/></div><button onClick={()=>setPage("Downloads")}>ДЕТАЛІ <ArrowRight size={14}/></button></div>}
 
-        {page==="Instances"&&<div className="fre-module"><InstancesPanel version={selected} active={activeInstanceId} setActive={setActiveInstanceId} setVersion={setSelected} setMemory={setMemoryMb} navigateHome={()=>setPage("Home")} navigateMods={()=>{setFeaturedProject(null);setPage("Mods");}} navigateVersions={()=>setPage("Versions")} onPlayInstance={item=>void launch(item)} showWorlds={featureSettings.showWorlds} showFiles={featureSettings.showFiles} onImportPack={()=>void importMrpack()} importBusy={importingPack} createRequest={createInstanceRequest} requestedId={libraryFocusId}/></div>}
-        {page==="Mods"&&<div className="fre-module"><ModsPanel version={selected} instanceId={activeInstanceId} initialProject={featuredProject?{...featuredProject,slug:featuredProject.slug||""}:null} onServers={()=>setPage("Servers")} onImportPack={()=>void importMrpack()} importBusy={importingPack}
+        {page==="Instances"&&<div className="fre-module"><InstancesPanel version={selected} active={activeInstanceId} setActive={setActiveInstanceId} setVersion={setSelected} setMemory={setMemoryMb} navigateHome={()=>setPage("Home")} navigateMods={()=>{setFeaturedProject(null);setPage("Mods");}} navigateVersions={()=>setPage("Versions")} onPlayInstance={item=>void launch(item)} showWorlds={featureSettings.showWorlds} showFiles={featureSettings.showFiles} onImportPack={()=>void importMrpack()} importBusy={importingPack||isBusy} createRequest={createInstanceRequest} requestedId={libraryFocusId}/></div>}
+        {page==="Mods"&&<div className="fre-module"><ModsPanel version={selected} instanceId={activeInstanceId} initialProject={featuredProject?{...featuredProject,slug:featuredProject.slug||""}:null} onServers={()=>setPage("Servers")} onImportPack={()=>void importMrpack()} importBusy={importingPack||isBusy}
           onPackInstalled={instance=>{
             if(instance.iconUrl?.startsWith("https://")){
               try{
