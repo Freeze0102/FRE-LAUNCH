@@ -122,3 +122,9 @@
 @media(max-width:1070px){.freplay-layout{grid-template-columns:minmax(0,1fr) 175px}.freplay-packs{grid-template-columns:repeat(2,minmax(0,1fr))}.freplay-right>section{padding:12px 8px}}
 @media(max-width:840px){.freplay-layout{display:block;margin:-16px -18px -20px}.freplay-content{padding:18px}.freplay-right{border:0;border-top:1px solid #34363c;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));height:auto;min-height:0}.freplay-right>section{padding:15px}}
 @media(max-width:600px){.freplay-header-actions{flex-wrap:wrap}.freplay-cards{grid-template-columns:repeat(2,minmax(0,1fr))}.freplay-right{grid-template-columns:1fr}.freplay-section-head{flex-wrap:wrap}.freplay-content{padding:12px}.freplay-layout{margin:-12px -12px -16px}.freplay-jump-play{padding:8px!important}}
+
+/* Local Modrinth pack import, available without an existing profile. */
+.freplay-first-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
+.freplay-import-btn{display:inline-flex;align-items:center;gap:6px;border:1px solid #455049;border-radius:8px;padding:9px 12px;background:#333a36;color:#e2eee3;font-size:11px;font-weight:700}
+.freplay-import-btn:hover:not(:disabled){border-color:#6bbe8a;background:#3b5343}
+.freplay-import-btn:disabled{opacity:.45}
