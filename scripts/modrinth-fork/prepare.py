@@ -98,6 +98,23 @@ def customize(root,revision):
     if start<0 or end<0:
         raise RuntimeError("Modrinth hosting button layout changed")
     body=body[:start]+body[end+len("\t\t\t</NavButton>"):]
+    # Disable ad API calls as well as removing ad UI. The Tauri ads
+    # capability is disabled in this fork so these helpers must be no-ops.
+    ad_import=("import {\n"
+               "\thide_ads_window,\n"
+               "\tinit_ads_window,\n"
+               "\tperform_ads_consent_action,\n"
+               "\trelease_ads_window_hold,\n"
+               "\tshould_show_ads_consent_popup,\n"
+               "\ttake_ads_window_hold,\n"
+               "} from '@/helpers/ads.js'")
+    if body.count(ad_import)!=1:
+        raise RuntimeError("Ad helper imports changed")
+    body=body.replace(ad_import,
+        "const take_ads_window_hold = async () => {}\n"
+        "const release_ads_window_hold = async () => {}\n"
+        "const should_show_ads_consent_popup = async () => false\n"
+        "const perform_ads_consent_action = async () => {}")
     original='const showAd = computed(\n\t() => sidebarVisible.value && !hasPlus.value && credentials.value !== undefined,\n)\nconst adConsentAvailable = computed(() => credentials.value !== undefined && !hasPlus.value)'
     if body.count(original)!=1:
         raise RuntimeError("Ad visibility code changed")
