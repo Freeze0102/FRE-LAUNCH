@@ -22,7 +22,7 @@ type Props={
   version:string;active:string;setActive:(id:string)=>void;
   setVersion:(v:string)=>void;setMemory:(mb:number)=>void;
   navigateHome:()=>void;navigateMods:()=>void;navigateVersions:()=>void;onPlayInstance:(item:Instance)=>void;requestedId?:string;
-  showWorlds:boolean;showFiles:boolean;
+  showWorlds:boolean;showFiles:boolean;createRequest:number;
 };
 const categories:{id:Category;label:string}[]=[
   {id:"mods",label:"Моди"},{id:"resourcepacks",label:"Ресурс-паки"},{id:"shaderpacks",label:"Шейдери"}
@@ -32,7 +32,7 @@ function loaderLabel(instance:Instance){
 }
 function sizeLabel(bytes:number){return bytes>=1048576?(bytes/1048576).toFixed(1)+" MB":Math.round(bytes/1024)+" KB";}
 
-export function InstancesPanel({version,active,setActive,setVersion,setMemory,navigateHome,navigateMods,navigateVersions,onPlayInstance,showWorlds,showFiles,requestedId}:Props){
+export function InstancesPanel({version,active,setActive,setVersion,setMemory,navigateHome,navigateMods,navigateVersions,onPlayInstance,showWorlds,showFiles,createRequest,requestedId}:Props){
   const [instances,setInstances]=useState<Instance[]>([]);
   const [search,setSearch]=useState("");
   const [sort,setSort]=useState("name");
@@ -60,6 +60,7 @@ export function InstancesPanel({version,active,setActive,setVersion,setMemory,na
   const [notice,setNotice]=useState("");
 
   useEffect(()=>{if(requestedId)setSelected(requestedId);},[requestedId]);
+  useEffect(()=>{if(createRequest>0){setSelected(null);setCreateOpen(true);setCreateStep("choose");setCreateError("");}},[createRequest]);
   useEffect(()=>{if((tab==="worlds"&&!showWorlds)||(tab==="files"&&!showFiles))setTab("content");},[tab,showWorlds,showFiles]);
   const current=instances.find(item=>item.id===selected)||null;
   const filtered=useMemo(()=>{
