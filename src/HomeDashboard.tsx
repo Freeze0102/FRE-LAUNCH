@@ -4,6 +4,7 @@ import {ArrowDownToLine,ArrowRight,Boxes,Check,ChevronRight,Clock3,Coffee,Folder
 
 type Release={id:string;type:string;releaseTime:string};
 type Instance={id:string;name:string;version:string;favorite:boolean;loader:string;loaderVersion:string|null;memoryMb:number};
+type DiscoverHit={project_id:string;title:string;description:string;icon_url:string|null;downloads:number;author?:string;project_type:string};
 type Destination="Versions"|"Instances"|"Mods"|"Downloads"|"Settings"|"Accounts";
 type Props={
   versions:Release[];loading:boolean;selected:string;selectedKind:string;
@@ -15,15 +16,45 @@ type Props={
 
 export default function HomeDashboard({versions,loading,selected,selectedKind,installed,isBusy,installAction,activeInstanceId,memoryMb,nickname,java,recoveryMode,onPage,onLaunch,onVersion,onSelectInstance,onRefresh}:Props){
   const [instances,setInstances]=useState<Instance[]>([]);
+  const [featuredPacks,setFeaturedPacks]=useState<DiscoverHit[]>([]);
+  const [featuredMods,setFeaturedMods]=useState<DiscoverHit[]>([]);
   useEffect(()=>{
     let alive=true;
     void invoke<Instance[]>("list_instances").then(items=>{if(alive)setInstances(items);}).catch(()=>{});
     return ()=>{alive=false;};
   },[]);
-  const releases=versions.filter(v=>v.type==="release").slice(0,5);
+  useEffect(()=>{
+    let mounted=true;
+    for (const [projectType,setter] of [["modpack",setFeaturedPacks],["mod",setFeaturedMods]] as const){
+      void invoke<DiscoverHit[]>("search_modrinth",{query:"",version:null,projectType,offset:0,loader:null,sort:"downloads"})
+        .then(items=>{if(mounted)setter(items.slice(0,4));})
+        .catch(()=>{/* Catalog remains accessible separately if Modrinth is offline. */});
+    }
+    return()=>{mounted=false;};
+  },[]);
+    const releases=versions.filter(v=>v.type==="release").slice(0,5);
   const active=instances.find(v=>v.id===activeInstanceId);
   const javaState=java.startsWith("Java в PATH")?"Не знайдено":java.startsWith("Перевірка")?"Перевіряємо":"Виявлено";
   return <div className="fl-home">
+    <section className="fl-modrinth-discovery">
+      <div className="fl-discover-title"><h2>Ласкаво просимо до FRE LAUNCH!</h2><p>Відкривай моди та модпаки з Modrinth, створюй власні збірки.</p></div>
+      <div className="fl-discover-row-title"><h3>Популярні модпаки</h3><button onClick={()=>onPage("Mods")}>Переглянути все <ArrowRight size={15}/></button></div>
+      <div className="fl-featured-track">
+        {featuredPacks.map(hit=><button className="fl-featured-card" key={hit.project_id} onClick={()=>onPage("Mods")}>
+          <span className="fl-featured-cover">{hit.icon_url?<img src={hit.icon_url} alt=""/>:<Package size={46}/>}</span>
+          <span className="fl-featured-content"><strong>{hit.title}</strong><small>{hit.author?"від "+hit.author:hit.description}</small><em><ArrowDownToLine size={12}/> {hit.downloads.toLocaleString("uk-UA")} завантажень</em></span>
+        </button>)}
+        {!featuredPacks.length&&<div className="fl-featured-placeholder">Популярні модпаки з'являться після отримання даних Modrinth.</div>}
+      </div>
+      <div className="fl-discover-row-title"><h3>Популярні моди</h3><button onClick={()=>onPage("Mods")}>Переглянути все <ArrowRight size={15}/></button></div>
+      <div className="fl-featured-track">
+        {featuredMods.map(hit=><button className="fl-featured-card" key={hit.project_id} onClick={()=>onPage("Mods")}>
+          <span className="fl-featured-cover">{hit.icon_url?<img src={hit.icon_url} alt=""/>:<Package size={46}/>}</span>
+          <span className="fl-featured-content"><strong>{hit.title}</strong><small>{hit.author?"від "+hit.author:hit.description}</small><em><ArrowDownToLine size={12}/> {hit.downloads.toLocaleString("uk-UA")} завантажень</em></span>
+        </button>)}
+        {!featuredMods.length&&<div className="fl-featured-placeholder">Популярні моди з'являться після отримання даних Modrinth.</div>}
+      </div>
+    </section>
     <div className="fl-section-kicker"><span className="fl-pulse"/> ЛАУНЧЕР ГОТОВИЙ <span className="fl-kicker-line"/> <span>MINECRAFT JAVA EDITION</span></div>
     <div className="fl-workbench">
       <section className="fl-game-stage">
