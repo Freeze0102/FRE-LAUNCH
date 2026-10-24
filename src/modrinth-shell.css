@@ -70,6 +70,8 @@
     min-width: 36px;
     border-radius: 11px;
   }
+  /* Older responsive rules hide a lone SVG; keep the Add Instance icon visible. */
+  .fre-app .fre-sidebar-add > svg {display: block!important}
   .fre-app .fre-sidebar-add {
     border: 1px dashed #484b53!important;
     background: #292b31!important;
