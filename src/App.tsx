@@ -77,9 +77,9 @@ function themesafe(theme:unknown):string {
 const menus = [
   {name:"Home",label:"Головна",icon:House,index:"01"},
   {name:"Mods",label:"Пошук модів",icon:Puzzle,index:"02"},
-  {name:"Instances",label:"Бібліотека збірок",icon:Boxes,index:"03"},
-  {name:"Versions",label:"Версії Minecraft",icon:Layers3,index:"04"},
-  {name:"Skins",label:"Скіни",icon:Shirt,index:"05"},
+  {name:"Skins",label:"Скіни",icon:Shirt,index:"03"},
+  {name:"Instances",label:"Бібліотека збірок",icon:Boxes,index:"04"},
+  {name:"Versions",label:"Версії Minecraft",icon:Layers3,index:"05"},
   {name:"Screenshots",label:"Скріншоти",icon:Images,index:"06"},
   {name:"Backups",label:"Резервні копії",icon:Archive,index:"07"},
   {name:"Accounts",label:"Облікові записи",icon:UserRound,index:"08"},
