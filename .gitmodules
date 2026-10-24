@@ -1,0 +1,3 @@
+[submodule "vendor/modrinth"]
+	path = vendor/modrinth
+	url = https://github.com/modrinth/code.git
