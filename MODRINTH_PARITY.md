@@ -1,3 +1,19 @@
+## Source-code comparison (24 October 2026)
+
+Studied public Modrinth App source files directly, not merely screenshots:
+
+- [Theseus .mrpack installer](https://github.com/modrinth/code/blob/main/packages/app-lib/src/api/pack/install_mrpack.rs) and [pack format types](https://github.com/modrinth/code/blob/main/packages/app-lib/src/api/pack/install_from.rs): manifest, environment-specific content, verified downloads, safe extraction, failure handling.
+- [Minecraft skin management](https://github.com/modrinth/code/blob/main/packages/app-lib/src/api/minecraft_skins.rs) and [Mojang skin API](https://github.com/modrinth/code/blob/main/packages/app-lib/src/state/minecraft_skins/mojang_api.rs): local saved skins are distinct from the real Mojang skin, which is changed using authenticated Minecraft Services requests.
+- [Official .mrpack format](https://support.modrinth.com/en/articles/8802351-modrinth-modpack-format-mrpack).
+
+Implemented in FRE LAUNCH with independent source files:
+- `src-tauri/src/mrpack.rs`: download a published Modrinth .mrpack, validate format v1/index/ZIP paths, SHA-512 and optional SHA-1, skip client-unsupported entries, honor Minecraft and Fabric/Quilt loader dependencies, stage downloads safely, and open a new instance. Allowed official Modrinth/GitHub/GitLab hosts; external hosts fail instead of being fetched without verification.
+- `src/ModsPanel.tsx`: real "Install modpack" controls for listed projects and selected releases, error/progress feedback, opening the new instance.
+- `src-tauri/src/microsoft.rs`: Minecraft Services skin PNG multipart upload, Classic/Slim model, and default-skin reset without sending tokens to JavaScript.
+- `src/SkinStudio.tsx`: explicit local preview versus real account upload; real upload requires active authenticated premium Minecraft session and a permitted Microsoft client registration.
+
+**Limits**: no `.mrpack` file-picker/import-from-disk yet, Forge and NeoForge modpacks rejected explicitly, client-optional files currently installed automatically, server-only files skipped, large packs and unsupported external hosts rejected for security, no complete rollback guarantee after unusual filesystem failures. Do not treat this as full functional parity with Modrinth. **Windows Rust+TypeScript compilation and live modpack/skin tests have not yet run**, and the new code may require fixes in the local build.
+
 ## New video-based parity pass — 24 October 2026
 
 Reference: user-supplied Windows recording of Modrinth App 0.22.0 (not a website screenshot). FRE LAUNCH keeps its own brand, code and data directories. **"Without hosts" excludes paid/commercial server hosting, not multiplayer BedWars/Survival servers.**
