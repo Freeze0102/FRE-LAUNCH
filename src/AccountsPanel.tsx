@@ -21,6 +21,8 @@ export default function AccountsPanel({nickname,onSelect,microsoft,onMicrosoftSe
   const [authError,setAuthError]=useState("");
   const [authNotice,setAuthNotice]=useState("");
   const checking=useRef(false);
+  const onMicrosoftSelectRef=useRef(onMicrosoftSelect);
+  useEffect(()=>{onMicrosoftSelectRef.current=onMicrosoftSelect;},[onMicrosoftSelect]);
   const [accounts,setAccounts]=useState<Account[]>([]);
   const [name,setName]=useState("");
   const [error,setError]=useState("");
@@ -49,11 +51,12 @@ export default function AccountsPanel({nickname,onSelect,microsoft,onMicrosoftSe
     }catch(e){setError(String(e));}
     finally{setBusy(false);}
   }
-  const canLogin=hasBuiltInId||(showDeveloperOptions&&/^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$/.test(clientId.trim()));
+  const validDeveloperId=/^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$/.test(clientId.trim());
+  const canLogin=hasBuiltInId||(showDeveloperOptions&&validDeveloperId);
   async function beginBrowserLogin(){
     setAuthBusy(true);setAuthError("");setAuthNotice("");setChallenge(null);
     try{
-      const result=await invoke<BrowserLoginResult>("microsoft_browser_login",{clientId:showDeveloperOptions?clientId.trim()||null:null});
+      const result=await invoke<BrowserLoginResult>("microsoft_browser_login",{clientId:showDeveloperOptions&&validDeveloperId?clientId.trim():null});
       if(showDeveloperOptions)try{localStorage.setItem("fre-ms-client-id",clientId.trim());}catch{}
       onMicrosoftSelect(result.account);
       setAuthNotice(result.persisted?
@@ -65,7 +68,7 @@ export default function AccountsPanel({nickname,onSelect,microsoft,onMicrosoftSe
   async function beginMicrosoft(){
     setAuthBusy(true);setAuthError("");setAuthNotice("");setChallenge(null);
     try{
-      const code=await invoke<DeviceChallenge>("microsoft_begin_login",{clientId:showDeveloperOptions?clientId.trim()||null:null});
+      const code=await invoke<DeviceChallenge>("microsoft_begin_login",{clientId:showDeveloperOptions&&validDeveloperId?clientId.trim():null});
       if(showDeveloperOptions)try{localStorage.setItem("fre-ms-client-id",clientId.trim());}catch{/* public app identifier only */}
       setChallenge(code);
     }catch(e){setAuthError(String(e));}
@@ -89,7 +92,7 @@ export default function AccountsPanel({nickname,onSelect,microsoft,onMicrosoftSe
         if(!active)return;
         if(result.status==="connected"&&result.account){
           setChallenge(null);
-          onMicrosoftSelect(result.account);
+          onMicrosoftSelectRef.current(result.account);
           setAuthError("");
           setAuthNotice(result.persisted?
             "Minecraft-акаунт підключено. Windows збереже вхід для наступного запуску.":
@@ -100,7 +103,7 @@ export default function AccountsPanel({nickname,onSelect,microsoft,onMicrosoftSe
       }finally{checking.current=false;}
     },ms);
     return()=>{active=false;window.clearInterval(timer);};
-  },[challenge,onMicrosoftSelect]);
+  },[challenge]);
   return <section className="panel">
     <div className="panel-heading"><h3>Акаунти Minecraft</h3><UserRound size={20}/></div>
     <div className="fre-ms-account">
