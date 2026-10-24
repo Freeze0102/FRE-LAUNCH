@@ -3,7 +3,7 @@ import {invoke} from "@tauri-apps/api/core";
 import {
   ArrowRight,BookOpen,Check,ChevronDown,Clock3,Compass,Download,
   FolderOpen,Grid2X2,Layers3,List,MoreHorizontal,Package,Palette,
-  Play,Plus,Search,Settings2,ShieldCheck,SlidersHorizontal,Trash2,UserRound,X
+  Play,Plus,Search,Settings2,ShieldCheck,SlidersHorizontal,Trash2,Upload,UserRound,X
 } from "lucide-react";
 import "./play-page.css";
 
@@ -22,6 +22,7 @@ type Props={
   onLaunchInstance:(instance:{id:string;version:string;memoryMb:number})=>void;
   onOpenInstance:(id:string,version:string,memory:number)=>void;
   onCreateInstance:()=>void;
+  onImportPack:()=>void;importBusy:boolean;
 };
 type IconSpec={symbol:string;color:string};
 type Group={id:string;name:string};
@@ -43,7 +44,7 @@ function Art({instance,overrides,large=false}:{instance:Instance;overrides:Recor
 }
 export default function PlayPage({
   versions,loading,selected,installed,isBusy,installAction,activeInstanceId,nickname,microsoftConnected,
-  onPage,onLaunch,onVersion,onSelectInstance,onRefresh,onOpenProject,onLaunchInstance,onOpenInstance,onCreateInstance
+  onPage,onLaunch,onVersion,onSelectInstance,onRefresh,onOpenProject,onLaunchInstance,onOpenInstance,onCreateInstance,onImportPack,importBusy
 }:Props){
   const [instances,setInstances]=useState<Instance[]>([]);
   const [filter,setFilter]=useState("");
@@ -112,11 +113,15 @@ export default function PlayPage({
         </div>:<div className="freplay-first">
           <Package size={28}/><strong>Тут з'являться твої збірки</strong>
           <p>Створи першу збірку, щоб запускати Minecraft безпосередньо з головної сторінки.</p>
+          <div className="freplay-first-actions">
           <button className="freplay-green" onClick={onCreateInstance}><Plus size={16}/> Створити збірку</button>
+          <button className="freplay-import-btn" disabled={importBusy} onClick={onImportPack}><Upload size={16}/> Імпортувати .mrpack</button>
+          </div>
         </div>}
       </section>
       <section className="freplay-library">
         <div className="freplay-section-head"><h2>Бібліотека</h2><div className="freplay-header-actions">
+          <button disabled={importBusy} onClick={onImportPack}><Upload size={14}/> Імпорт .mrpack</button>
           <button onClick={()=>setShowNewGroup(true)}><Plus size={14}/> Нова група</button>
           <button className="freplay-green" onClick={onCreateInstance}><Plus size={14}/> Нова збірка</button>
         </div></div>
