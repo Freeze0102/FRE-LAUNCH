@@ -132,3 +132,17 @@
 /* Authentic Modrinth project icons for imported online modpacks. */
 .freplay-art{overflow:hidden}
 .freplay-art .freplay-art-image{display:block;width:100%;height:100%;object-fit:cover;border-radius:inherit}
+
+/* Featured Modrinth gallery images: two large editorial cards like the current Play page. */
+.freplay-packs{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.freplay-pack{padding:0;gap:0;overflow:hidden;border-radius:12px;background:#24262d}
+.freplay-pack-image{display:grid;place-items:center;aspect-ratio:16/8.7;min-height:0;width:100%;border-radius:0;overflow:hidden;background:linear-gradient(125deg,#2a5040,#394650)}
+.freplay-pack-image img.freplay-pack-banner{display:block;width:100%;height:100%;max-width:none;object-fit:cover;border-radius:0}
+.freplay-pack-image img.freplay-pack-fallback{object-fit:contain;padding:18px;filter:drop-shadow(0 3px 8px #0006)}
+.freplay-pack-meta{display:flex;align-items:center;gap:9px;padding:12px 12px 8px;min-width:0}
+.freplay-pack-logo{width:35px;height:35px;flex:0 0 35px;border-radius:8px;object-fit:cover}
+.freplay-pack-meta>span{display:flex;flex-direction:column;gap:4px;min-width:0}
+.freplay-pack-meta b{font-size:12px;color:#edf2f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.freplay-pack-meta small{font-size:10px;color:#a8afb8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;min-height:0}
+.freplay-pack em{padding:0 12px 11px;color:#aeb8b1}
+@media(max-width:550px){.freplay-packs{grid-template-columns:1fr}}
