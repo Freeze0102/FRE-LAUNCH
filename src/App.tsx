@@ -21,6 +21,8 @@ import AccountsPanel from "./AccountsPanel";
 import type {MicrosoftAccount} from "./AccountsPanel";
 import JavaPanel from "./JavaPanel";
 import ScreenshotsPanel from "./ScreenshotsPanel";
+import SettingsDialog from "./SettingsDialog";
+import type {FeatureSettings} from "./SettingsDialog";
 import ServersPanel from "./ServersPanel";
 
 type Version = { id: string; type: string; url: string; time: string; releaseTime: string };
@@ -139,6 +141,19 @@ function progressPercent(progress:Progress|null){
 export default function App() {
   const {page,setPage,selected,setSelected,nickname,setNickname,memoryMb,setMemoryMb,activeInstanceId,setActiveInstanceId,theme,setTheme}=useApp();
   const [versions,setVersions]=useState<Version[]>([]);
+  const [featureSettings,setFeatureSettings]=useState<FeatureSettings>(()=>{
+    const defaults={showSkins:true,showScreenshots:true,showWorlds:true,showFiles:true};
+    try{
+      const item=JSON.parse(localStorage.getItem("fre-launch-feature-tabs")||"null");
+      if(item&&typeof item==="object")return {
+        showSkins:typeof item.showSkins==="boolean"?item.showSkins:true,
+        showScreenshots:typeof item.showScreenshots==="boolean"?item.showScreenshots:true,
+        showWorlds:typeof item.showWorlds==="boolean"?item.showWorlds:true,
+        showFiles:typeof item.showFiles==="boolean"?item.showFiles:true
+      };
+    }catch{}
+    return defaults;
+  });
   const [sidebarInstances,setSidebarInstances]=useState<{id:string;name:string;version:string;memoryMb:number;favorite:boolean}[]>([]);
   const [libraryFocusId,setLibraryFocusId]=useState("");
   const [featuredProject,setFeaturedProject]=useState<DiscoverHit|null>(null);
@@ -278,6 +293,10 @@ export default function App() {
       setTask("idle");
     }
   }
+  function saveFeatureSettings(next:FeatureSettings){
+    setFeatureSettings(next);
+    try{localStorage.setItem("fre-launch-feature-tabs",JSON.stringify(next));}catch{}
+  }
   async function launch(target?:{id:string;version:string;memoryMb:number}) {
     const playVersion=target?.version??selected;
     const playInstance=target?.id??activeInstanceId;
@@ -320,7 +339,7 @@ export default function App() {
       </button>
       <div className="fre-rail-divider"><span>НАВІГАЦІЯ</span></div>
       <nav className="fre-nav" aria-label="Розділи лаунчера">
-        {menus.slice(0,4).map(({name,label,icon:Icon,index})=><button key={name}
+        {menus.slice(0,4).filter(item=>item.name!=="Skins"||featureSettings.showSkins).map(({name,label,icon:Icon,index})=><button key={name}
           className={"fre-nav-link"+(page===name?" is-active":"")}
           onClick={()=>{if(name==="Instances")setLibraryFocusId("");if(name==="Mods")setFeaturedProject(null);setPage(name);}}
           aria-current={page===name?"page":undefined}
@@ -338,7 +357,7 @@ export default function App() {
         <button className="fre-nav-link fre-sidebar-add" title="Створити збірку" aria-label="Створити збірку"
           onClick={()=>{setLibraryFocusId("");setPage("Instances");}}><Plus size={21}/></button>
         <div className="fre-sidebar-divider" aria-hidden="true"/>
-        {menus.slice(4).map(({name,label,icon:Icon,index})=><button key={name}
+        {menus.slice(4).filter(item=>item.name!=="Screenshots"||featureSettings.showScreenshots).map(({name,label,icon:Icon,index})=><button key={name}
           className={"fre-nav-link fre-sidebar-other"+(page===name?" is-active":"")}
           onClick={()=>setPage(name)}
           aria-current={page===name?"page":undefined}
@@ -376,7 +395,7 @@ export default function App() {
         {error&&<div className="fre-incident" role="alert"><AlertTriangle size={16}/><span title={error}>{error}</span><button onClick={()=>setPage("Logs")}><Terminal size={14}/> ЖУРНАЛ <ArrowRight size={13}/></button><button onClick={()=>setError("")} title="Приховати повідомлення" aria-label="Приховати повідомлення"><X size={16}/></button></div>}
         {message&&<div className="fre-flash" role="status"><Check size={17}/><span>{message}</span><button onClick={()=>setMessage("")} title="Закрити"><X size={16}/></button></div>}
 
-        {page==="Home"&&<PlayPage
+        {(page==="Home"||page==="Settings")&&<PlayPage
           versions={versions}
           loading={loading}
           selected={selected}
@@ -418,7 +437,7 @@ export default function App() {
 
         {task==="installing" && progress && <div className="fre-install-activity" aria-live="polite"><div><span>ПРОЦЕС: {stages[progress.stage]??progress.stage.toUpperCase()}</span><strong>{progress.message}</strong></div><span className="fre-install-percent">{percent}%</span><div className="fre-install-track"><div style={{width:percent+"%"}}/></div><button onClick={()=>setPage("Downloads")}>ДЕТАЛІ <ArrowRight size={14}/></button></div>}
 
-        {page==="Instances"&&<div className="fre-module"><InstancesPanel version={selected} active={activeInstanceId} setActive={setActiveInstanceId} setVersion={setSelected} setMemory={setMemoryMb} navigateHome={()=>setPage("Home")} navigateMods={()=>{setFeaturedProject(null);setPage("Mods");}} navigateVersions={()=>setPage("Versions")} onPlayInstance={item=>void launch(item)} requestedId={libraryFocusId}/></div>}
+        {page==="Instances"&&<div className="fre-module"><InstancesPanel version={selected} active={activeInstanceId} setActive={setActiveInstanceId} setVersion={setSelected} setMemory={setMemoryMb} navigateHome={()=>setPage("Home")} navigateMods={()=>{setFeaturedProject(null);setPage("Mods");}} navigateVersions={()=>setPage("Versions")} onPlayInstance={item=>void launch(item)} showWorlds={featureSettings.showWorlds} showFiles={featureSettings.showFiles} requestedId={libraryFocusId}/></div>}
         {page==="Mods"&&<div className="fre-module"><ModsPanel version={selected} instanceId={activeInstanceId} initialProject={featuredProject?{...featuredProject,slug:featuredProject.slug||""}:null} onServers={()=>setPage("Servers")}/></div>}
         {page==="Skins"&&<div className="fre-module"><Suspense fallback={<div className="fre-log-mini-empty">Завантажуємо 3D-студію скінів…</div>}><SkinStudio/></Suspense></div>}
          {page==="Servers"&&<div className="fre-module"><ServersPanel/></div>}
@@ -433,26 +452,19 @@ export default function App() {
             else setNickname("Player");
           }}/></div>}
 
-        {page==="Settings"&&<div className="fre-settings-stack">
-          <section className="fre-control-paper"><div className="fre-module-label"><span>01 / ВИГЛЯД</span><Wrench size={18}/></div>
-            <h2>Оформлення</h2><p>Обери тему інтерфейсу. Налаштування зберігаються автоматично.</p>
-            {recoveryMode&&<div className="fre-log-mini-empty">RECOVERY: захисний режим WebView2 активований після аварії. Світи Minecraft збережені. <button onClick={()=>{void invoke("disable_software_recovery").then(()=>setMessage("Повернення до GPU-прискорення заплановано. Перезапусти FRE LAUNCH; якщо знову вилетить, RECOVERY автоматично повернеться.")).catch(e=>setError(humanError(e)));}}>СПРОБУВАТИ ЗВИЧАЙНУ ГРАФІКУ НА НАСТУПНОМУ ЗАПУСКУ</button></div>}
-            <div className="fre-theme-grid">{themes.map(item=><button key={item.id} className={"fre-theme-choice"+(theme===item.id?" is-selected":"")} onClick={()=>setTheme(item.id)}>
-              <span style={{background:item.color}}/><b>{item.label}</b>{theme===item.id?<Check size={18}/>:<ArrowRight size={17}/>}</button>)}</div>
-          </section>
-          <section className="fre-control-paper"><div className="fre-module-label"><span>02 / РЕСУРСИ</span><SlidersHorizontal size={18}/></div>
-            <h2>Оперативна пам'ять</h2><p>Виділена RAM: <strong>{memoryMb} MB</strong></p>
-            {activeInstanceId ? <>
-              <p>Зараз обрана окрема збірка. Її RAM зберігається в налаштуваннях збірки, а не в загальному повзунку.</p>
-              <button className="secondary" onClick={()=>setPage("Instances")}><Boxes size={16}/> Налаштувати RAM збірки в бібліотеці</button>
-            </> : <>
-              <input type="range" min={1024} max={16384} step={512} value={memoryMb} onChange={e=>setMemoryMb(Number(e.target.value))} className="fre-ram-range"/>
-              <div className="fre-ram-ends"><span>1 GB</span><span>16 GB</span></div>
-              <p>Загальна RAM для гри без окремої збірки. Зберігається автоматично.</p>
-            </>}
-          </section>
-          <section className="fre-control-paper"><div className="fre-module-label"><span>03 / JAVA</span><Coffee size={18}/></div><JavaPanel instanceId={activeInstanceId}/></section>
-        </div>}
+        {page==="Settings"&&<SettingsDialog
+          onClose={()=>setPage("Home")}
+          onNavigate={dest=>setPage(dest)}
+          theme={theme}
+          onTheme={setTheme}
+          features={featureSettings}
+          onFeatures={saveFeatureSettings}
+          memoryMb={memoryMb}
+          onMemory={setMemoryMb}
+          instanceId={activeInstanceId}
+          recoveryMode={recoveryMode}
+          onRecoveryDisabled={()=>void invoke("disable_software_recovery").then(()=>setMessage("Після перезапуску лаунчер спробує звичайну графіку.")).catch(e=>setError(humanError(e)))}
+        />}
 
         {page==="Downloads"&&<>
           <InstallDeck
