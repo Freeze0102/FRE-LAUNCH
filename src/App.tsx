@@ -10,6 +10,7 @@ import InstallDeck from "./InstallDeck";
 import GameFolders from "./GameFolders";
 import UpdateCenter from "./UpdateCenter";
 import HomeDashboard from "./HomeDashboard";
+import type {DiscoverHit} from "./HomeDashboard";
 import { LAST_UI_CRASH } from "./ErrorBoundary";
 import { InstancesPanel } from "./InstanceLibrary";
 import ModsPanel from "./ModsPanel";
@@ -137,6 +138,7 @@ export default function App() {
   const [versions,setVersions]=useState<Version[]>([]);
   const [sidebarInstances,setSidebarInstances]=useState<{id:string;name:string;version:string;memoryMb:number;favorite:boolean}[]>([]);
   const [libraryFocusId,setLibraryFocusId]=useState("");
+  const [featuredProject,setFeaturedProject]=useState<DiscoverHit|null>(null);
   const [microsoftAccount,setMicrosoftAccount]=useState<MicrosoftAccount|null>(null);
   const [useMicrosoft,setUseMicrosoft]=useState(false);
   const [loading,setLoading]=useState(false);
@@ -308,7 +310,7 @@ export default function App() {
       <nav className="fre-nav" aria-label="Розділи лаунчера">
         {menus.slice(0,4).map(({name,label,icon:Icon,index})=><button key={name}
           className={"fre-nav-link"+(page===name?" is-active":"")}
-          onClick={()=>{if(name==="Instances")setLibraryFocusId("");setPage(name);}}
+          onClick={()=>{if(name==="Instances")setLibraryFocusId("");if(name==="Mods")setFeaturedProject(null);setPage(name);}}
           aria-current={page===name?"page":undefined}
           title={label}>
           <span className="fre-nav-index">{index}</span><Icon size={19} strokeWidth={1.9}/>
@@ -375,11 +377,12 @@ export default function App() {
           nickname={nickname}
           java={java}
           recoveryMode={recoveryMode}
-          onPage={setPage}
+          onPage={dest=>{if(dest==="Mods")setFeaturedProject(null);setPage(dest);}}
           onLaunch={()=>void launch()}
           onVersion={id=>{setSelected(id);setActiveInstanceId("");}}
           onSelectInstance={(id,version,memory)=>{setActiveInstanceId(id);setSelected(version);setMemoryMb(memory);}}
           onRefresh={()=>void refreshVersions()}
+          onOpenProject={hit=>{setFeaturedProject(hit);setPage("Mods");}}
         />}
 
         {page==="Versions"&&<section className="fre-version-catalog">
@@ -400,8 +403,8 @@ export default function App() {
 
         {task==="installing" && progress && <div className="fre-install-activity" aria-live="polite"><div><span>ПРОЦЕС: {stages[progress.stage]??progress.stage.toUpperCase()}</span><strong>{progress.message}</strong></div><span className="fre-install-percent">{percent}%</span><div className="fre-install-track"><div style={{width:percent+"%"}}/></div><button onClick={()=>setPage("Downloads")}>ДЕТАЛІ <ArrowRight size={14}/></button></div>}
 
-        {page==="Instances"&&<div className="fre-module"><InstancesPanel version={selected} active={activeInstanceId} setActive={setActiveInstanceId} setVersion={setSelected} setMemory={setMemoryMb} navigateHome={()=>setPage("Home")} navigateMods={()=>setPage("Mods")} navigateVersions={()=>setPage("Versions")} requestedId={libraryFocusId}/></div>}
-        {page==="Mods"&&<div className="fre-module"><ModsPanel version={selected} instanceId={activeInstanceId}/></div>}
+        {page==="Instances"&&<div className="fre-module"><InstancesPanel version={selected} active={activeInstanceId} setActive={setActiveInstanceId} setVersion={setSelected} setMemory={setMemoryMb} navigateHome={()=>setPage("Home")} navigateMods={()=>{setFeaturedProject(null);setPage("Mods");}} navigateVersions={()=>setPage("Versions")} requestedId={libraryFocusId}/></div>}
+        {page==="Mods"&&<div className="fre-module"><ModsPanel version={selected} instanceId={activeInstanceId} initialProject={featuredProject?{...featuredProject,slug:featuredProject.slug||""}:null}/></div>}
         {page==="Skins"&&<div className="fre-module"><Suspense fallback={<div className="fre-log-mini-empty">Завантажуємо 3D-студію скінів…</div>}><SkinStudio/></Suspense></div>}
               {page==="Screenshots"&&<div className="fre-module"><ScreenshotsPanel instanceId={activeInstanceId}/></div>}
         {page==="Backups"&&<div className="fre-module"><BackupsPanel instanceId={activeInstanceId} instanceName={activeInstanceId?"ВИБРАНА ЗБІРКА":""}/></div>}
