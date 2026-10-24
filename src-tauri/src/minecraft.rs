@@ -538,11 +538,16 @@ async fn launch_inner(app: AppHandle, version: String, nickname: String, memory_
         .map_err(|e| format!("Java executable not found: {e}"))?;
     if !java_output.status.success() { return Err("Java version check failed".into()); }
     let java = String::from_utf8_lossy(&java_output.stderr).lines().next().unwrap_or("").to_owned();
-    if let Some(required) = meta["javaVersion"]["majorVersion"].as_u64() {
-        let actual = java_major(&java).ok_or("Не вдалося визначити версію Java")?;
-        if actual != required as u32 {
-            return Err(format!("Minecraft {version} потребує Java {required}, але {java_bin} має Java {actual}. Обери правильний шлях у FRE JAVA MANAGER."));
-        }
+    // Versions released before Mojang added javaVersion metadata generally need
+    // Java 8. Without this check, the PATH fallback can silently select Java 21+
+    // and the legacy game exits immediately with an opaque crash.
+    let required_java = meta["javaVersion"]["majorVersion"].as_u64().unwrap_or(8) as u32;
+    let actual_java = java_major(&java).ok_or("Не вдалося визначити версію Java")?;
+    if actual_java != required_java {
+        return Err(format!(
+            "Minecraft {version} потребує Java {required_java}, але {java_bin} має Java {actual_java}. \
+             Обери Java {required_java} у FRE JAVA MANAGER або в налаштуваннях збірки."
+        ));
     }
     let dir = if let Some(id) = instance_id.as_deref() {
         super::instances::game_directory(&app, id, &version)?
