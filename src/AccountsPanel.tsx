@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { UserRound, Plus, Trash2, ShieldCheck, UserCheck, ExternalLink, LogIn, LogOut } from "lucide-react";
+import { UserRound, Plus, Trash2, ShieldCheck, UserCheck, ExternalLink, LogIn, LogOut, Copy, Smartphone, Monitor } from "lucide-react";
 
 type Account = {id:string;nickname:string;offlineUuid:string};
 export type MicrosoftAccount = {name:string;id:string};
@@ -14,6 +14,7 @@ export default function AccountsPanel({nickname,onSelect,microsoft,onMicrosoftSe
     try{return localStorage.getItem("fre-ms-client-id")||"";}catch{return "";}
   });
   const [challenge,setChallenge]=useState<DeviceChallenge|null>(null);
+  const [secondsRemaining,setSecondsRemaining]=useState(0);
   const [hasBuiltInId,setHasBuiltInId]=useState(false);
   const [showDeveloperOptions,setShowDeveloperOptions]=useState(false);
   useEffect(()=>{void invoke<boolean>("microsoft_login_configuration").then(setHasBuiltInId).catch(()=>{});},[]);
@@ -71,6 +72,8 @@ export default function AccountsPanel({nickname,onSelect,microsoft,onMicrosoftSe
       const code=await invoke<DeviceChallenge>("microsoft_begin_login",{clientId:showDeveloperOptions&&validDeveloperId?clientId.trim():null});
       if(showDeveloperOptions)try{localStorage.setItem("fre-ms-client-id",clientId.trim());}catch{/* public app identifier only */}
       setChallenge(code);
+      setSecondsRemaining(code.expiresIn);
+      setAuthNotice("На телефоні відкрий microsoft.com/link і введи показаний код. Повертатися з телефону в лаунчер не потрібно.");
     }catch(e){setAuthError(String(e));}
     finally{setAuthBusy(false);}
   }
@@ -80,12 +83,23 @@ export default function AccountsPanel({nickname,onSelect,microsoft,onMicrosoftSe
     catch(e){setAuthError(String(e));}
     finally{setAuthBusy(false);}
   }
+  // Device-code is designed for a second device: the phone never needs a
+  // localhost callback. Respect server-advised slow_down intervals.
   useEffect(()=>{
     if(!challenge)return;
     let active=true;
-    const ms=Math.max(5,Math.min(60,challenge.interval))*1000;
-    const timer=window.setInterval(async()=>{
-      if(checking.current)return;
+    let timer:number|undefined;
+    const expiresAt=Date.now()+challenge.expiresIn*1000;
+    const countdown=window.setInterval(()=>{
+      if(active)setSecondsRemaining(Math.max(0,Math.ceil((expiresAt-Date.now())/1000)));
+    },1000);
+    function schedule(seconds:number){
+      const delay=Math.max(5,Math.min(60,seconds))*1000;
+      timer=window.setTimeout(()=>void poll(),delay);
+    }
+    async function poll(){
+      if(!active)return;
+      if(checking.current){schedule(challenge.interval);return;}
       checking.current=true;
       try{
         const result=await invoke<PollStatus>("microsoft_poll_login");
@@ -96,14 +110,25 @@ export default function AccountsPanel({nickname,onSelect,microsoft,onMicrosoftSe
           setAuthError("");
           setAuthNotice(result.persisted?
             "Minecraft-акаунт підключено. Windows збереже вхід для наступного запуску.":
-            "Minecraft-акаунт підключено, але збереження сесії у Windows не підтверджене. Можливо, після перезапуску доведеться ввійти ще раз.");
+            "Minecraft-акаунт підключено, але збереження сесії у Windows не підтверджене.");
+        }else{
+          schedule(result.interval||challenge.interval);
         }
       }catch(err){
         if(active){setAuthError(String(err));setChallenge(null);}
       }finally{checking.current=false;}
-    },ms);
-    return()=>{active=false;window.clearInterval(timer);};
+    }
+    schedule(challenge.interval);
+    return()=>{active=false;window.clearInterval(countdown);if(timer!==undefined)window.clearTimeout(timer);};
   },[challenge]);
+  async function copyDeviceCode(){
+    if(!challenge)return;
+    try{
+      await navigator.clipboard.writeText(challenge.userCode);
+      setAuthError("");
+      setAuthNotice("Код скопійовано. Відкрий microsoft.com/link на телефоні та встав його.");
+    }catch{setAuthError("Не вдалося скопіювати. Введи код вручну на microsoft.com/link.");}
+  }
   return <section className="panel">
     <div className="panel-heading"><h3>Акаунти Minecraft</h3><UserRound size={20}/></div>
     <div className="fre-ms-account">
@@ -114,26 +139,33 @@ export default function AccountsPanel({nickname,onSelect,microsoft,onMicrosoftSe
       {microsoft?<><div className="fre-ms-signed"><UserCheck size={23}/><div><strong>{microsoft.name}</strong><small>Microsoft Minecraft · {microsoft.id}</small></div><button className="secondary" disabled={authBusy} onClick={()=>void logoutMicrosoft()}><LogOut size={15}/> Вийти</button></div>{authNotice&&<p className="notice">{authNotice}</p>}</>:
         <div className="fre-ms-login">
           <div className="fre-ms-form">
-            <button className="primary" disabled={authBusy||!canLogin} onClick={()=>void beginBrowserLogin()}>
-              <LogIn size={16}/> {authBusy?"Очікуємо підтвердження…":"Увійти через Microsoft"}
+            <button className="primary" disabled={authBusy||!canLogin} onClick={()=>void beginMicrosoft()}>
+              <Smartphone size={16}/> Увійти за кодом · телефон
             </button>
-            <button className="secondary" disabled={authBusy||!canLogin} onClick={()=>void beginMicrosoft()}>Увійти за кодом</button>
+            <button className="secondary" disabled={authBusy||!canLogin} onClick={()=>void beginBrowserLogin()}>
+              <Monitor size={16}/> {authBusy?"Очікуємо браузер…":"Увійти через браузер на ПК"}
+            </button>
             <button className="secondary" disabled={authBusy} onClick={()=>setShowDeveloperOptions(v=>!v)}>Для розробника</button>
           </div>
-          {authBusy&&<p className="notice" role="status">Відкривається системний браузер Microsoft. Увійди в потрібний акаунт і повернися в FRE LAUNCH. Підтвердження може тривати до 5 хвилин.</p>}
+          {authBusy&&<p className="notice" role="status">Очікуємо авторизацію в системному браузері цього комп’ютера. Якщо входиш через телефон, обери «Увійти за кодом» замість цього способу.</p>}
           {hasBuiltInId?
-            <p className="muted">Вхід відкриває офіційний сайт Microsoft у браузері й автоматично завершується у FRE LAUNCH. Якщо локальний браузер заблокований, обери «Увійти за кодом».</p>:
+            <p className="muted">Вхід відкриває офіційний сайт Microsoft у браузері й автоматично завершується у FRE LAUNCH. Для входу з телефона обери «Увійти за кодом»: відкрий посилання на телефоні, підтвердь Microsoft і лаунчер завершить вхід на ПК.</p>:
             <p className="muted">FRE LAUNCH ще не має власного схваленого Minecraft Client ID. Поки розробник не отримає дозвіл Minecraft Services та не додасть ID до збірки, ліцензійний Microsoft-вхід не запрацює. Локальний нікнейм можна використовувати окремо.</p>}
           {showDeveloperOptions&&<div className="fre-ms-dev-options">
             <label className="field-label">Власний Minecraft-схвалений Application Client ID</label>
             <input className="input" value={clientId} onChange={e=>setClientId(e.target.value)} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" autoComplete="off"/>
             <p className="muted">Тільки для власного схваленого Minecraft Client ID. Для входу через браузер додай в Microsoft Entra платформу «Mobile and desktop applications» з redirect URI http://localhost. Вхід за кодом не потребує redirect URI. Звичайний Client ID без дозволу Minecraft Services може отримати HTTP 403.</p>
           </div>}
-          {challenge&&<div className="fre-ms-challenge">
-            <span>Підтвердь вхід у Microsoft</span><strong>{challenge.userCode}</strong>
-            <p>Відкрий офіційний сайт Microsoft, введи цей код і підтвердь вхід. Перевірка виконується автоматично.</p>
-            <a href="https://www.microsoft.com/link" target="_blank" rel="noopener noreferrer">Відкрити Microsoft <ExternalLink size={15}/></a>
-            <button className="secondary" onClick={()=>setChallenge(null)}>Приховати код</button>
+          {challenge&&<div className="fre-ms-challenge" role="status" aria-live="polite">
+            <span>Підтвердь Microsoft на телефоні або цьому ПК</span>
+            <strong>{challenge.userCode}</strong>
+            <p>1. Відкрий <b>microsoft.com/link</b> на телефоні. 2. Увійди в Microsoft і введи код вище. 3. FRE LAUNCH на комп’ютері підключить профіль автоматично — повертатися з телефона в застосунок не потрібно.</p>
+            <div className="fre-ms-challenge-actions">
+              <button className="secondary" onClick={()=>void copyDeviceCode()}><Copy size={15}/> Копіювати код</button>
+              <a href={challenge.verificationUri} target="_blank" rel="noopener noreferrer">Відкрити Microsoft <ExternalLink size={15}/></a>
+              <button className="secondary" onClick={()=>setChallenge(null)}>Скасувати</button>
+            </div>
+            <small>Код дійсний ще {Math.floor(secondsRemaining/60)}:{String(secondsRemaining%60).padStart(2,"0")}</small>
           </div>}
           {authError&&<div className="error">{authError}</div>}
           <div className="fre-ms-links">
