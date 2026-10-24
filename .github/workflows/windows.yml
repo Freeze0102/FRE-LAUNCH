@@ -11,6 +11,8 @@ permissions:
 # Set Actions secret FRE_RELEASE_TOKEN (Contents write on that repo).
 env:
   FRE_LAUNCH_RELEASE_REPO: ${{ vars.FRE_LAUNCH_RELEASE_REPO }}
+  # Public application UUID only. Requires independent Minecraft Services approval.
+  FRE_MS_CLIENT_ID: ${{ vars.FRE_MS_CLIENT_ID }}
 
 concurrency:
   group: windows-build-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
