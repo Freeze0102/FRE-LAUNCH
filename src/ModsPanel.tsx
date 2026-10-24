@@ -221,6 +221,8 @@ export default function ModsPanel({version, instanceId, initialProject, onServer
         <Library size={16}/> {view==="library"?"Пошук контенту":`Встановлено ${instanceId?"("+(installed.length+resourcepacks.length+shaderpacks.length)+")":""}`}
       </button>
     </div>
+    <div className="fre-discover-shell">
+    <main className="fre-discover-main">
     {error&&<div className="error">{error}</div>}
     {message&&<div className="notice"><ShieldCheck size={16}/>{message}</div>}
     {view==="browse"&&<>
@@ -246,6 +248,7 @@ export default function ModsPanel({version, instanceId, initialProject, onServer
       <button className="fre-discover-link" onClick={()=>window.open("https://www.curseforge.com/minecraft/search?search="+encodeURIComponent(query.trim()||"mods"),"_blank","noopener,noreferrer")}>CurseForge <ExternalLink size={13}/></button>
     </div>}
     {!opened&&!instanceId&&<p className="muted">Щоб установити проєкт, спершу обери збірку в бібліотеці.</p>}
+    {!opened&&categoryFilter&&<button className="fre-discover-active-category" onClick={()=>setCategoryFilter("")}>{categoryLists[kind]?.find(x=>x.id===categoryFilter)?.label||categoryFilter} <X size={12}/></button>}
     {opened&&<section className="fre-mod-detail">
       <button className="secondary" onClick={()=>{setOpened(null);setDetails(null);setError("");}}><ArrowLeft size={16}/> До каталогу</button>
       <div className="fre-mod-detail-hero">
@@ -344,5 +347,26 @@ export default function ModsPanel({version, instanceId, initialProject, onServer
       <span><strong>FRE SAFE DOWNLOAD</strong> · Встановлення з Modrinth використовує HTTPS, SHA-512, обмеження розміру та перевірку ZIP/JAR. Для модів Fabric підтягуються обов’язкові залежності. Лаунчер не є антивірусом і не гарантує відсутності шкідливого Java-коду.</span>
     </div>
     <p className="muted">Власні JAR, завантажені через браузер, можна покласти в папку mods обраної збірки. Вони не отримують позначки перевіреного джерела Modrinth. Моди — сторонній виконуваний код; перед запуском перевіряй автора й репутацію проєкту.</p>
+    </main>
+    {view==="browse"&&!opened&&<aside className="fre-discover-sidebar" aria-label="Фільтри пошуку">
+      <div className="fre-discover-side-section">
+        <h3><Filter size={15}/> Фільтри</h3>
+        <label className="fre-side-check"><input type="checkbox" checked={onlyCompatible} onChange={e=>setOnlyCompatible(e.target.checked)}/> Сумісні з Minecraft {version||"—"}</label>
+      </div>
+      <div className="fre-discover-side-section">
+        <h3>Категорія <span>{categoryFilter?"1 вибрано":"Усі"}</span></h3>
+        <div className="fre-discover-category-list">
+          <button className={!categoryFilter?"selected":""} onClick={()=>setCategoryFilter("")}>Усі категорії</button>
+          {(categoryLists[kind]||[]).map(item=><button key={item.id} className={categoryFilter===item.id?"selected":""} onClick={()=>setCategoryFilter(categoryFilter===item.id?"":item.id)}>
+            <span className="fre-discover-category-symbol">{item.label.charAt(0).toUpperCase()}</span>{item.label}
+          </button>)}
+        </div>
+      </div>
+      <div className="fre-discover-side-section fre-discover-side-footer">
+        <h3>Джерело контенту</h3>
+        <p>Проєкти та версії надходять із Modrinth. Автори вказані у результатах пошуку.</p>
+      </div>
+    </aside>}
+    </div>
   </section>;
 }
