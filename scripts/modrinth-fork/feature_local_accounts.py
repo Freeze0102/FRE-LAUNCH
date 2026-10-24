@@ -37,6 +37,11 @@ pub async fn create_offline_user(name: &str) -> crate::Result<Credentials> {
         if let Some((_, mut user)) = users.remove(&id) {
             user.active = true;
             user.upsert(&state.pool).await?;
+            // A local player profile also completes the account setup step.
+            // This does not claim that Microsoft authentication succeeded.
+            if let Err(error) = crate::onboarding_checklist::mark_logged_into_minecraft().await {
+                tracing::warn!("Could not update account setup checklist: {error}");
+            }
             return Ok(user);
         }
     }
@@ -63,6 +68,9 @@ pub async fn create_offline_user(name: &str) -> crate::Result<Credentials> {
         active: true,
     };
     user.upsert(&state.pool).await?;
+    if let Err(error) = crate::onboarding_checklist::mark_logged_into_minecraft().await {
+        tracing::warn!("Could not update account setup checklist: {error}");
+    }
     Ok(user)
 }
 """
