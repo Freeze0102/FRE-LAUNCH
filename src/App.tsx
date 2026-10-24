@@ -510,7 +510,16 @@ export default function App() {
 
         {page==="Instances"&&<div className="fre-module"><InstancesPanel version={selected} active={activeInstanceId} setActive={setActiveInstanceId} setVersion={setSelected} setMemory={setMemoryMb} navigateHome={()=>setPage("Home")} navigateMods={()=>{setFeaturedProject(null);setPage("Mods");}} navigateVersions={()=>setPage("Versions")} onPlayInstance={item=>void launch(item)} showWorlds={featureSettings.showWorlds} showFiles={featureSettings.showFiles} onImportPack={()=>void importMrpack()} importBusy={importingPack} createRequest={createInstanceRequest} requestedId={libraryFocusId}/></div>}
         {page==="Mods"&&<div className="fre-module"><ModsPanel version={selected} instanceId={activeInstanceId} initialProject={featuredProject?{...featuredProject,slug:featuredProject.slug||""}:null} onServers={()=>setPage("Servers")} onImportPack={()=>void importMrpack()} importBusy={importingPack}
-          onPackInstalled={instance=>{setActiveInstanceId(instance.id);setSelected(instance.version);setMemoryMb(instance.memoryMb);setLibraryFocusId(instance.id);setPage("Instances");}}/></div>}
+          onPackInstalled={instance=>{
+            if(instance.iconUrl?.startsWith("https://")){
+              try{
+                const stored=JSON.parse(localStorage.getItem("fre-play-instance-art")||"{}") as Record<string,string>;
+                localStorage.setItem("fre-play-instance-art",JSON.stringify({...stored,[instance.id]:instance.iconUrl}));
+              }catch{}
+            }
+            setActiveInstanceId(instance.id);setSelected(instance.version);setMemoryMb(instance.memoryMb);
+            setLibraryFocusId(instance.id);setPage("Instances");
+          }}/></div>}
         {page==="Skins"&&<div className="fre-module"><Suspense fallback={<div className="fre-log-mini-empty">Завантажуємо 3D-студію скінів…</div>}><SkinStudio microsoftConnected={!!microsoftAccount&&useMicrosoft}/></Suspense></div>}
          {page==="Servers"&&<div className="fre-module"><ServersPanel/></div>}
               {page==="Screenshots"&&<div className="fre-module"><ScreenshotsPanel instanceId={activeInstanceId}/></div>}
