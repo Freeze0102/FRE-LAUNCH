@@ -716,7 +716,7 @@ async fn launch_inner(app: AppHandle, version: String, nickname: String, memory_
             Ok(exit)=>format!("Minecraft завершився з кодом {:?}",exit.code()),
             Err(e)=>format!("Minecraft process error: {e}"),
         };
-        if result.as_ref().is_err_or(|status|!status.success()){
+        if match result.as_ref(){Ok(status)=>!status.success(),Err(_)=>true}{
             let game_log=dir.join("logs").join("fre-launch-game.log");
             let latest=dir.join("logs").join("latest.log");
             let output=log_tail(&game_log,48*1024);
