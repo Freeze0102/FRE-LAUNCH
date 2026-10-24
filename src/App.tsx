@@ -18,6 +18,7 @@ import ModsPanel from "./ModsPanel";
 const SkinStudio = lazy(() => import("./SkinStudio"));
 import BackupsPanel from "./BackupsPanel";
 import AccountsPanel from "./AccountsPanel";
+import AccountSwitcher from "./AccountSwitcher";
 import type {MicrosoftAccount} from "./AccountsPanel";
 import JavaPanel from "./JavaPanel";
 import ScreenshotsPanel from "./ScreenshotsPanel";
@@ -167,7 +168,20 @@ export default function App() {
   const [createInstanceRequest,setCreateInstanceRequest]=useState(0);
   const [featuredProject,setFeaturedProject]=useState<DiscoverHit|null>(null);
   const [microsoftAccount,setMicrosoftAccount]=useState<MicrosoftAccount|null>(null);
-  const [useMicrosoft,setUseMicrosoft]=useState(false);
+  const [useMicrosoft,setUseMicrosoft]=useState(()=>{
+    try{return localStorage.getItem("fre-auth-choice")==="microsoft";}catch{return false;}
+  });
+  function selectOffline(name:string){
+    setNickname(name);
+    setUseMicrosoft(false);
+    try{localStorage.setItem("fre-auth-choice","offline");}catch{}
+  }
+  function selectMicrosoftAccount(){
+    if(!microsoftAccount){setPage("Accounts");return;}
+    setNickname(microsoftAccount.name);
+    setUseMicrosoft(true);
+    try{localStorage.setItem("fre-auth-choice","microsoft");}catch{}
+  }
   const [gameCrash,setGameCrash]=useState<GameCrash|null>(null);
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState("");
@@ -255,7 +269,7 @@ export default function App() {
     void refreshVersions(true);
     void invoke<string>("java_info").then(setJava).catch(e=>setJava("Java в PATH не знайдена: "+humanError(e)));
     void invoke<MicrosoftAccount|null>("microsoft_restore_login").then(account=>{
-      if(account){setMicrosoftAccount(account);setUseMicrosoft(true);setNickname(account.name);}
+      if(account){setMicrosoftAccount(account);if(localStorage.getItem("fre-auth-choice")==="microsoft")setNickname(account.name);}
     }).catch(e=>setMessage("Microsoft: "+humanError(e)));
 
     const a=listen<Progress>("install-progress",event=>setProgress(event.payload));
@@ -324,6 +338,11 @@ export default function App() {
     const playInstance=target?.id??activeInstanceId;
     const playMemory=target?.memoryMb??memoryMb;
     if(!playVersion||busyRef.current||task==="running")return;
+    if(useMicrosoft&&!microsoftAccount){
+      setError("Microsoft-профіль не підключений. Увійди через Microsoft або обери локальний акаунт.");
+      setPage("Accounts");
+      return;
+    }
     if(target){
       setSelected(playVersion);setActiveInstanceId(playInstance);setMemoryMb(playMemory);
     }
@@ -337,7 +356,7 @@ export default function App() {
     busyRef.current=true;
     setTask("launching");setError("");setMessage("");setLogs([]);setGameCrash(null);
     try{
-      const response=await invoke<string>("launch_game",{version:playVersion,nickname,memoryMb:playMemory,instanceId:playInstance||null,useMicrosoft:useMicrosoft&&!!microsoftAccount});
+      const response=await invoke<string>("launch_game",{version:playVersion,nickname,memoryMb:playMemory,instanceId:playInstance||null,useMicrosoft});
       setMessage(response);
       setTask("running");
     }catch(e){
@@ -405,9 +424,9 @@ export default function App() {
         <div className="fre-command-right">
           {recoveryMode&&<span title="Відновлення після аварійного завершення: WebView2 без GPU-прискорення" className="fre-safe-mode-tag">RECOVERY</span>}
           <button className="fre-command-java" onClick={()=>setPage("Settings")} title="Стан Java"><Coffee size={16}/><span>{java.startsWith("Java в PATH")?"JAVA НЕ ЗНАЙДЕНА":"JAVA READY"}</span></button>
-          <button className="fre-command-account" onClick={()=>setPage("Accounts")} title="Вибрати профіль">
-            <span className="fre-avatar">{nickname[0]?.toUpperCase()||"P"}</span><span>{nickname}{useMicrosoft&&microsoftAccount?" · Microsoft":""}</span><ChevronRight size={15}/>
-          </button>
+          <AccountSwitcher nickname={nickname} isMicrosoft={useMicrosoft&&!!microsoftAccount}
+            microsoft={microsoftAccount} onSelectOffline={selectOffline}
+            onSelectMicrosoft={selectMicrosoftAccount} onAccounts={()=>setPage("Accounts")}/>
         </div>
       </header>
       <main className="fre-main">
@@ -472,11 +491,16 @@ export default function App() {
         {page==="Backups"&&<div className="fre-module"><BackupsPanel instanceId={activeInstanceId} instanceName={activeInstanceId?"ВИБРАНА ЗБІРКА":""}/></div>}
         {page==="Accounts"&&<div className="fre-module"><AccountsPanel nickname={nickname}
           microsoft={microsoftAccount}
-          onSelect={name=>{setNickname(name);setUseMicrosoft(false);}}
+          onSelect={selectOffline}
           onMicrosoftSelect={account=>{
-            setMicrosoftAccount(account);setUseMicrosoft(!!account);
-            if(account)setNickname(account.name);
-            else setNickname("Player");
+            setMicrosoftAccount(account);
+            if(account){
+              setNickname(account.name);setUseMicrosoft(true);
+              try{localStorage.setItem("fre-auth-choice","microsoft");}catch{}
+            }else{
+              setUseMicrosoft(false);setNickname("Player");
+              try{localStorage.setItem("fre-auth-choice","offline");}catch{}
+            }
           }}/></div>}
 
         {page==="Settings"&&<SettingsDialog
