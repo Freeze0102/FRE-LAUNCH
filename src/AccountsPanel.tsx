@@ -119,7 +119,7 @@ export default function AccountsPanel({nickname,onSelect,microsoft,onMicrosoftSe
             <a href="https://help.minecraft.net/hc/en-us/articles/16254801392141" target="_blank" rel="noopener noreferrer">Дозвіл Minecraft на Client ID <ExternalLink size={12}/></a>
           </div>
         </div>}
-      <p className="fre-ms-caution">Пароль не потрапляє в FRE LAUNCH. Токен Minecraft не передається інтерфейсу. Під час успішного входу лаунчер намагається зберегти ключ оновлення в Windows Credential Manager; автоматичне відновлення сесії після перезапуску ще проходить доопрацювання.</p>
+      <p className="fre-ms-caution">Пароль не потрапляє в FRE LAUNCH. Токен Minecraft не передається інтерфейсу. Під час успішного входу лаунчер намагається зберегти ключ оновлення в Windows Credential Manager; при наступному запуску FRE LAUNCH спробує автоматично відновити Minecraft-сесію. Для входу потрібен схвалений Minecraft Client ID.</p>
     </div>
     <h3 className="fre-offline-title">Офлайн-профілі</h3>
     <p>Додавай локальні імена Minecraft. Вони не є Microsoft-акаунтами та не дають ліцензійного доступу.</p>
