@@ -1364,3 +1364,23 @@ input:focus-visible,button:focus-visible,select:focus-visible,textarea:focus-vis
  .fre-app .fre-discover-search .primary{width:100%;justify-content:center}
  .fre-discover-link{margin-left:0}
 }
+
+/* Real Markdown layout in Modrinth detail descriptions, with no HTML execution. */
+.fre-prose{font-size:13px;line-height:1.65;color:#ccd0d8;overflow-wrap:anywhere;min-width:0}
+.fre-prose h1,.fre-prose h2,.fre-prose h3,.fre-prose h4{line-height:1.25;margin:21px 0 10px;color:#f5f6f8;font-weight:750}
+.fre-prose h1{font-size:21px}.fre-prose h2{font-size:18px}.fre-prose h3{font-size:15px}
+.fre-prose h1:first-child,.fre-prose h2:first-child,.fre-prose h3:first-child{margin-top:0}
+.fre-prose p{margin:0 0 13px;white-space:normal!important;max-height:none!important;overflow:visible!important;font-size:13px;line-height:1.65;color:#bdc4cd}
+.fre-prose :where(ul,ol){margin:10px 0 15px;padding-left:22px}
+.fre-prose li{margin:4px 0}.fre-prose li::marker{color:#70e59d}
+.fre-prose a{color:#5de796;text-decoration:underline;text-underline-offset:2px}
+.fre-prose a:hover{color:#b7f4cb}
+.fre-prose img{max-width:100%;height:auto;border-radius:8px}
+.fre-prose table{width:100%;border-collapse:collapse;display:block;overflow-x:auto;margin:15px 0}
+.fre-prose th,.fre-prose td{border:1px solid #3a4145;padding:8px 10px;font-size:12px;text-align:left}
+.fre-prose th{background:#343840}
+.fre-prose blockquote{border-left:3px solid #3a9b63;padding:6px 14px;margin:14px 0;color:#adb6b0;background:#2b3132}
+.fre-prose pre{padding:14px;background:#161b1c;border:1px solid #333b3b;border-radius:8px;overflow-x:auto;font-size:12px}
+.fre-prose code{background:#32373a;border-radius:5px;padding:2px 5px;font-family:Consolas,monospace;font-size:.92em}
+.fre-prose pre code{background:transparent;padding:0}
+.fre-prose hr{border-top:1px solid #3a4145}
