@@ -5,7 +5,7 @@ import { open as selectLocalFile } from "@tauri-apps/plugin-dialog";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import {
-  ArrowRight, AlertTriangle, Boxes, Check, CircleHelp, Coffee, Copy, Download, FolderOpen, HardDriveDownload, House, Images, Layers3, ListFilter, Orbit, Play, Plus, Puzzle, RefreshCw, Search, Server, Settings2, ShieldCheck, Shirt, Terminal, UserRound, X, Archive, ScrollText
+  ArrowRight, AlertTriangle, Boxes, Check, CircleHelp, Coffee, Copy, Download, FolderOpen, HardDriveDownload, House, Images, Layers3, ListFilter, Orbit, Package, Play, Plus, Puzzle, RefreshCw, Search, Server, Settings2, ShieldCheck, Shirt, Terminal, UserRound, X, Archive, ScrollText
 } from "lucide-react";
 import InstallDeck from "./InstallDeck";
 import GameFolders from "./GameFolders";
