@@ -196,9 +196,10 @@ export default function ModsPanel({version, instanceId}: {version: string; insta
       {[{id:"modpack",label:"Модпаки"},{id:"mod",label:"Моди"},{id:"resourcepack",label:"Ресурс-паки"},{id:"shader",label:"Шейдери"}].map(category=>
         <button key={category.id} className={kind===category.id?"active":""} onClick={()=>setKind(category.id)}>{category.label}</button>)}
     </nav>}
-    {!opened&&<div className="toolbar">
-      <div className="search"><Search size={18}/><input placeholder="Знайти Sodium, Lithium, Fabric API..." value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")void search(0);}}/></div>
-      </div>}
+    {!opened&&<div className="toolbar fre-discover-search">
+      <div className="search"><Search size={18}/><input placeholder="Шукати контент..." value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")void search(0);}}/></div>
+      <button className="primary" onClick={()=>void search(0)} disabled={loading}>{loading?"Шукаю...":"Знайти"}</button>
+    </div>}
     {!opened&&<div className="fre-discover-filters">
       <select value={sort} onChange={e=>setSort(e.target.value)} aria-label="Сортування результатів">
         <option value="relevance">За відповідністю</option>
@@ -207,22 +208,11 @@ export default function ModsPanel({version, instanceId}: {version: string; insta
         <option value="newest">Нові проєкти</option>
         <option value="follows">За підписками</option>
       </select>
-      <button className="primary" onClick={()=>void search(0)} disabled={loading}>{loading?"Шукаю...":"Знайти"}</button>
-    </div>
-    <div className="toolbar" style={{marginTop:12,alignItems:"center"}}>
-      <span className="muted">Джерела:</span>
-      <strong>Modrinth · встановлення в лаунчері</strong>
-      <button className="secondary" onClick={()=>window.open("https://www.curseforge.com/minecraft/search?search="+encodeURIComponent(query.trim()||"mods"),"_blank","noopener,noreferrer")}>
-        CurseForge · знайти більше <ExternalLink size={15}/>
-      </button>
-    </div>
-    <label className="muted" style={{display:"flex",alignItems:"center",gap:8,marginTop:12}}>
-      <input type="checkbox" checked={onlyCompatible} onChange={e=>setOnlyCompatible(e.target.checked)}/>
-      Автопідбір під Minecraft {version||"обраної версії"}{kind==="mod"&&selectedInstance?.loader&&selectedInstance.loader!=="vanilla"?` · ${selectedInstance.loader}`:""}
-    </label>
-    <p className="muted">Пошук у всьому каталозі Modrinth. Без галочки показуються також проєкти для інших версій, але встановлення потребує сумісного релізу.</p>
-    <p className="muted">{instanceId ? `Збірка: ${selectedInstance?.name??"Обрана"} · ${selectedInstance?.loader??"Vanilla"}` : "Спочатку обери окрему збірку для встановлення."} · Minecraft {version||"—"}</p>
-
+      <label className="fre-filter-chip"><input type="checkbox" checked={onlyCompatible} onChange={e=>setOnlyCompatible(e.target.checked)}/> {onlyCompatible?"Сумісні":"Усі версії"} · {version||"Minecraft"}</label>
+      <span className="fre-discover-filter-count">{loading?"Пошук…":hits.length+" результатів"}</span>
+      <button className="fre-discover-link" onClick={()=>window.open("https://www.curseforge.com/minecraft/search?search="+encodeURIComponent(query.trim()||"mods"),"_blank","noopener,noreferrer")}>CurseForge <ExternalLink size={13}/></button>
+    </div>}
+    {!opened&&!instanceId&&<p className="muted">Щоб установити проєкт, спершу обери збірку в бібліотеці.</p>}
     {opened&&<section className="fre-mod-detail">
       <button className="secondary" onClick={()=>{setOpened(null);setDetails(null);setError("");}}><ArrowLeft size={16}/> До каталогу</button>
       <div className="fre-mod-detail-hero">
