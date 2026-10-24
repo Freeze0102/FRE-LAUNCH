@@ -2,6 +2,8 @@
 
 **Minecraft Java Edition launcher для Windows** · Tauri 2 · Rust · React · TypeScript
 
+**Хочеш перевірити найновішу версію прямо зараз?** [Інструкція з локального тестування й створення EXE без GitHub Actions](LOCAL_BUILD_UA.md) — скачай код, розпакуй та запусти `FRE-LAUNCH-LOCAL.cmd`.
+
 > **Alpha 0.5.7 — у розробці.** FRE LAUNCH є незалежним неофіційним проєктом і не пов'язаний з Mojang, Microsoft, Modrinth або CurseForge.
 
 > [!CAUTION]
