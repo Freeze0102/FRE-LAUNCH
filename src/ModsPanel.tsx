@@ -42,7 +42,7 @@ export default function ModsPanel({version, instanceId, initialProject, onServer
   version: string; instanceId: string; initialProject?: ModrinthHit | null;
   onServers?:()=>void;
   onImportPack:()=>void;importBusy:boolean;
-  onPackInstalled?:(instance:{id:string;name:string;version:string;memoryMb:number})=>void;
+  onPackInstalled?:(instance:{id:string;name:string;version:string;memoryMb:number;iconUrl?:string|null})=>void;
 }) {
   const [query,setQuery]=useState("");
   const [view,setView]=useState<"browse"|"library">("browse");
@@ -139,7 +139,7 @@ export default function ModsPanel({version, instanceId, initialProject, onServer
           projectId:opened.project_id,versionId:chosenVersion
         });
         setMessage("Модпак встановлено: "+created.name+" · "+created.version);
-        onPackInstalled?.(created);
+        onPackInstalled?.({...created,iconUrl:opened?.icon_url||null});
       } else if(opened.project_type==="mod") {
         if(!selectedInstance)throw Error("Обери Minecraft-збірку.");
         if(selectedInstance.loader!=="fabric")throw Error("Зараз автоматичне встановлення модів підтримує Fabric. Обери Fabric-збірку.");
@@ -166,7 +166,7 @@ export default function ModsPanel({version, instanceId, initialProject, onServer
       if(hit.project_type==="modpack"){
         const created=await invoke<{id:string;name:string;version:string;memoryMb:number}>("install_modrinth_modpack",{projectId:hit.project_id});
         setMessage("Модпак встановлено: "+created.name+" · "+created.version);
-        onPackInstalled?.(created);
+        onPackInstalled?.({...created,iconUrl:hit.icon_url||null});
       } else
       if (kind==="resourcepack"||kind==="shader") {
         const command=kind==="shader"?"install_shaderpack":"install_resourcepack";
