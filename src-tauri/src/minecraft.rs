@@ -704,6 +704,8 @@ async fn launch_inner(app: AppHandle, version: String, nickname: String, memory_
             }
         }
     });
+    let monitor_version=version.clone();
+    let monitor_instance=instance_id.clone();
     tokio::spawn(async move {
         let result=child.wait().await;
         let exit_code=result.as_ref().ok().and_then(|status|status.code());
@@ -719,16 +721,16 @@ async fn launch_inner(app: AppHandle, version: String, nickname: String, memory_
             let hint=crash_hint(&(output+"\n"+&latest_text)).to_string();
             let report=recent_crash_report(&dir,started_at);
             super::diagnostics::write(&app,"GAME_CRASH",&format!(
-                "Minecraft {version}, instance {:?}, exit {:?}. {hint}; log {}",
-                instance_id,exit_code,game_log.display()
+                "Minecraft {monitor_version}, instance {:?}, exit {:?}. {hint}; log {}",
+                monitor_instance,exit_code,game_log.display()
             ));
             let _=app.emit("game-crash",GameCrash{
-                version,instance_id,exit_code,summary:hint,
+                version:monitor_version,instance_id:monitor_instance,exit_code,summary:hint,
                 log_path:latest.to_string_lossy().into_owned(),
                 crash_report_path:report,
             });
         }else{
-            super::diagnostics::write(&app,"GAME_EXIT",&format!("Minecraft {version} exited normally"));
+            super::diagnostics::write(&app,"GAME_EXIT",&format!("Minecraft {monitor_version} exited normally"));
         }
         let _=app.emit("game-log",message.clone());
         let _=app.emit("game-status",message);
