@@ -67,6 +67,9 @@ echo.
 echo --- FRE LAUNCH LIVE TEST ---
 call :prepare
 if errorlevel 1 goto failed
+echo Checking React / TypeScript before compiling Rust...
+call npm run check
+if errorlevel 1 goto failed
 echo Launching latest local source as a development app...
 echo Leave this window open during testing.
 call npm run tauri dev
