@@ -5,7 +5,7 @@ import { UserRound, Plus, Trash2, ShieldCheck, UserCheck, ExternalLink, LogIn, L
 type Account = {id:string;nickname:string;offlineUuid:string};
 export type MicrosoftAccount = {name:string;id:string};
 type DeviceChallenge = {userCode:string;verificationUri:string;expiresIn:number;interval:number};
-type PollStatus = {status:"pending"|"connected";account:MicrosoftAccount|null;interval:number};
+type PollStatus = {status:"pending"|"connected";account:MicrosoftAccount|null;interval:number;persisted?:boolean};
 export default function AccountsPanel({nickname,onSelect,microsoft,onMicrosoftSelect}:{
   nickname:string;onSelect:(name:string)=>void;microsoft:MicrosoftAccount|null;onMicrosoftSelect:(account:MicrosoftAccount|null)=>void;
 }){
@@ -18,6 +18,7 @@ export default function AccountsPanel({nickname,onSelect,microsoft,onMicrosoftSe
   useEffect(()=>{void invoke<boolean>("microsoft_login_configuration").then(setHasBuiltInId).catch(()=>{});},[]);
   const [authBusy,setAuthBusy]=useState(false);
   const [authError,setAuthError]=useState("");
+  const [authNotice,setAuthNotice]=useState("");
   const checking=useRef(false);
   const [accounts,setAccounts]=useState<Account[]>([]);
   const [name,setName]=useState("");
@@ -48,7 +49,7 @@ export default function AccountsPanel({nickname,onSelect,microsoft,onMicrosoftSe
     finally{setBusy(false);}
   }
   async function beginMicrosoft(){
-    setAuthBusy(true);setAuthError("");setChallenge(null);
+    setAuthBusy(true);setAuthError("");setAuthNotice("");setChallenge(null);
     try{
       const code=await invoke<DeviceChallenge>("microsoft_begin_login",{clientId:showDeveloperOptions?clientId.trim()||null:null});
       if(showDeveloperOptions)try{localStorage.setItem("fre-ms-client-id",clientId.trim());}catch{/* public app identifier only */}
@@ -76,6 +77,9 @@ export default function AccountsPanel({nickname,onSelect,microsoft,onMicrosoftSe
           setChallenge(null);
           onMicrosoftSelect(result.account);
           setAuthError("");
+          setAuthNotice(result.persisted?
+            "Minecraft-акаунт підключено. Windows збереже вхід для наступного запуску.":
+            "Minecraft-акаунт підключено, але збереження сесії у Windows не підтверджене. Можливо, після перезапуску доведеться ввійти ще раз.");
         }
       }catch(err){
         if(active){setAuthError(String(err));setChallenge(null);}
@@ -90,7 +94,7 @@ export default function AccountsPanel({nickname,onSelect,microsoft,onMicrosoftSe
         <span className="fre-ms-logo">M</span>
         <div><h3>Microsoft · Minecraft Java Edition</h3><p>Справжній вхід через Microsoft → Xbox → Minecraft. Пароль вводиться тільки на сайті Microsoft.</p></div>
       </div>
-      {microsoft?<div className="fre-ms-signed"><UserCheck size={23}/><div><strong>{microsoft.name}</strong><small>Microsoft Minecraft · {microsoft.id}</small></div><button className="secondary" disabled={authBusy} onClick={()=>void logoutMicrosoft()}><LogOut size={15}/> Вийти</button></div>:
+      {microsoft?<><div className="fre-ms-signed"><UserCheck size={23}/><div><strong>{microsoft.name}</strong><small>Microsoft Minecraft · {microsoft.id}</small></div><button className="secondary" disabled={authBusy} onClick={()=>void logoutMicrosoft()}><LogOut size={15}/> Вийти</button></div>{authNotice&&<p className="notice">{authNotice}</p>}</>:
         <div className="fre-ms-login">
           <div className="fre-ms-form">
             <button className="primary" disabled={authBusy||(!hasBuiltInId&&!showDeveloperOptions)} onClick={()=>void beginMicrosoft()}><LogIn size={16}/> {authBusy?"Підключення…":"Увійти через Microsoft"}</button>
@@ -110,7 +114,8 @@ export default function AccountsPanel({nickname,onSelect,microsoft,onMicrosoftSe
           </div>}
           {authError&&<div className="error">{authError}</div>}
           <div className="fre-ms-links">
-            <a href="https://entra.microsoft.com/" target="_blank" rel="noopener noreferrer">Реєстрація власного застосунку <ExternalLink size={12}/></a>
+            <a href="https://signup.live.com/" target="_blank" rel="noopener noreferrer">Створити Microsoft-акаунт <ExternalLink size={12}/></a>
+            <a href="https://entra.microsoft.com/" target="_blank" rel="noopener noreferrer">Реєстрація застосунку (для розробника) <ExternalLink size={12}/></a>
             <a href="https://help.minecraft.net/hc/en-us/articles/16254801392141" target="_blank" rel="noopener noreferrer">Дозвіл Minecraft на Client ID <ExternalLink size={12}/></a>
           </div>
         </div>}
