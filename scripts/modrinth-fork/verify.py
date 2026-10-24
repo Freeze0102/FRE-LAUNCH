@@ -62,14 +62,15 @@ def verify(root):
     checks={
         "apps/app/src/api/auth.rs":["create_offline_user","Sign in to Minecraft with Microsoft"],
         "apps/app/build.rs":["create_offline_user"],
-        "packages/app-lib/src/api/minecraft_auth.rs":["pub async fn create_offline_user","OfflinePlayer:","md5::compute"],
+        "packages/app-lib/src/api/minecraft_auth.rs":["pub async fn create_offline_user","OfflinePlayer:","md5::compute","mark_logged_into_minecraft"],
         "packages/app-lib/src/state/minecraft_auth.rs":["pub fn is_offline_profile","fre-offline:"],
         "packages/app-lib/src/launcher/args.rs":['access_token.starts_with("fre-offline:")'],
-        "apps/app-frontend/src/features/minecraft-accounts/accounts-card.vue":["OfflineProfileCreator","onOfflineCreated"],
+        "apps/app-frontend/src/features/minecraft-accounts/accounts-card.vue":["OfflineProfileCreator", "fre-launch-offline-account-created"],
         "apps/app-frontend/src/features/minecraft-accounts/offline-profile-creator.vue":["v-model.trim","create_offline_user","@submit.prevent"],
         "apps/app-frontend/src/helpers/auth.js":["plugin:auth|create_offline_user"],
         "apps/app-frontend/src/pages/Skins.vue":["isLocalAccount", "fre-launch.skins.local-notice"],
         "apps/app-frontend/src/app/shell/title-bar/index.vue":["FRE LAUNCH"],
+        "apps/app-frontend/src/components/ui/WelcomeScreen.vue":["OfflineProfileCreator", "fre-launch.welcome-screen.title"],
     }
     for relative,snippets in checks.items():
         data=(root/relative).read_text(encoding="utf-8")
@@ -83,6 +84,7 @@ def verify(root):
     assert 'to="/hosting/manage"' not in app
     assert ':show-ad="false"' in app
     assert 'watch(\n\t[stateInitialized, showAd, adConsentAvailable],' not in app
+    assert (root/"packages/app-lib/.env").is_file(), "Missing production API environment file"
     assert (root/"FRE_LAUNCH_FORK.md").is_file()
     print(f"Source check passed: {len(app_en)} App messages and {len(ui_en)} UI messages covered in UK + EN.")
     print("Nickname path, unique identifier, advertising and hosting checks passed.")
