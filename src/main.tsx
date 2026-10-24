@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import ErrorBoundary, { LAST_UI_CRASH } from "./ErrorBoundary";
 import "./style.css";
+import "./modrinth-shell.css";
 
 // Collect JavaScript failures locally. No analytics or network transport.
 window.addEventListener("error",event=>{
