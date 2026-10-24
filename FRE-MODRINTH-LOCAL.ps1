@@ -1,45 +1,43 @@
-# FRE LAUNCH desktop source fork based on official GPLv3 Modrinth App.
-# Generates source only. Does not execute or download third-party game installers.
+# FRE LAUNCH desktop source based on upstream GPLv3 Modrinth App.
+# No GitHub Actions, no new branches. This script never changes the legacy game files.
 param(
     [switch]$BuildWindows
 )
 $ErrorActionPreference = 'Stop'
-$sourceSha = '4ccf4d51804627cd0687ce7dfd5004f20c267acc'
 $projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-$converter = Join-Path $projectRoot 'scripts\modrinth-fork\prepare.py'
+$revision = '4ccf4d51804627cd0687ce7dfd5004f20c267acc'
+$upstream = Join-Path $projectRoot 'vendor\modrinth'
 $destination = Join-Path $projectRoot 'FRE-Modrinth-Source'
-if (!(Test-Path $converter)) {
-    throw 'Download or clone the complete FRE-LAUNCH GitHub repository first.'
-}
-if (Test-Path $destination) {
-    throw "Folder already exists: $destination. Refusing to overwrite worlds or custom source."
-}
+$converter = Join-Path $projectRoot 'scripts\modrinth-fork\prepare.py'
+if (-not (Test-Path $converter)) { throw 'Full FRE LAUNCH repository not found.' }
+if (Test-Path $destination) { throw "Refusing to overwrite $destination. Rename your old generated source first." }
 Get-Command git -ErrorAction Stop | Out-Null
 Get-Command py -ErrorAction Stop | Out-Null
-Write-Host 'Cloning official Modrinth desktop source at pinned commit...' -ForegroundColor Cyan
-git clone --no-checkout --filter=blob:none --depth=1 https://github.com/modrinth/code.git "$destination"
-if ($LASTEXITCODE -ne 0) { throw 'Git clone failed' }
-git -C "$destination" fetch --no-tags --depth=1 origin $sourceSha
-if ($LASTEXITCODE -ne 0) { throw 'Pinned upstream commit fetch failed' }
-git -C "$destination" checkout --detach $sourceSha
-if ($LASTEXITCODE -ne 0) { throw 'Upstream checkout failed' }
-Write-Host 'Generating original FRE LAUNCH branding and disabling hosting/ads...' -ForegroundColor Cyan
+Write-Host 'Fetching pinned original Modrinth source via Git submodule...' -ForegroundColor Cyan
+git -C "$projectRoot" submodule update --init --depth 1 vendor/modrinth
+if ($LASTEXITCODE -ne 0) { throw 'Modrinth source fetch failed.' }
+$actual = (git -C "$upstream" rev-parse HEAD).Trim()
+if ($actual -ne $revision) { throw "Refusing unverified Modrinth source: $actual" }
+Write-Host 'Copying upstream desktop source without modifying your old launcher...' -ForegroundColor Cyan
+Copy-Item -Path $upstream -Destination $destination -Recurse -Force
+$copiedGit = Join-Path $destination '.git'
+if (Test-Path $copiedGit) { Remove-Item $copiedGit -Force -Recurse }
 py -3 -m pip install 'Pillow>=11,<13'
-if ($LASTEXITCODE -ne 0) { throw 'Pillow dependency installation failed' }
-py -3 "$converter" "$destination" --upstream-sha $sourceSha
-if ($LASTEXITCODE -ne 0) { throw 'Customization failed; original FRE LAUNCH was not changed' }
-Write-Host "Modified GPLv3 source ready at $destination" -ForegroundColor Green
-Write-Host 'Your existing FRE LAUNCH and Minecraft data have not been modified.'
+if ($LASTEXITCODE -ne 0) { throw 'Pillow dependency installation failed.' }
+py -3 "$converter" "$destination" --upstream-sha $revision
+if ($LASTEXITCODE -ne 0) { throw 'Customization failed, source remains in FRE-Modrinth-Source for inspection.' }
+Write-Host "FRE LAUNCH modified Modrinth GPLv3 source: $destination" -ForegroundColor Green
+Write-Host 'Separate old FRE LAUNCH profiles and worlds have not been changed.'
 if ($BuildWindows) {
     Get-Command pnpm -ErrorAction Stop | Out-Null
     Get-Command cargo -ErrorAction Stop | Out-Null
     Push-Location $destination
     try {
         pnpm install --frozen-lockfile
-        if ($LASTEXITCODE -ne 0) { throw 'Workspace dependency installation failed' }
+        if ($LASTEXITCODE -ne 0) { throw 'pnpm install failed' }
         pnpm --filter '@modrinth/app-frontend' run tsc:check
-        if ($LASTEXITCODE -ne 0) { throw 'Type check failed' }
+        if ($LASTEXITCODE -ne 0) { throw 'Vue typecheck failed' }
         pnpm --filter '@modrinth/app' tauri build --bundles nsis
-        if ($LASTEXITCODE -ne 0) { throw 'Windows installer compilation failed' }
+        if ($LASTEXITCODE -ne 0) { throw 'Tauri build failed' }
     } finally { Pop-Location }
 }
