@@ -97,6 +97,7 @@ pub struct PollStatus {
     status: String,
     account: Option<MicrosoftAccount>,
     interval: u64,
+    persisted: bool,
 }
 fn http() -> Result<Client, String> {
     Client::builder()
@@ -106,7 +107,7 @@ fn http() -> Result<Client, String> {
         .build().map_err(|_| "Не вдалося ініціалізувати захищене з'єднання".to_string())
 }
 fn pending_status(interval:u64) -> PollStatus {
-    PollStatus{status:"pending".into(), account:None, interval}
+    PollStatus{status:"pending".into(), account:None, interval,persisted:false}
 }
 fn safe_profile(name: &str, id: &str) -> bool {
     (1..=16).contains(&name.len())
@@ -240,7 +241,10 @@ pub async fn microsoft_poll_login() -> Result<PollStatus,String> {
     let live=exchange_for_minecraft(&client,access).await?;
     let account=MicrosoftAccount{name:live.name.clone(),id:live.id.clone()};
     *session().lock().map_err(|_|"Стан авторизації недоступний")?=Some(live);
-    Ok(PollStatus{status:"connected".into(),account:Some(account),interval:0})
+    // A Windows credential storage failure does not invalidate current authentication.
+    let persisted=body["refresh_token"].as_str().filter(|s|!s.is_empty())
+        .is_some_and(|refresh|store_refresh(&state.client_id,refresh).is_ok());
+    Ok(PollStatus{status:"connected".into(),account:Some(account),interval:0,persisted})
 }
 
 #[tauri::command]
@@ -254,6 +258,7 @@ pub fn microsoft_current_account() -> Result<Option<MicrosoftAccount>,String> {
 pub fn microsoft_logout() -> Result<(),String> {
     *session().lock().map_err(|_|"Стан авторизації недоступний")?=None;
     *pending().lock().map_err(|_|"Стан авторизації недоступний")?=None;
+    delete_refresh()?;
     Ok(())
 }
 
