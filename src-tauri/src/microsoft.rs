@@ -153,6 +153,23 @@ fn pkce_challenge(verifier:&str)->String{
     use sha2::{Digest,Sha256};
     base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(Sha256::digest(verifier.as_bytes()))
 }
+
+#[cfg(test)]
+mod browser_login_tests{
+    use super::*;
+    #[test]
+    fn rfc7636_pkce_s256_example(){
+        let verifier="dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
+        assert_eq!(pkce_challenge(verifier),"E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM");
+    }
+    #[test]
+    fn generated_verifier_is_url_safe(){
+        let verifier=pkce_verifier();
+        assert!(verifier.len()>=43&&verifier.len()<=128);
+        assert!(verifier.bytes().all(|x|x.is_ascii_alphanumeric()||x==b'-'||x==b'_'));
+        assert_ne!(verifier,pkce_verifier());
+    }
+}
 async fn read_browser_callback(listener:tokio::net::TcpListener,expected_state:&str)
     ->Result<String,String>{
     use tokio::io::{AsyncReadExt,AsyncWriteExt};
