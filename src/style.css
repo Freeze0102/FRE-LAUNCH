@@ -1244,3 +1244,123 @@ input:focus-visible,button:focus-visible,select:focus-visible,textarea:focus-vis
 .fre-skin-controls>.secondary{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:42px}
 @media(max-width:1130px){.fre-app .studio-grid{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:570px){.fre-skin-file-actions{grid-template-columns:1fr}}
+
+
+/* Modrinth shell recreation V1: independent FRE LAUNCH components/brand. */
+/* Narrow, icon-led rail and shallow breadcrumbs as in the desktop app. */
+.fre-app{--fre-paper:#17181e;--fre-card:#212329;--fre-secondary:#282b33;--fre-ink:#f1f2f6;--fre-line:#383b45;--fre-muted:#a6a9b5;--fre-accent:#20c867;--fre-accent-text:#12291e;--fre-side:#181a20;--fre-side-text:#ecf0ed;background:#17181e}
+.fre-app .fre-rail{width:64px;min-width:64px;background:#191b22;border-right:1px solid #343640;box-shadow:none}
+.fre-app .fre-identity{width:64px;min-height:60px;height:60px;padding:9px;justify-content:center;align-items:center;gap:0}
+.fre-app .fre-identity-mark{width:37px;min-width:37px;height:37px;border-radius:11px;font-size:23px;background:#1b5134;color:#52e58c;box-shadow:none}
+.fre-app .fre-identity-word,.fre-app .fre-rail-divider,.fre-app .fre-nav-label,.fre-app .fre-nav-index,.fre-app .fre-nav-link>svg:last-child:not(:first-of-type){display:none}
+.fre-app .fre-nav{padding:5px 7px 12px;gap:7px;align-items:stretch;overflow-x:hidden;overflow-y:auto}
+.fre-app .fre-nav-link{width:49px;min-width:49px;height:47px;min-height:47px;display:flex;justify-content:center;align-items:center;padding:10px;border-radius:12px;color:#a1a5b1;flex-shrink:0}
+.fre-app .fre-nav-link:hover{background:#292c35;color:#f5f7fa}
+.fre-app .fre-nav-link.is-active{color:#49e583;background:#1c5236}
+.fre-app .fre-nav-link.is-active::before{display:none}
+.fre-app .fre-nav-link svg{width:20px;height:20px;flex-shrink:0}
+.fre-app .fre-rail-foot{display:none}
+.fre-app .fre-updates{margin-top:auto}
+.fre-app .fre-updates-trigger{padding:9px 6px;justify-content:center}
+.fre-app .fre-updates-trigger>span{display:none}
+.fre-app .fre-updates-body{left:73px;width:min(350px,calc(100vw - 100px));bottom:15px}
+.fre-app .fre-commandbar{height:48px;min-height:48px;padding:0 22px;background:#1f2128;border-bottom:1px solid #353740}
+.fre-app .fre-command-left{font-size:12px;color:#a6a9b2;gap:9px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.fre-app .fre-command-square,.fre-app .fre-command-left>span:nth-child(2){display:none}
+.fre-app .fre-command-left b{color:#f3f4f6;font-size:12px}
+.fre-app .fre-command-right{gap:8px}
+.fre-app .fre-command-account{padding:5px 9px!important}
+.fre-app .fre-workspace{background:#17181e;min-width:0}
+.fre-app .fre-main{max-width:none;margin:0;padding:24px 28px 26px;min-width:0}
+.fre-app .fre-page-intro{margin-bottom:17px}
+.fre-app .fre-kicker{display:none}
+.fre-app .fre-heading-row{margin:0}
+.fre-app .fre-heading-row h1{font-size:24px;font-weight:730;letter-spacing:-.6px}
+.fre-app .fre-heading-row p{font-size:12px;color:#a5a9b3;margin:5px 0 0}
+.fre-app .fre-return{border-radius:9px}
+.fre-app .fre-module{min-width:0}
+.fre-app .fre-modrinth-page{border:0;background:transparent;box-shadow:none;padding:0;border-radius:0}
+.fre-discover-heading{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:2px 0 13px}
+.fre-discover-heading h2{font:750 19px/1.2 "Segoe UI",sans-serif;letter-spacing:-.4px;color:#f4f5f6;margin:0}
+.fre-discover-heading p{font-size:12px;color:#aaaeb9;margin:6px 0 0}
+.fre-discover-heading>svg{color:#5dca87}
+.fre-app .fre-content-tabs{display:flex;flex-wrap:wrap;width:max-content;max-width:100%;padding:4px;margin:4px 0 19px;border:1px solid #34363f;background:#24262e;border-radius:12px;gap:4px}
+.fre-app .fre-content-tabs button{flex:0 1 auto;min-width:120px;padding:8px 14px;border-radius:9px;border:0;font-weight:650;font-size:12px;color:#c2c5ce}
+.fre-app .fre-content-tabs button.active{background:#21563a;color:#5eed98;border:0;box-shadow:none}
+.fre-discover-categories{display:flex;gap:5px;flex-wrap:wrap;background:#24262e;padding:5px;margin-bottom:13px;border-radius:12px;width:max-content;max-width:100%}
+.fre-discover-categories button{border:0;padding:11px 15px;background:transparent;border-radius:9px;color:#d5d6de;font-size:12px;font-weight:650;white-space:nowrap}
+.fre-discover-categories button.active{background:#21573a;color:#58ef93}
+.fre-discover-categories button:hover:not(.active){background:#34363e}
+.fre-app .fre-discover-search{width:100%;margin:0 0 10px;display:flex;gap:8px}
+.fre-app .fre-discover-search .search{background:#282b34!important;border:1px solid #424550!important;min-width:0;flex:1}
+.fre-app .fre-discover-search .search input{background:transparent!important;color:#eef0f5!important;font-size:13px}
+.fre-app .fre-discover-search .primary{padding:11px 16px;font-size:12px}
+.fre-discover-filters{display:flex;align-items:center;flex-wrap:wrap;gap:9px;margin:0 0 17px;min-width:0}
+.fre-discover-filters select{background:#2b2e36!important;border:1px solid #3f424c!important;color:#dce0e5!important;padding:9px 12px;font-size:12px}
+.fre-filter-chip{display:inline-flex;align-items:center;gap:7px;min-height:37px;padding:5px 11px;background:#2b2e36;border:1px solid #3f424c;border-radius:8px;color:#d6d9df;font-size:12px;white-space:nowrap;cursor:pointer}
+.fre-filter-chip input{accent-color:#28d16d}
+.fre-discover-filter-count{font-size:11px;color:#a3a8b2}
+.fre-discover-link{margin-left:auto;border:0;background:transparent;color:#afb4c0;font-size:11px;display:inline-flex;align-items:center;gap:5px}
+.fre-discover-link:hover{color:#60e794}
+/* One full-width search result per row, with action buttons on the far right. */
+.fre-app .mod-grid{display:flex;flex-direction:column;gap:10px;margin-top:8px;min-width:0}
+.fre-app .mod-grid>.mod-card{width:100%;max-width:none;display:grid;grid-template-columns:72px minmax(0,1fr) auto;grid-template-areas:"icon copy actions";align-items:center;min-height:103px;gap:16px;padding:12px 15px;border:1px solid #3b3d46!important;background:#25272f!important;border-radius:11px!important;box-shadow:none!important}
+.fre-app .mod-grid>.mod-card:hover{border-color:#5f7669!important;background:#2b2e36!important;transform:none!important;box-shadow:none!important}
+.fre-app .mod-grid>.mod-card>.mod-icon{grid-area:icon;width:64px;height:64px;border-radius:10px;background:#353840}
+.fre-app .mod-grid>.mod-card>.mod-copy{grid-area:copy;min-width:0;max-width:100%;align-self:center}
+.fre-app .mod-grid .mod-copy h3{font:700 15px/1.35 "Segoe UI",sans-serif!important;margin:0 0 2px;color:#f6f7fa!important;overflow-wrap:normal;word-break:normal}
+.fre-app .mod-grid .fre-mod-open{display:block;max-width:100%;text-align:left}
+.fre-mod-author{font-size:11px;line-height:1.2;color:#a3a7b4;margin:1px 0 5px}
+.fre-app .mod-grid .mod-copy p{color:#afb3bf!important;font-size:12px!important;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:normal;overflow-wrap:break-word;margin:4px 0 7px}
+.fre-app .mod-grid .mod-copy small{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:10px;color:#969ba9!important}
+.fre-mod-tag{display:inline-flex;border:1px solid #3b3d46;background:#34363f;border-radius:9px;padding:3px 8px;color:#aeb3bc}
+.fre-app .mod-grid .fre-mod-card-actions{grid-area:actions;display:flex;align-items:center;gap:8px;flex-wrap:nowrap}
+.fre-app .mod-grid .fre-mod-card-actions>.secondary{flex:none;min-width:0;white-space:nowrap;padding:9px 12px;border-radius:8px!important;font-size:11px}
+.fre-app .mod-grid .fre-mod-card-actions>.secondary:last-of-type{background:#20573a!important;color:#69eda1!important;border-color:#2c754b!important}
+.fre-app .mod-grid .fre-mod-card-actions>.secondary:last-of-type:disabled{opacity:.48}
+/* Detail page with Modrinth-style hero, tabs, content and pinned version column. */
+.fre-mod-detail{padding:0}
+.fre-mod-detail>.secondary:first-child{font-size:11px;padding:8px 11px}
+.fre-mod-detail-hero{padding:20px 0;margin:14px 0;border-bottom:1px solid #373943;gap:15px}
+.fre-mod-detail-icon{width:80px;height:80px;border-radius:14px}
+.fre-mod-detail-hero h2{font-size:24px;margin:0 0 7px;color:#f3f4f7}
+.fre-mod-detail-hero p{font-size:12px;color:#acb0ba;line-height:1.5}
+.fre-mod-detail-tabs{display:flex;gap:8px;border-bottom:1px solid #3c3e47;margin:0 0 18px}
+.fre-mod-detail-tabs button{background:transparent;border:0;border-bottom:3px solid transparent;color:#a6abb5;padding:11px 16px;font-weight:650;font-size:12px}
+.fre-mod-detail-tabs button.active{border-bottom-color:#37d67b;color:#63ea9c}
+.fre-app .fre-mod-detail-layout{grid-template-columns:minmax(0,1.65fr) minmax(270px,.75fr);gap:14px}
+.fre-mod-detail-description,.fre-mod-detail-versions{background:#25272e;border:1px solid #353842;border-radius:11px;padding:19px}
+.fre-mod-detail-description p{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;color:#bac0c9;line-height:1.7}
+.fre-mod-detail-versions h3,.fre-mod-detail-description h3{font-size:15px;color:#ebecf1}
+.fre-app .installed-mods{background:#212329;border:1px solid #393b43;border-radius:12px;padding:16px 18px;margin:12px 0 18px}
+.fre-app .installed-mod-row{min-height:56px;gap:10px}
+.fre-app .installed-mod-row b{font-size:12px}
+.fre-app .installed-mod-row .secondary{padding:8px 11px;font-size:11px}
+.fre-app .instance-grid{grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr));gap:12px}
+.fre-app .instance-card{padding:14px;gap:10px;align-items:center;min-height:130px;border-radius:11px!important;background:#26282f!important}
+.fre-app .instance-card.chosen{border-color:#4fa271!important;background:#26402f!important}
+.fre-app .instance-icon{width:53px;height:53px;border-radius:10px;background:#36483d;color:#63e995}
+.fre-app .instance-info{flex:1 1 calc(100% - 80px)}
+.fre-app .instance-info b{font-size:15px}
+.fre-app .instance-card .secondary{padding:9px 12px}
+@media(max-width:1050px){
+ .fre-app .fre-main{padding:20px}
+ .fre-app .fre-mod-detail-layout{grid-template-columns:1fr}
+ .fre-app .mod-grid>.mod-card{grid-template-columns:58px minmax(0,1fr);grid-template-areas:"icon copy" "actions actions";min-height:110px}
+ .fre-app .mod-grid>.mod-card>.mod-icon{width:53px;height:53px}
+ .fre-app .mod-grid .fre-mod-card-actions{justify-content:flex-end;flex-wrap:wrap}
+}
+@media(max-width:630px){
+ .fre-app .fre-rail{height:auto;width:100%;min-width:0;overflow-x:auto}
+ .fre-app .fre-identity{width:52px;min-width:52px}
+ .fre-app .fre-nav{flex-direction:row;overflow-x:auto;overflow-y:hidden}
+ .fre-app .fre-nav-link{flex:0 0 43px;height:43px;min-width:43px;min-height:43px}
+ .fre-app .fre-updates{display:none}
+ .fre-app .fre-content-tabs{width:100%}
+ .fre-app .fre-content-tabs button{flex:1}
+ .fre-discover-categories{width:100%}
+ .fre-discover-categories button{flex:1 1 100px}
+ .fre-app .fre-discover-search{flex-wrap:wrap}
+ .fre-app .fre-discover-search .primary{width:100%;justify-content:center}
+ .fre-discover-link{margin-left:0}
+}
