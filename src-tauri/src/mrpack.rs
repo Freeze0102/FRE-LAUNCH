@@ -241,6 +241,11 @@ pub async fn install_modrinth_modpack(app:AppHandle,project_id:String,version_id
     if bytes.len() as u64!=size||!format!("{:x}",Sha512::digest(&bytes)).eq_ignore_ascii_case(digest){
         return Err("Неповне завантаження або невірний SHA-512 архіву".into());
     }
+    install_verified_archive(app,bytes,project["title"].as_str().unwrap_or("Модпак")).await
+}
+async fn install_verified_archive(app:AppHandle,bytes:Vec<u8>,suggested_name:&str)
+    ->Result<super::instances::Instance,String>{
+    let client=client()?;
     notify(&app,0,1,"Перевірка структури .mrpack");
     let (index,overrides)=tokio::task::spawn_blocking(move||parse_pack(bytes))
         .await.map_err(|e|e.to_string())??;
@@ -251,7 +256,7 @@ pub async fn install_modrinth_modpack(app:AppHandle,project_id:String,version_id
     let name=if index.name.chars().count()<=48&& !index.name.trim().is_empty() {
         index.name.trim().to_string()
     }else{
-        project["title"].as_str().unwrap_or("Модпак").chars().take(48).collect()
+        suggested_name.chars().take(48).collect()
     };
     // Stage away from the user's existing worlds/instances.
     let base=app.path().app_data_dir().map_err(|e|e.to_string())?.join("minecraft");
@@ -320,6 +325,7 @@ pub async fn install_modrinth_modpack(app:AppHandle,project_id:String,version_id
     }
     result
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;
