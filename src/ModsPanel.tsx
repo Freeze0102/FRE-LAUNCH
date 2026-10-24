@@ -3,8 +3,9 @@ import { invoke } from "@tauri-apps/api/core";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeSanitize from "rehype-sanitize";
-import { Package, DownloadCloud, Search, ShieldCheck, Trash2, RefreshCw, ArrowLeft, CheckCircle2, Info, ExternalLink } from "lucide-react";
+import { Package, DownloadCloud, Search, ShieldCheck, Trash2, RefreshCw, ArrowLeft, CheckCircle2, Info, ExternalLink, Library } from "lucide-react";
 import type { Instance } from "./Features";
+import "./discover-page.css";
 
 type ModrinthHit = {
   project_id: string; slug: string; title: string; description: string;
@@ -192,18 +193,18 @@ export default function ModsPanel({version, instanceId, initialProject}: {versio
   }
 
   return <section className="panel fre-modrinth-page">
-    <div className="fre-discover-heading"><div><h2>Знайти контент</h2><p>Каталог модів, модпаків, ресурс-паків та шейдерів Minecraft</p></div><Package size={20}/></div>
-    <nav className="fre-content-tabs" aria-label="Каталог та встановлені ресурси">
-      <button className={view==="browse"?"active":""} onClick={()=>{setView("browse");setOpened(null);}}>Огляд</button>
-      <button className={view==="library"?"active":""} onClick={()=>setView("library")}>
-        Встановлено {instanceId? `(${installed.length+resourcepacks.length+shaderpacks.length})`:""}
+    <div className="fre-discover-heading">
+      <div><h2>{view==="library"?"Встановлений контент":opened?"Проєкт Modrinth":"Пошук контенту"}</h2>
+        <p>{view==="library"?"Файли активної збірки":"Моди, модпаки, ресурс-паки, датапаки та шейдери з Modrinth"}</p></div>
+      <button className="fre-discover-installed" onClick={()=>{setView(view==="library"?"browse":"library");setOpened(null);}}>
+        <Library size={16}/> {view==="library"?"Пошук контенту":`Встановлено ${instanceId?"("+(installed.length+resourcepacks.length+shaderpacks.length)+")":""}`}
       </button>
-    </nav>
+    </div>
     {error&&<div className="error">{error}</div>}
     {message&&<div className="notice"><ShieldCheck size={16}/>{message}</div>}
     {view==="browse"&&<>
     {!opened&&<nav className="fre-discover-categories" aria-label="Категорії Modrinth">
-      {[{id:"modpack",label:"Модпаки"},{id:"mod",label:"Моди"},{id:"resourcepack",label:"Ресурс-паки"},{id:"shader",label:"Шейдери"}].map(category=>
+      {[{id:"modpack",label:"Модпаки"},{id:"mod",label:"Моди"},{id:"resourcepack",label:"Ресурс-паки"},{id:"datapack",label:"Датапаки"},{id:"shader",label:"Шейдери"}].map(category=>
         <button key={category.id} className={kind===category.id?"active":""} onClick={()=>setKind(category.id)}>{category.label}</button>)}
     </nav>}
     {!opened&&<div className="toolbar fre-discover-search">
@@ -218,7 +219,7 @@ export default function ModsPanel({version, instanceId, initialProject}: {versio
         <option value="newest">Нові проєкти</option>
         <option value="follows">За підписками</option>
       </select>
-      <label className="fre-filter-chip"><input type="checkbox" checked={onlyCompatible} onChange={e=>setOnlyCompatible(e.target.checked)}/> {onlyCompatible?"Сумісні":"Усі версії"} · {version||"Minecraft"}</label>
+      <label className="fre-filter-chip"><input type="checkbox" checked={onlyCompatible} onChange={e=>setOnlyCompatible(e.target.checked)}/> {onlyCompatible?"Сумісні з "+(version||"Minecraft"):"Усі версії Minecraft"}</label>
       <span className="fre-discover-filter-count">{loading?"Пошук…":hits.length+" результатів"}</span>
       <button className="fre-discover-link" onClick={()=>window.open("https://www.curseforge.com/minecraft/search?search="+encodeURIComponent(query.trim()||"mods"),"_blank","noopener,noreferrer")}>CurseForge <ExternalLink size={13}/></button>
     </div>}
@@ -228,7 +229,7 @@ export default function ModsPanel({version, instanceId, initialProject}: {versio
       <div className="fre-mod-detail-hero">
         {opened.icon_url&&<img src={opened.icon_url} alt="" className="fre-mod-detail-icon"/>}
         <div><h2>{details?.project.title??opened.title}</h2><p>{details?.project.description??opened.description}</p>
-          <span className="muted"><DownloadCloud size={14}/> {(details?.project.downloads??opened.downloads).toLocaleString("uk-UA")} завантажень · {opened.project_type==="modpack"?"Модпак":opened.project_type==="resourcepack"?"Ресурс-пак":opened.project_type==="shader"?"Шейдер":"Мод"}</span></div>
+          <span className="muted"><DownloadCloud size={14}/> {(details?.project.downloads??opened.downloads).toLocaleString("uk-UA")} завантажень · {opened.project_type==="modpack"?"Модпак":opened.project_type==="resourcepack"?"Ресурс-пак":opened.project_type==="datapack"?"Датапак":opened.project_type==="shader"?"Шейдер":"Мод"}</span></div>
       </div>
       {detailBusy&&<p className="muted">Завантажуємо опис і версії з Modrinth…</p>}
       {details&&<>
@@ -265,7 +266,7 @@ export default function ModsPanel({version, instanceId, initialProject}: {versio
         {hit.icon_url ? <img className="mod-icon" src={hit.icon_url} alt=""/> : <span className="mod-icon fallback"><Package size={24}/></span>}
         <div className="mod-copy"><button className="fre-mod-open" onClick={()=>void openProject(hit)}><h3>{hit.title}</h3></button>{hit.author&&<div className="fre-mod-author">від {hit.author}</div>}<p>{hit.description}</p><small><DownloadCloud size={13}/>{hit.downloads.toLocaleString("uk-UA")} завантажень {hit.categories?.slice(0,2).map(cat=><span className="fre-mod-tag" key={cat}>{cat}</span>)}</small></div>
         <div className="fre-mod-card-actions">
-          <button className="secondary" onClick={()=>void openProject(hit)}>Детальніше</button>
+          <button className="secondary" onClick={()=>void openProject(hit)}>Відкрити</button>
           {(kind==="mod"||kind==="resourcepack"||kind==="shader")
             ? <button className="secondary" disabled={busy || !selectedInstance || (kind==="mod"&&selectedInstance.loader!=="fabric")} title={kind==="mod"&&selectedInstance?.loader!=="fabric"?"Потрібна Fabric-збірка":"Встановити"} onClick={()=>void install(hit)}>{busy?"...":"Встановити"}</button>
             : <span className="muted">Перегляд</span>}
