@@ -102,26 +102,36 @@ export default function SkinStudio() {
   }
   return <><div className="studio-grid">
     <section className="panel skin-stage">
-      <div className="panel-heading"><h3>FRE SKIN STUDIO</h3><ImagePlus size={19}/></div>
+      <div className="panel-heading"><h3>Перегляд скіна</h3><ImagePlus size={19}/></div>
       <div className="skin-canvas"><canvas ref={canvas} aria-label="3D-попередній перегляд скіна Minecraft"/>{error.includes("3D-перегляд недоступний")&&<img className="fre-skin-fallback" src={skin} alt="PNG-скін персонажа"/>}</div>
-      <p className="muted">Крути персонажа мишкою, змінюй масштаб коліщатком.</p>
+      <p className="muted fre-skin-preview-tip">Перетягни мишкою, щоб повернути персонажа. Коліщатко змінює масштаб.</p>
     </section>
     <section className="panel skin-tools">
-      <h3>Мій персонаж</h3>
-      <div className="fre-skin-status">{custom?"Власний скін":"Стандартний Стів — завантажений локально"}</div>
-      <p>Завантаж власний PNG-скін або плащ. Скін зберігається локально для наступного перегляду.</p>
-      <label className="file-action"><Upload size={18}/> Завантажити скін<input type="file" accept="image/png" onChange={(e) => importImage(e.target.files?.[0],"skin")}/></label>
-      <label className="file-action alt"><Upload size={18}/> Завантажити плащ<input type="file" accept="image/png" onChange={(e) => importImage(e.target.files?.[0],"cape")}/></label>
-      <div className="field-label">Анімація персонажа</div>
-      <div className="segmented">
-        <button className={animation === "idle" ? "selected" : ""} onClick={() => setAnimation("idle")}><Pause size={15}/> Стоїть</button>
-        <button className={animation === "walk" ? "selected" : ""} onClick={() => setAnimation("walk")}><Footprints size={15}/> Ходить</button>
-        <button className={animation === "run" ? "selected" : ""} onClick={() => setAnimation("run")}><Play size={15}/> Біжить</button>
+      <h3>Скін і плащ</h3>
+      <div className="fre-skin-status">{custom?"Власний скін збережено":"Зараз стандартний скін"}</div>
+      <div className="fre-skin-guide">
+        <strong>1. Завантаж PNG</strong>
+        <p>Вибери скін Minecraft 64×64 або 64×32. Побачиш його одразу зліва. Файл зберігається для наступного перегляду.</p>
       </div>
-      <button className="secondary" onClick={() => setSpin(!spin)}><RotateCcw size={16}/> {spin ? "Зупинити обертання" : "Увімкнути обертання"}</button>
-      <button className="secondary" disabled={!custom} onClick={restoreDefault}><RotateCcw size={16}/> Повернути стандартний скін</button>
+      <div className="fre-skin-file-actions">
+        <label className="file-action"><Upload size={18}/> Вибрати скін<input type="file" accept="image/png" aria-label="Вибрати PNG-файл скіна" onChange={(e) => importImage(e.target.files?.[0],"skin")}/></label>
+        <label className="file-action alt"><Upload size={18}/> Вибрати плащ<input type="file" accept="image/png" aria-label="Вибрати PNG-файл плаща" onChange={(e) => importImage(e.target.files?.[0],"cape")}/></label>
+      </div>
+      <div className="fre-skin-controls">
+        <div className="field-label">2. Анімація персонажа</div>
+        <div className="segmented">
+          <button className={animation === "idle" ? "selected" : ""} onClick={() => setAnimation("idle")}><Pause size={15}/> Стоїть</button>
+          <button className={animation === "walk" ? "selected" : ""} onClick={() => setAnimation("walk")}><Footprints size={15}/> Ходить</button>
+          <button className={animation === "run" ? "selected" : ""} onClick={() => setAnimation("run")}><Play size={15}/> Біжить</button>
+        </div>
+        <button className="secondary" onClick={() => setSpin(!spin)}><RotateCcw size={16}/> {spin ? "Зупинити обертання" : "Увімкнути обертання"}</button>
+        <button className="secondary" disabled={!custom} onClick={restoreDefault}><RotateCcw size={16}/> Повернути стандартний скін</button>
+      </div>
       {error && <p className="error">{error}</p>}
-      <p className="muted">Це локальний 3D-перегляд. Застосування скінів до Microsoft-акаунта поки не підтримується.</p>
+      <div className="fre-skin-guide">
+        <strong>Де працюватиме цей скін?</strong>
+        <p>Наразі це лише локальний перегляд і редактор. На Microsoft-акаунт та ігрові сервери скін звідси не завантажується.</p>
+      </div>
     </section>
   </div>{custom && skin && <SkinPixelEditor source={skin} onEdit={applySkin}/>}</>;
 }
