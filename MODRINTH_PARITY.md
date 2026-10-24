@@ -1,3 +1,19 @@
+## New video-based parity pass — 24 October 2026
+
+Reference: user-supplied Windows recording of Modrinth App 0.22.0 (not a website screenshot). FRE LAUNCH keeps its own brand, code and data directories. **"Without hosts" excludes paid/commercial server hosting, not multiplayer BedWars/Survival servers.**
+
+- [x] Replaced the older home dashboard with the current Modrinth-like unified **Play**: Jump In list with real Play actions, instance-library grid/list, search and sorting, color/icon customizer, local groups, right onboarding/account pane.
+- [x] The Discover view now has a right-hand category-filter sidebar driven by validated Modrinth search facets, the five content tabs plus a shortcut to ordinary multiplayer servers, and a real project-detail view.
+- [x] Instance detail follows the video: large title, loader/RAM subline, native Play button, settings shortcut, pill-like Content/Files/Worlds/Logs/Settings tabs and real file toggles.
+- [x] The instance-creation dialog now asks how to create a profile and supports real Vanilla/Fabric/Quilt setup using loaders returned by the Rust backend.
+- [x] Settings are a centered category-driven dialog; its appearance, RAM and visible-tab switches are real persisted controls. Sections with unsupported operations do not pretend to work.
+- [x] Vanilla multiplayer server IP/status/favorites list remains available; no commercial hosting UI.
+- [x] Kept the local skin gallery, 3D preview and editor as FRE-owned features.
+
+**Remaining differences from Modrinth:** pixel-perfect Windows screenshot comparison across all screens, real .mrpack import/install, all official default skin variants and licensed Minecraft cape selection, cloud sync, complete language translations, fully authorized persistent Microsoft accounts, automatic mod update replacement, Forge/NeoForge installers, exact file upload/drag-drop behavior, and full native Windows controls.
+
+**Build status:** Changes have been committed to GitHub but **not compiled or launched on the user's Windows machine in this edit**. A prior Cargo resolver error caused by the nonexistent reqwest "form" feature was fixed in Cargo.toml; a new local Rust check is required before calling this working. The previously reported Defender detection on v0.5.5 remains unresolved; do not disable Defender or restore flagged installers.
+
 # FRE LAUNCH / Modrinth App visual and functional parity
 
 Our goal is a close reproduction of the **Modrinth App desktop interaction model** in independent, editable React + Tauri/Rust code, without embedding Modrinth's app source or impersonating its brand. Reference: https://modrinth.com/app and https://github.com/modrinth/code. Never claim that unfinished functions are operational.
