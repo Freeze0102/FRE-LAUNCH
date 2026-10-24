@@ -21,7 +21,7 @@ type Tab="content"|"worlds"|"files"|"settings"|"logs";
 type Props={
   version:string;active:string;setActive:(id:string)=>void;
   setVersion:(v:string)=>void;setMemory:(mb:number)=>void;
-  navigateHome:()=>void;navigateMods:()=>void;navigateVersions:()=>void;
+  navigateHome:()=>void;navigateMods:()=>void;navigateVersions:()=>void;requestedId?:string;
 };
 const categories:{id:Category;label:string}[]=[
   {id:"mods",label:"Моди"},{id:"resourcepacks",label:"Ресурс-паки"},{id:"shaderpacks",label:"Шейдери"}
@@ -31,7 +31,7 @@ function loaderLabel(instance:Instance){
 }
 function sizeLabel(bytes:number){return bytes>=1048576?(bytes/1048576).toFixed(1)+" MB":Math.round(bytes/1024)+" KB";}
 
-export function InstancesPanel({version,active,setActive,setVersion,setMemory,navigateHome,navigateMods,navigateVersions}:Props){
+export function InstancesPanel({version,active,setActive,setVersion,setMemory,navigateHome,navigateMods,navigateVersions,requestedId}:Props){
   const [instances,setInstances]=useState<Instance[]>([]);
   const [search,setSearch]=useState("");
   const [sort,setSort]=useState("name");
@@ -53,6 +53,7 @@ export function InstancesPanel({version,active,setActive,setVersion,setMemory,na
   const [error,setError]=useState("");
   const [notice,setNotice]=useState("");
 
+  useEffect(()=>{if(requestedId)setSelected(requestedId);},[requestedId]);
   const current=instances.find(item=>item.id===selected)||null;
   const filtered=useMemo(()=>{
     const items=instances.filter(item=>(item.name+" "+item.version+" "+item.loader).toLowerCase().includes(search.toLowerCase()));
