@@ -1,0 +1,132 @@
+/* FRE LAUNCH shell: compact icon navigation inspired by the open-source
+   Modrinth desktop UI. Original FRE assets and branding only. */
+@media (min-width: 631px) {
+  .fre-app .fre-rail {
+    width: 68px!important;
+    min-width: 68px!important;
+    max-width: 68px!important;
+    padding: 8px 0 4px;
+    align-items: center;
+    border-right: 1px solid #34363d!important;
+    background: #191b20!important;
+  }
+  .fre-app .fre-identity {
+    justify-content: center;
+    width: 52px;
+    min-height: 49px;
+    padding: 2px;
+    margin: 2px 0 6px;
+    flex: 0 0 auto;
+  }
+  .fre-app .fre-identity-mark {
+    width: 39px;
+    height: 39px;
+    font-size: 29px;
+    letter-spacing: -2px;
+    border-radius: 12px!important;
+  }
+  .fre-app .fre-identity-word,
+  .fre-app .fre-rail-divider,
+  .fre-app .fre-nav-label,
+  .fre-app .fre-nav-index,
+  .fre-app .fre-build-status,
+  .fre-app .fre-status-live {display: none!important}
+  .fre-app .fre-nav {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 5px 5px 9px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: none;
+  }
+  .fre-app .fre-nav::-webkit-scrollbar {display: none}
+  .fre-app .fre-nav-link {
+    width: 46px!important;
+    min-width: 46px!important;
+    min-height: 44px!important;
+    height: 44px!important;
+    margin-inline: auto;
+    flex: 0 0 auto;
+    padding: 6px!important;
+    border-radius: 13px!important;
+    justify-content: center!important;
+    gap: 0;
+    background: transparent;
+  }
+  .fre-app .fre-nav-link.is-active {
+    background: #284733!important;
+    color: #60ed96!important;
+  }
+  .fre-app .fre-nav-link.fre-sidebar-instance {
+    padding: 4px!important;
+    min-height: 43px!important;
+    height: 43px!important;
+  }
+  .fre-app .fre-sidebar-avatar {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    border-radius: 11px;
+  }
+  .fre-app .fre-sidebar-add {
+    border: 1px dashed #484b53!important;
+    background: #292b31!important;
+  }
+  .fre-app .fre-sidebar-divider {
+    width: 32px;
+    margin: 8px auto;
+  }
+  .fre-app .fre-rail-foot {display: none!important}
+  .fre-app .fre-updates {
+    width: 100%;
+    border: 0;
+    background: transparent!important;
+    margin: 0;
+    padding: 2px 0 4px;
+  }
+  .fre-app .fre-updates-trigger {
+    width: 46px;
+    height: 44px;
+    min-height: 44px;
+    margin: auto;
+    padding: 10px;
+    gap: 0;
+    justify-content: center;
+    border-radius: 12px;
+    color: #b3cbb8;
+    background: #262b2a;
+  }
+  .fre-app .fre-updates-trigger > span,
+  .fre-app .fre-updates-trigger > svg:last-child {display: none}
+  .fre-app .fre-updates-body {
+    position: fixed;
+    left: 76px!important;
+    bottom: 14px!important;
+    width: min(360px, calc(100vw - 90px))!important;
+    max-height: min(75vh, 620px);
+    box-shadow: 0 16px 52px #000a;
+    border-radius: 14px;
+  }
+  .fre-app .fre-commandbar {
+    min-height: 52px;
+    height: 52px;
+    padding: 0 25px;
+  }
+  .fre-app .fre-command-left {font-size: 12px;gap: 9px}
+  .fre-app .fre-command-square {width: 27px;height: 27px}
+}
+/* Account flow fits the same rounded controls as the main app. */
+.fre-app .fre-ms-account {border-color: #3d4148;background: #24262c}
+.fre-app .fre-ms-form {display: flex;flex-wrap: wrap;align-items: stretch;gap: 9px}
+.fre-app .fre-ms-form > button {display: inline-flex;align-items: center;justify-content: center;gap: 7px;min-height: 43px;padding: 9px 13px}
+.fre-app .fre-ms-challenge {background: #1c3426;border-color: #42704d}
+.fre-app .fre-ms-challenge-actions {display: flex;flex-wrap: wrap;align-items: center;gap: 10px}
+.fre-app .fre-ms-challenge-actions > button {display: inline-flex;align-items: center;gap: 7px;min-height: 36px}
+.fre-app .fre-ms-challenge-actions > a {padding: 8px 4px}
+.fre-app .fre-ms-challenge > small {color: #9bdcaf;font-size: 11px}
+@media (max-width: 630px) {
+  .fre-app .fre-ms-form > button {width: 100%}
+  .fre-app .fre-ms-challenge-actions {align-items: stretch;flex-direction: column}
+}
