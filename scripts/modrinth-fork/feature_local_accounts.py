@@ -200,6 +200,8 @@ const messages = defineMessages({
     p=root/"apps/app-frontend/src/features/minecraft-accounts/accounts-card.vue"
     exactly(p, "\tprofile: {\n\t\tid: string\n\t\tname: string\n\t}\n}",
         "\tprofile: {\n\t\tid: string\n\t\tname: string\n\t}\n\taccess_token?: string\n}")
+    exactly(p, "{{ formatMessage(messages.minecraftAccount) }}",
+        "{{ selectedAccount?.access_token?.startsWith('fre-offline:') ? formatMessage(messages.offline) : formatMessage(messages.minecraftAccount) }}")
     exactly(p, '{{ account.profile.name }}',
         '{{ account.profile.name }} <span v-if="account.access_token?.startsWith(\'fre-offline:\')" class="text-xs text-secondary">({{ formatMessage(messages.offline) }})</span>')
     exactly(p, "\tminecraftAccount: {\n",
