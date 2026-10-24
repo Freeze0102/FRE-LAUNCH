@@ -11,7 +11,7 @@ import GameFolders from "./GameFolders";
 import UpdateCenter from "./UpdateCenter";
 import HomeDashboard from "./HomeDashboard";
 import { LAST_UI_CRASH } from "./ErrorBoundary";
-import { InstancesPanel } from "./Features";
+import { InstancesPanel } from "./InstanceLibrary";
 import ModsPanel from "./ModsPanel";
 // Avoid evaluating Three.js/WebGL while the launcher is only showing the home screen.
 const SkinStudio = lazy(() => import("./SkinStudio"));
@@ -373,7 +373,7 @@ export default function App() {
 
         {task==="installing" && progress && <div className="fre-install-activity" aria-live="polite"><div><span>ПРОЦЕС: {stages[progress.stage]??progress.stage.toUpperCase()}</span><strong>{progress.message}</strong></div><span className="fre-install-percent">{percent}%</span><div className="fre-install-track"><div style={{width:percent+"%"}}/></div><button onClick={()=>setPage("Downloads")}>ДЕТАЛІ <ArrowRight size={14}/></button></div>}
 
-        {page==="Instances"&&<div className="fre-module"><InstancesPanel version={selected} active={activeInstanceId} setActive={setActiveInstanceId} setVersion={setSelected} setMemory={setMemoryMb} navigateHome={()=>setPage("Home")}/></div>}
+        {page==="Instances"&&<div className="fre-module"><InstancesPanel version={selected} active={activeInstanceId} setActive={setActiveInstanceId} setVersion={setSelected} setMemory={setMemoryMb} navigateHome={()=>setPage("Home")} navigateMods={()=>setPage("Mods")} navigateVersions={()=>setPage("Versions")}/></div>}
         {page==="Mods"&&<div className="fre-module"><ModsPanel version={selected} instanceId={activeInstanceId}/></div>}
         {page==="Skins"&&<div className="fre-module"><Suspense fallback={<div className="fre-log-mini-empty">Завантажуємо 3D-студію скінів…</div>}><SkinStudio/></Suspense></div>}
               {page==="Screenshots"&&<div className="fre-module"><ScreenshotsPanel instanceId={activeInstanceId}/></div>}
