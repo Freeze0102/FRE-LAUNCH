@@ -1,3 +1,13 @@
+## Local Modrinth pack import and visual parity pass
+
+- [x] Native Windows `.mrpack` picker from Play, Discover and the Create Instance wizard (`@tauri-apps/plugin-dialog`); only .mrpack files, regular-file metadata and 128 MiB cap accepted.
+- [x] Reused a single Rust archive installer for catalog downloads and local archives: `modrinth.index.json`, validated paths/hosts/checksums, staged files, per-file progress and independent game profile creation.
+- [x] Corrected the Modrinth archive layering rule: `client-overrides/` overlays same-named content from `overrides/`; duplicates in the same layer remain rejected.
+- [x] Online Modrinth modpack installs persist project-icon URLs keyed by profile ID for Play and profile-library artwork instead of always drawing random emojis. User-customized profile icons remain higher priority.
+- [x] Preserved Minecraft multiplayer server browsing; no paid Hosting flow.
+- [ ] Still missing modpack export, importing full Forge/NeoForge packs, cloud synchronization, cross-instance settings sharing and fully verified premium Microsoft login.
+- [ ] Full Windows `npm run check` and `cargo check` plus actual test of file import are **not yet executed**. Treat the feature as experimental until tested.
+
 ## Minecraft crash and Microsoft login pass
 
 - [x] Minecraft now reports nonzero Java process exit code, shows log/crash-report paths and classifies common mod/Java/OOM errors. This does **not** establish the cause of a particular user's crash without the actual latest.log or report.
@@ -22,7 +32,7 @@ Implemented in FRE LAUNCH with independent source files:
 - `src-tauri/src/microsoft.rs`: Minecraft Services skin PNG multipart upload, Classic/Slim model, and default-skin reset without sending tokens to JavaScript.
 - `src/SkinStudio.tsx`: explicit local preview versus real account upload; real upload requires active authenticated premium Minecraft session and a permitted Microsoft client registration.
 
-**Limits**: no `.mrpack` file-picker/import-from-disk yet, Forge and NeoForge modpacks rejected explicitly, client-optional files currently installed automatically, server-only files skipped, large packs and unsupported external hosts rejected for security, no complete rollback guarantee after unusual filesystem failures. Do not treat this as full functional parity with Modrinth. **Windows Rust+TypeScript compilation and live modpack/skin tests have not yet run**, and the new code may require fixes in the local build.
+**Limits**: `.mrpack` file picker/import-from-disk is now implemented with the native Windows Tauri dialog, but Forge and NeoForge modpacks remain rejected explicitly, client-optional files currently installed automatically, server-only files skipped, large packs and unsupported external hosts rejected for security, no complete rollback guarantee after unusual filesystem failures. Do not treat this as full functional parity with Modrinth. **Windows Rust+TypeScript compilation and live modpack/skin tests have not yet run**, and the new code may require fixes in the local build.
 
 ## New video-based parity pass — 24 October 2026
 
@@ -36,7 +46,7 @@ Reference: user-supplied Windows recording of Modrinth App 0.22.0 (not a website
 - [x] Vanilla multiplayer server IP/status/favorites list remains available; no commercial hosting UI.
 - [x] Kept the local skin gallery, 3D preview and editor as FRE-owned features.
 
-**Remaining differences from Modrinth:** pixel-perfect Windows screenshot comparison across all screens, real .mrpack import/install, all official default skin variants and licensed Minecraft cape selection, cloud sync, complete language translations, fully verified/approved Microsoft application registration and account sign-in, automatic mod update replacement, Forge/NeoForge installers, exact file upload/drag-drop behavior, and full native Windows controls.
+**Remaining differences from Modrinth:** pixel-perfect Windows screenshot comparison across all screens, tested real-world .mrpack installs, all official default skin variants and licensed Minecraft cape selection, cloud sync, complete language translations, fully verified/approved Microsoft application registration and account sign-in, automatic mod update replacement, Forge/NeoForge installers, exact file upload/drag-drop behavior, and full native Windows controls.
 
 **Build status:** Changes have been committed to GitHub but **not compiled or launched on the user's Windows machine in this edit**. A prior Cargo resolver error caused by the nonexistent reqwest "form" feature was fixed in Cargo.toml; a new local Rust check is required before calling this working. The previously reported Defender detection on v0.5.5 remains unresolved; do not disable Defender or restore flagged installers.
 
@@ -60,7 +70,7 @@ Our goal is a close reproduction of the **Modrinth App desktop interaction model
 ## Not yet equivalent to Modrinth
 
 - [ ] **Pixel-perfect 1:1 verification:** screenshots at each viewport resolution have not been manually compared in a running Windows app. Spacing, animations, icons, fonts, and modal microinteractions still need visual QA.
-- [ ] Modpack creation/installation and `.mrpack` import/export.
+- [x] `.mrpack` online installer plus native local import (not yet Windows-tested; export remains unsupported).
 - [ ] Forge / NeoForge instance installation.
 - [ ] Complete dependency resolver and atomic in-place mod updates.
 - [x] One Microsoft account: refresh-token storage in Windows Credential Manager and attempted automatic session restoration (not yet tested on an approved live Minecraft application). Multi-account management remains unimplemented.
