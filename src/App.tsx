@@ -254,6 +254,10 @@ export default function App() {
     void invoke<InstallPreflight>("install_preflight").then(setPreflight).catch(e=>setPreflight({path:"",ready:false,detail:humanError(e)}));
     void refreshVersions(true);
     void invoke<string>("java_info").then(setJava).catch(e=>setJava("Java в PATH не знайдена: "+humanError(e)));
+    void invoke<MicrosoftAccount|null>("microsoft_current_account").then(account=>{
+      if(account){setMicrosoftAccount(account);setUseMicrosoft(true);setNickname(account.name);}
+    }).catch(()=>{});
+
     const a=listen<Progress>("install-progress",event=>setProgress(event.payload));
     const b=listen<string>("game-log",event=>setLogs(prev=>[...prev.slice(-499),event.payload]));
     const c=listen<string>("game-status",event=>{
@@ -283,8 +287,8 @@ export default function App() {
     (filter==="all"||v.type===filter)&&v.id.toLowerCase().includes(search.toLowerCase())
   ).slice(0,120),[versions,search,filter]);
 
-  async function installVersion(version:string) {
-    if(!version||busyRef.current)return;
+  async function installVersion(version:string):Promise<boolean> {
+    if(!version||busyRef.current)return false;
     busyRef.current=true;
     activeVersionRef.current=version;
     markInstall(version,"installing");
@@ -299,11 +303,13 @@ export default function App() {
       markInstall(version,"complete",result);
       setMessage(result);
       if(useApp.getState().selected===version)setInstalled(true);
+      return true;
     }catch(e){
       markInstall(version,"error",humanError(e));
       setError(humanError(e));
       setPage("Downloads");
       void loadDiagnostics();
+      return false;
     }finally{
       busyRef.current=false;
       setTask("idle");
@@ -323,7 +329,10 @@ export default function App() {
     }
     try{
       const ready=target?await invoke<boolean>("is_installed",{version:playVersion}):installed;
-      if(!ready){await installVersion(playVersion);return;}
+      if(!ready){
+        const installedNow=await installVersion(playVersion);
+        if(!installedNow)return;
+      }
     }catch(e){setError("Не вдалося перевірити Minecraft: "+humanError(e));return;}
     busyRef.current=true;
     setTask("launching");setError("");setMessage("");setLogs([]);setGameCrash(null);
