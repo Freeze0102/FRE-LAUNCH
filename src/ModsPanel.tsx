@@ -127,11 +127,18 @@ export default function ModsPanel({version, instanceId, initialProject, onServer
     (opened?.project_type!=="mod"||v.loaders.includes(selectedInstance?.loader||"fabric"))))??[];
   const shownVersions=showAllVersions?details?.versions??[]:compatibleVersions;
   async function installSelected() {
-    if(!opened||!selectedInstance||!instanceId){setError("Спочатку обери збірку.");return;}
-    if(!chosenVersion){setError("Немає сумісної версії для обраної збірки.");return;}
-    setBusy(true);setError("");setMessage("");
+    if(!opened)return;
+    if(opened.project_type!=="modpack"&&(!selectedInstance||!instanceId)){setError("Спочатку обери збірку.");return;}
+    if(!chosenVersion){setError("Спочатку обери версію проєкту.");return;}
+    setBusy(true);setError("");setMessage("");setPackProgress(null);
     try {
-      if(opened.project_type==="mod") {
+      if(opened.project_type==="modpack"){
+        const created=await invoke<{id:string;name:string;version:string;memoryMb:number}>("install_modrinth_modpack",{
+          projectId:opened.project_id,versionId:chosenVersion
+        });
+        setMessage("Модпак встановлено: "+created.name+" · "+created.version);
+        onPackInstalled?.(created);
+      } else if(opened.project_type==="mod") {
         if(selectedInstance.loader!=="fabric")throw Error("Зараз автоматичне встановлення модів підтримує Fabric. Обери Fabric-збірку.");
         const update=modUpdates.find(u=>u.projectId===opened.project_id && u.versionId===chosenVersion);
         if(update && installed.some(m=>m.filename===update.filename && m.enabled)){
@@ -145,14 +152,19 @@ export default function ModsPanel({version, instanceId, initialProject, onServer
         const response=await invoke<string>(command,{instanceId,projectId:opened.project_id,versionId:chosenVersion});
         setMessage(opened.project_type==="shader"?`${response}. Для роботи шейдерів також потрібен Iris або інший сумісний шейдерний завантажувач.`:response);
         await refreshMods();
-      } else {throw Error("Імпорт модпаків поки не підтримується; не встановлюємо збірку частково.");}
+      } else {throw Error("Для цієї категорії автоматичне встановлення поки недоступне.");}
     } catch(e){setError(String(e));}finally{setBusy(false);}
   }
 
   async function install(hit: ModrinthHit) {
-    if (!instanceId || !selectedInstance){setError("Спочатку створи та обери Minecraft-збірку.");return;}
-    setBusy(true);setError("");setMessage("");
+    if(hit.project_type!=="modpack"&&(!instanceId||!selectedInstance)){setError("Спочатку створи та обери Minecraft-збірку.");return;}
+    setBusy(true);setError("");setMessage("");setPackProgress(null);
     try {
+      if(hit.project_type==="modpack"){
+        const created=await invoke<{id:string;name:string;version:string;memoryMb:number}>("install_modrinth_modpack",{projectId:hit.project_id});
+        setMessage("Модпак встановлено: "+created.name+" · "+created.version);
+        onPackInstalled?.(created);
+      } else
       if (kind==="resourcepack"||kind==="shader") {
         const command=kind==="shader"?"install_shaderpack":"install_resourcepack";
         const response=await invoke<string>(command,{instanceId,projectId:hit.project_id});
