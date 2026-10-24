@@ -84,3 +84,9 @@
 @media(min-width:1450px){.fre-app .fre-discover-shell .mod-grid>.mod-card{grid-template-columns:64px minmax(0,1fr) auto!important;grid-template-areas:"icon copy actions"!important}.fre-app .fre-discover-shell .mod-grid .fre-mod-card-actions{border-top:0;padding:0;justify-content:initial}}
 @media(max-width:960px){.fre-discover-shell{grid-template-columns:minmax(0,1fr) 190px;gap:10px}.fre-discover-sidebar{max-height:calc(100vh - 85px)}}
 @media(max-width:680px){.fre-discover-shell{display:flex;flex-direction:column}.fre-discover-main{width:100%}.fre-discover-sidebar{position:static;width:100%;max-height:250px}.fre-app .fre-discover-shell .mod-grid>.mod-card{grid-template-columns:54px minmax(0,1fr)!important}}
+
+.fre-discover-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.fre-discover-import{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid #3f7d54;border-radius:9px;background:#2b4f38;color:#a8edbd;font-size:11px;font-weight:700;padding:9px 12px;white-space:nowrap}
+.fre-discover-import:hover:not(:disabled){background:#356948;color:#f0fff1}
+.fre-discover-import:disabled{opacity:.5}
+@media(max-width:600px){.fre-discover-actions{width:100%}.fre-discover-actions button{flex:1}}
