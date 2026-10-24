@@ -53,10 +53,10 @@ goto failed
 echo.
 echo [1/2] Installing dependencies...
 call npm install --no-audit --no-fund
-if errorlevel 1 goto failed
+if errorlevel 1 exit /b 1
 echo [2/2] Generating application icons...
 call npm run tauri icon src-tauri/icons/app.svg
-if errorlevel 1 goto failed
+if errorlevel 1 exit /b 1
 exit /b 0
 
 :dev
