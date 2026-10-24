@@ -132,3 +132,47 @@
   .fre-app .fre-ms-form > button {width: 100%}
   .fre-app .fre-ms-challenge-actions {align-items: stretch;flex-direction: column}
 }
+
+.fre-app .freplay-quick-nick {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-top: 11px;
+}
+.fre-app .freplay-quick-nick > label {
+  color: #b9c4bd;
+  font-size: 10px;
+  font-weight: 700;
+}
+.fre-app .freplay-quick-nick > div {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+}
+.fre-app .freplay-quick-nick input {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  height: 33px;
+  padding: 7px 9px;
+  border: 1px solid #454951;
+  border-radius: 8px;
+  background: #171b1d;
+  color: #edf3ef;
+  font-size: 11px;
+}
+.fre-app .freplay-quick-nick button {
+  flex: 0 0 33px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: #34d878;
+  color: #0a291a;
+}
+.fre-app .freplay-quick-nick button:disabled {opacity: .4}
+.fre-app .freplay-quick-nick small {
+  font-size: 10px;
+  line-height: 1.4;
+  color: #a8b7ad;
+}
