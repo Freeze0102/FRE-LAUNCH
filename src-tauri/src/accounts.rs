@@ -52,6 +52,36 @@ pub fn create_offline_account(app: AppHandle, nickname: String) -> Result<Offlin
     Ok(account)
 }
 
+/// Select/create an offline nickname in one action, as in nickname-based launchers.
+/// Idempotent, case-insensitive, and returns the stable existing account UUID.
+#[tauri::command]
+pub fn ensure_offline_account(app:AppHandle,nickname:String)->Result<OfflineAccount,String>{
+    let nickname=nickname.trim();
+    if nickname.is_empty()||nickname.len()>16||
+        !nickname.bytes().all(|b|b.is_ascii_alphanumeric()||b==b'_'){
+        return Err("Нікнейм має містити 1–16 латинських літер, цифр або _".into());
+    }
+    let conn=table(&app)?;
+    let existing=conn.query_row(
+        "SELECT id,nickname,offline_uuid FROM offline_accounts WHERE nickname=?1 COLLATE NOCASE LIMIT 1",
+        params![nickname],
+        |r|Ok(OfflineAccount{id:r.get(0)?,nickname:r.get(1)?,offline_uuid:r.get(2)?})
+    );
+    match existing{
+        Ok(found)=>return Ok(found),
+        Err(rusqlite::Error::QueryReturnedNoRows)=>{},
+        Err(e)=>return Err(format!("Помилка читання профілю: {e}"))
+    }
+    let account=OfflineAccount{
+        id:Uuid::new_v4().to_string(),nickname:nickname.into(),offline_uuid:offline_uuid(nickname)
+    };
+    conn.execute(
+        "INSERT INTO offline_accounts (id,nickname,offline_uuid) VALUES (?1,?2,?3)",
+        params![account.id,account.nickname,account.offline_uuid]
+    ).map_err(|e|format!("Не вдалося зберегти нік: {e}"))?;
+    Ok(account)
+}
+
 #[tauri::command]
 pub fn delete_offline_account(app: AppHandle, id: String) -> Result<(), String> {
     Uuid::parse_str(&id).map_err(|_| "Invalid offline account ID")?;
@@ -63,6 +93,11 @@ pub fn delete_offline_account(app: AppHandle, id: String) -> Result<(), String> 
 #[cfg(test)]
 mod tests{
     use super::*;
+    #[test] fn account_name_is_not_a_microsoft_login(){
+        let uuid=offline_uuid("SomeNickname");
+        assert_eq!(uuid,offline_uuid("SomeNickname"));
+        assert_ne!(uuid,offline_uuid("AnotherNickname"));
+    }
     #[test] fn deterministic_profile_uuid(){
        assert_eq!(offline_uuid("Player"),offline_uuid("Player"));
        assert_ne!(offline_uuid("Player"),offline_uuid("Player2"));
