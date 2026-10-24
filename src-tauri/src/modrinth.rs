@@ -53,7 +53,7 @@ fn validate_project_id(id: &str) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn search_modrinth(query: String, version: Option<String>, project_type: String, offset: Option<u32>, loader: Option<String>, sort: Option<String>) -> Result<Vec<ModrinthHit>, String> {
+pub async fn search_modrinth(query: String, version: Option<String>, project_type: String, offset: Option<u32>, loader: Option<String>, sort: Option<String>, category: Option<String>) -> Result<Vec<ModrinthHit>, String> {
     if query.chars().count() > 100 { return Err("Search is too long".into()); }
     if !["mod", "resourcepack", "shader", "modpack", "datapack"].contains(&project_type.as_str()) {
         return Err("Invalid Modrinth search category".into());
@@ -64,6 +64,14 @@ pub async fn search_modrinth(query: String, version: Option<String>, project_typ
     if let Some(version) = version.filter(|s| !s.is_empty()) {
         super::minecraft::validate_version(&version)?;
         facets.push(vec![format!("versions:{version}")]);
+    }
+    if let Some(category)=category.filter(|s|!s.is_empty()) {
+        // Categories are facets, not a file path or an executable argument.
+        // Restrict to Modrinth slugs only, to avoid overly large or malformed requests.
+        if category.len()>32 || !category.bytes().all(|x|x.is_ascii_lowercase() || x==b'-' || x.is_ascii_digit()) {
+            return Err("Некоректна категорія Modrinth".into());
+        }
+        facets.push(vec![format!("categories:{category}")]);
     }
     if project_type=="mod" {
         if let Some(loader) = loader.filter(|s|!s.is_empty()) {
