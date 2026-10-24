@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeSanitize from "rehype-sanitize";
@@ -37,13 +38,17 @@ const categoryLists:Record<string,{id:string;label:string}[]>={
     {id:"utility",label:"Утиліти"},{id:"worldgen",label:"Генерація світу"}]
 };
 
-export default function ModsPanel({version, instanceId, initialProject, onServers}: {version: string; instanceId: string; initialProject?: ModrinthHit | null; onServers?:()=>void}) {
+export default function ModsPanel({version, instanceId, initialProject, onServers, onPackInstalled}: {
+  version: string; instanceId: string; initialProject?: ModrinthHit | null;
+  onServers?:()=>void;
+  onPackInstalled?:(instance:{id:string;name:string;version:string;memoryMb:number})=>void;
+}) {
   const [query,setQuery]=useState("");
   const [view,setView]=useState<"browse"|"library">("browse");
   const [kind,setKind]=useState("modpack");
   const [categoryFilter,setCategoryFilter]=useState("");
   const [hits,setHits]=useState<ModrinthHit[]>([]);
-  const [onlyCompatible,setOnlyCompatible]=useState(true);
+  const [onlyCompatible,setOnlyCompatible]=useState(false);
   const [sort,setSort]=useState("relevance");
   const searchSequence=useRef(0);
   const [offset,setOffset]=useState(0);
@@ -63,6 +68,8 @@ export default function ModsPanel({version, instanceId, initialProject, onServer
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
   const [message,setMessage]=useState("");
+  const [packProgress,setPackProgress]=useState<{current:number;total:number;message:string}|null>(null);
+  useEffect(()=>{const p=listen<{current:number;total:number;message:string}>("fre-modpack-progress",e=>setPackProgress(e.payload));return()=>{void p.then(stop=>stop());};},[]);
 
   async function refreshMods() {
     if (!instanceId) {setSelectedInstance(null);setInstalled([]);setResourcepacks([]);setShaderpacks([]);setModUpdates([]);return;}
@@ -104,7 +111,7 @@ export default function ModsPanel({version, instanceId, initialProject, onServer
     try {
       const data=await invoke<ModDetails>("modrinth_project_details",{projectId:hit.project_id});
       setDetails(data);
-      const matches=data.versions.filter(v=>v.game_versions.includes(version)&& (hit.project_type!=="mod"||v.loaders.includes(selectedInstance?.loader||"fabric")));
+      const matches=hit.project_type==="modpack"?data.versions:data.versions.filter(v=>v.game_versions.includes(version)&& (hit.project_type!=="mod"||v.loaders.includes(selectedInstance?.loader||"fabric")));
       setChosenVersion(matches.find(v=>v.id===preferredVersionId)?.id||matches[0]?.id||"");
     } catch(e){setError(String(e));}
     finally{setDetailBusy(false);}
@@ -116,8 +123,8 @@ export default function ModsPanel({version, instanceId, initialProject, onServer
     void openProject(initialProject);
     // Navigating to a different home discovery card changes the project ID.
   },[initialProject?.project_id]);
-    const compatibleVersions=details?.versions.filter(v=>v.game_versions.includes(version)&&
-    (opened?.project_type!=="mod"||v.loaders.includes(selectedInstance?.loader||"fabric")))??[];
+    const compatibleVersions=details?.versions.filter(v=>opened?.project_type==="modpack"||(v.game_versions.includes(version)&&
+    (opened?.project_type!=="mod"||v.loaders.includes(selectedInstance?.loader||"fabric"))))??[];
   const shownVersions=showAllVersions?details?.versions??[]:compatibleVersions;
   async function installSelected() {
     if(!opened||!selectedInstance||!instanceId){setError("Спочатку обери збірку.");return;}
