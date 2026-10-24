@@ -625,6 +625,9 @@ async fn launch_inner(app: AppHandle, version: String, nickname: String, memory_
     let classpath = cp.join(if cfg!(windows) { ";" } else { ":" });
     // The launcher passes a compact 32-digit Mojang-style UUID argument.
     let (uuid, auth_token, user_type) = if use_microsoft {
+        // An expired Minecraft access token can be transparently refreshed
+        // from the user-owned Windows Credential Manager before launching.
+        let _=super::microsoft::microsoft_restore_login().await?;
         let (id,token) = super::microsoft::launch_credentials(&nickname)?;
         (id.replace('-',""), token, "msa")
     } else {(stable_uuid(&nickname).replace('-', ""), "0".to_string(), "legacy")};
