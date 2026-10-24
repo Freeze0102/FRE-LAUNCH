@@ -124,3 +124,13 @@
   .fre-instance-content-columns>span:nth-child(2),.fre-instance-file>span:nth-child(2){display:none}
   .fre-instance-content-columns,.fre-instance-file{grid-template-columns:minmax(0,1fr) 47px 35px}
 }
+
+/* Read-only world cards, backed by level.dat in each instance's saves folder. */
+.fre-instance-world-list{display:flex;flex-direction:column;gap:9px;margin:10px 0 20px}
+.fre-instance-world{display:flex;align-items:center;gap:12px;min-height:76px;padding:12px 14px;border:1px solid #3b4046;border-radius:10px;background:#282b33}
+.fre-instance-world-art{display:grid;place-items:center;width:51px;height:51px;flex-shrink:0;border-radius:9px;background:#34463b;color:#b8ecbd}
+.fre-instance-world>div:nth-child(2){display:flex;flex-direction:column;gap:6px;flex:1;min-width:0}
+.fre-instance-world strong{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fre-instance-world small{font-size:11px;color:#a2adb3}
+.fre-instance-world .secondary{display:inline-flex;align-items:center;gap:6px;padding:9px 11px;font-size:11px}
+@media(max-width:520px){.fre-instance-world{flex-wrap:wrap}.fre-instance-world .secondary{margin-left:auto}}
