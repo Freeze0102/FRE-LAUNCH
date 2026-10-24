@@ -8,6 +8,56 @@ use tauri::{AppHandle, Emitter, Manager};
 use tokio::{fs, io::{AsyncReadExt, AsyncSeekExt}, process::Command};
 use uuid::Uuid;
 
+
+#[derive(Clone,Serialize)]
+#[serde(rename_all="camelCase")]
+struct GameCrash {
+    version:String,
+    instance_id:Option<String>,
+    exit_code:Option<i32>,
+    summary:String,
+    log_path:String,
+    crash_report_path:Option<String>,
+}
+fn log_tail(path:&Path,max:u64)->String{
+    use std::io::{Read,Seek,SeekFrom};
+    let Ok(mut file)=std::fs::File::open(path) else{return String::new();};
+    let size=file.metadata().map(|m|m.len()).unwrap_or(0);
+    let _=file.seek(SeekFrom::Start(size.saturating_sub(max)));
+    let mut bytes=Vec::new();
+    if file.read_to_end(&mut bytes).is_err(){return String::new();}
+    String::from_utf8_lossy(&bytes).into_owned()
+}
+fn crash_hint(text:&str)->&'static str{
+    if text.contains("OutOfMemoryError")||text.contains("Java heap space"){
+        "Minecraft бракує RAM. Збільш пам'ять цієї збірки або приберіть важкі моди."
+    }else if text.contains("UnsupportedClassVersionError")||text.contains("class file version"){
+        "Мод або бібліотека потребує іншої версії Java. Перевір Java для цього модпака."
+    }else if text.contains("ModResolutionException")||text.contains("Incompatible mod set")||text.contains("requires any version of"){
+        "Конфлікт модів або відсутня залежність. Перевір список модів та їхні версії."
+    }else if text.contains("MixinApplyError")||text.contains("Mixin transformation of"){
+        "Помилка Mixin: можливий конфлікт модів чи невідповідність їхніх версій."
+    }else if text.contains("NoClassDefFoundError")||text.contains("ClassNotFoundException"){
+        "Бракує класу/залежності або встановлено несумісну версію мода."
+    }else if text.contains("GLFW error")||text.contains("OpenGL")||text.contains("Failed to create window"){
+        "Можлива помилка відеодрайвера або OpenGL. Перевір драйвери відеокарти."
+    }else{
+        "Minecraft завершився аварійно. Перевір crash-report та latest.log; точну причину встановлює журнал."
+    }
+}
+fn recent_crash_report(directory:&Path,since:std::time::SystemTime)->Option<String>{
+    let mut found=None;
+    let mut latest=since;
+    for entry in std::fs::read_dir(directory.join("crash-reports")).ok()?.flatten(){
+        let Ok(meta)=entry.metadata() else{continue;};
+        let Ok(modified)=meta.modified() else{continue;};
+        if meta.is_file()&&modified>=latest&&entry.file_name().to_string_lossy().ends_with(".txt"){
+            latest=modified;found=Some(entry.path().to_string_lossy().into_owned());
+        }
+    }
+    found
+}
+
 static RUNNING: AtomicBool = AtomicBool::new(false);
 static INSTALLING: AtomicBool = AtomicBool::new(false);
 
@@ -619,6 +669,7 @@ async fn launch_inner(app: AppHandle, version: String, nickname: String, memory_
         // Start Java in an independent process group without a console window.
         command.creation_flags(0x00000200 | 0x08000000);
     }
+    let started_at=std::time::SystemTime::now();
     let mut child = command.spawn().map_err(|e| format!("Не вдалося запустити Java: {e}"))?;
     let pid = child.id().unwrap_or(0);
     let _ = app.emit("game-status", "running");
@@ -654,14 +705,34 @@ async fn launch_inner(app: AppHandle, version: String, nickname: String, memory_
         }
     });
     tokio::spawn(async move {
-        let result = child.wait().await;
-        let message = match result {
-            Ok(exit) => format!("Minecraft exited with code {:?}", exit.code()),
-            Err(e) => format!("Minecraft process error: {e}"),
+        let result=child.wait().await;
+        let exit_code=result.as_ref().ok().and_then(|status|status.code());
+        let message=match &result {
+            Ok(exit)=>format!("Minecraft завершився з кодом {:?}",exit.code()),
+            Err(e)=>format!("Minecraft process error: {e}"),
         };
-        let _ = app.emit("game-log", message.clone());
-        let _ = app.emit("game-status", message);
-        RUNNING.store(false, Ordering::SeqCst);
+        if result.as_ref().is_err_or(|status|!status.success()){
+            let game_log=dir.join("logs").join("fre-launch-game.log");
+            let latest=dir.join("logs").join("latest.log");
+            let output=log_tail(&game_log,48*1024);
+            let latest_text=log_tail(&latest,48*1024);
+            let hint=crash_hint(&(output+"\n"+&latest_text)).to_string();
+            let report=recent_crash_report(&dir,started_at);
+            super::diagnostics::write(&app,"GAME_CRASH",&format!(
+                "Minecraft {version}, instance {:?}, exit {:?}. {hint}; log {}",
+                instance_id,exit_code,game_log.display()
+            ));
+            let _=app.emit("game-crash",GameCrash{
+                version,instance_id,exit_code,summary:hint,
+                log_path:latest.to_string_lossy().into_owned(),
+                crash_report_path:report,
+            });
+        }else{
+            super::diagnostics::write(&app,"GAME_EXIT",&format!("Minecraft {version} exited normally"));
+        }
+        let _=app.emit("game-log",message.clone());
+        let _=app.emit("game-status",message);
+        RUNNING.store(false,Ordering::SeqCst);
     });
     Ok(format!("Minecraft {version} launched (PID {pid})"))
 }
