@@ -195,3 +195,7 @@
 .fre-create-wizard .fre-wizard-loaders button{display:flex;justify-content:space-between;align-items:center;gap:5px;background:#35373d;border:1px solid #4b4e55;border-radius:9px;color:#d2d8dd;padding:11px;font-size:12px}
 .fre-create-wizard .fre-wizard-loaders button.selected{background:#245f40;border-color:#48c475;color:#a2fac0}
 .fre-create-wizard .fre-wizard-loaders button svg{flex-shrink:0}
+
+.fre-library-new-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.fre-library-new-actions>button{display:inline-flex;align-items:center;gap:6px;border-radius:9px}
+.fre-create-wizard .fre-wizard-option:disabled{opacity:.5;cursor:not-allowed}
