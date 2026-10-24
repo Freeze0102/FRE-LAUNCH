@@ -116,6 +116,139 @@ fn safe_profile(name: &str, id: &str) -> bool {
         && id.len()==32 && id.bytes().all(|b|b.is_ascii_hexdigit())
 }
 
+/// Browser-based OAuth Authorization Code + PKCE for native Windows sign-in.
+/// The Client ID must be configured as an Entra public "Mobile and desktop" app
+/// with http://localhost as a redirect URI, and separately approved by Minecraft.
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+pub struct BrowserLoginResult {
+    account: MicrosoftAccount,
+    persisted: bool,
+}
+static BROWSER_LOGIN: std::sync::atomic::AtomicBool=std::sync::atomic::AtomicBool::new(false);
+struct BrowserLoginGuard;
+impl Drop for BrowserLoginGuard {
+    fn drop(&mut self){
+        BROWSER_LOGIN.store(false,std::sync::atomic::Ordering::SeqCst);
+    }
+}
+fn login_client_id(id:Option<String>)->Result<String,String>{
+    let configured=configured_client_id();
+    let selected=id.as_deref().map(str::trim).filter(|s|!s.is_empty())
+        .or(configured.as_deref())
+        .ok_or("FRE LAUNCH потребує власний Minecraft-схвалений Client ID. Розробник повинен указати FRE_MS_CLIENT_ID.")?;
+    Uuid::parse_str(selected)
+        .map(|id|id.to_string())
+        .map_err(|_|"Некоректний Microsoft Application Client ID".to_string())
+}
+fn pkce_verifier()->String{
+    // 48 OS-random bytes represented using the URL-safe PKCE alphabet.
+    let mut bytes=Vec::with_capacity(48);
+    for _ in 0..3 {bytes.extend_from_slice(Uuid::new_v4().as_bytes());}
+    use base64::Engine;
+    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(bytes)
+}
+fn pkce_challenge(verifier:&str)->String{
+    use base64::Engine;
+    use sha2::{Digest,Sha256};
+    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(Sha256::digest(verifier.as_bytes()))
+}
+async fn read_browser_callback(listener:tokio::net::TcpListener,expected_state:&str)
+    ->Result<String,String>{
+    use tokio::io::{AsyncReadExt,AsyncWriteExt};
+    // Overall timeout handled by the caller. Only accept a callback on loopback.
+    for _ in 0..12 {
+        let (mut stream,_address)=listener.accept().await
+            .map_err(|_|"Не вдалося прийняти відповідь браузера".to_string())?;
+        let mut bytes=[0u8;8192];
+        let size=match tokio::time::timeout(Duration::from_secs(10),stream.read(&mut bytes)).await{
+            Ok(Ok(size))=>size,
+            _=>continue,
+        };
+        let line=String::from_utf8_lossy(&bytes[..size]);
+        let first=line.lines().next().unwrap_or("");
+        let path=first.strip_prefix("GET ").and_then(|line|line.split_whitespace().next());
+        let Some(path)=path else{continue};
+        // All received paths must be local relative request targets.
+        if !path.starts_with('/')||path.starts_with("//"){continue;}
+        let Ok(callback)=reqwest::Url::parse(&format!("http://localhost{path}")) else{continue};
+        let pairs=callback.query_pairs().into_owned().collect::<std::collections::HashMap<_,_>>();
+        let state_matches=pairs.get("state").is_some_and(|s|s==expected_state);
+        let outcome=if state_matches{
+            if let Some(code)=pairs.get("code").filter(|s|!s.is_empty()&&s.len()<4096){
+                Some(Ok(code.clone()))
+            }else if pairs.contains_key("error"){
+                Some(Err("Microsoft-вхід скасовано або відхилено. Спробуй ще раз.".to_string()))
+            }else{None}
+        }else{None};
+        let (status,body)=if outcome.is_some(){
+            ("200 OK","<html><meta charset=\"utf-8\"><body style=\"font-family:sans-serif;text-align:center;padding:48px\"><h2>Microsoft підтвердила вхід</h2><p>Повернися до FRE LAUNCH, щоб завершити перевірку Minecraft.</p></body></html>")
+        }else{
+            ("400 Bad Request","<html><body>Неправильний або застарілий запит авторизації.</body></html>")
+        };
+        let reply=format!("HTTP/1.1 {status}\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\n\r\n{body}",body.len());
+        let _=stream.write_all(reply.as_bytes()).await;
+        let _=stream.shutdown().await;
+        if let Some(outcome)=outcome{return outcome;}
+    }
+    Err("Не отримано коректної відповіді від Microsoft у браузері".into())
+}
+#[tauri::command]
+pub async fn microsoft_browser_login(client_id:Option<String>)->Result<BrowserLoginResult,String>{
+    use std::sync::atomic::Ordering;
+    if BROWSER_LOGIN.compare_exchange(false,true,Ordering::SeqCst,Ordering::SeqCst).is_err(){
+        return Err("Вхід через браузер уже виконується".into());
+    }
+    let _guard=BrowserLoginGuard;
+    let id=login_client_id(client_id)?;
+    let listener=tokio::net::TcpListener::bind("127.0.0.1:0").await
+        .map_err(|_|"Не вдалося відкрити локальний порт для Microsoft-входу".to_string())?;
+    let port=listener.local_addr().map_err(|_|"Не вдалося визначити локальний порт")?.port();
+    // This URI requires http://localhost registered as a native redirect.
+    let redirect=format!("http://localhost:{port}/");
+    let verifier=pkce_verifier();
+    let challenge=pkce_challenge(&verifier);
+    let state=Uuid::new_v4().to_string();
+    let mut login=reqwest::Url::parse("https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize")
+        .map_err(|_|"Помилка адреси Microsoft")?;
+    login.query_pairs_mut()
+        .append_pair("client_id",&id)
+        .append_pair("response_type","code")
+        .append_pair("response_mode","query")
+        .append_pair("redirect_uri",&redirect)
+        .append_pair("scope","XboxLive.signin offline_access")
+        .append_pair("code_challenge",&challenge)
+        .append_pair("code_challenge_method","S256")
+        .append_pair("state",&state)
+        .append_pair("prompt","select_account");
+    webbrowser::open(login.as_str()).map_err(|_|"Не вдалося відкрити системний браузер Microsoft".to_string())?;
+    let code=tokio::time::timeout(Duration::from_secs(300),read_browser_callback(listener,&state))
+        .await.map_err(|_|"Час входу в Microsoft завершився (5 хвилин)".to_string())??;
+    let client=http()?;
+    let response=client.post("https://login.microsoftonline.com/consumers/oauth2/v2.0/token")
+        .form(&[
+            ("client_id",id.as_str()),
+            ("grant_type","authorization_code"),
+            ("code",code.as_str()),
+            ("redirect_uri",redirect.as_str()),
+            ("code_verifier",verifier.as_str()),
+            ("scope","XboxLive.signin offline_access"),
+        ]).send().await.map_err(|_|"Не вдалося завершити Microsoft-вхід".to_string())?;
+    if !response.status().is_success(){
+        return Err(format!("Microsoft відхилила авторизацію (HTTP {}). Перевір Client ID та redirect URI http://localhost.",response.status()));
+    }
+    let json:Value=response.json().await.map_err(|_|"Microsoft повернула некоректні токени")?;
+    let access=json["access_token"].as_str().filter(|s|!s.is_empty())
+        .ok_or("Microsoft не надала access token")?;
+    // Xbox / XSTS / Minecraft verification is required. Microsoft login alone is insufficient.
+    let live=exchange_for_minecraft(&client,access).await?;
+    let account=MicrosoftAccount{name:live.name.clone(),id:live.id.clone()};
+    *session().lock().map_err(|_|"Стан авторизації недоступний")?=Some(live);
+    let persisted=json["refresh_token"].as_str().filter(|s|!s.is_empty())
+        .is_some_and(|refresh|store_refresh(&id,refresh).is_ok());
+    Ok(BrowserLoginResult{account,persisted})
+}
+
 #[tauri::command]
 pub async fn microsoft_begin_login(client_id:Option<String>) -> Result<DeviceChallenge,String> {
     let configured=configured_client_id();
