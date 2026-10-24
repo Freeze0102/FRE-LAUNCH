@@ -15,6 +15,7 @@ export type Instance = {
   javaPath:string|null;loader:string;loaderVersion:string|null;
 };
 type Installed={filename:string;enabled:boolean;bytes:number};
+type WorldSummary={name:string;lastModified:number;bytesOnDisk:number};
 type Category="mods"|"resourcepacks"|"shaderpacks";
 type Tab="content"|"worlds"|"files"|"settings"|"logs";
 type Props={
@@ -40,6 +41,8 @@ export function InstancesPanel({version,active,setActive,setVersion,setMemory,na
   const [category,setCategory]=useState<Category>("mods");
   const [fileFilter,setFileFilter]=useState("");
   const [files,setFiles]=useState<Installed[]>([]);
+  const [worlds,setWorlds]=useState<WorldSummary[]>([]);
+  const [worldFilter,setWorldFilter]=useState("");
   const [createOpen,setCreateOpen]=useState(false);
   const [createName,setCreateName]=useState("");
   const [editName,setEditName]=useState("");
@@ -74,9 +77,17 @@ export function InstancesPanel({version,active,setActive,setVersion,setMemory,na
     finally{setLoadingFiles(false);}
   },[selected,category]);
   useEffect(()=>{if(current&&tab==="content")void refreshFiles();},[current?.id,tab,refreshFiles]);
+  useEffect(()=>{
+    if(!current||tab!=="worlds")return;
+    let active=true;
+    void invoke<WorldSummary[]>("list_instance_worlds",{instanceId:current.id})
+      .then(items=>{if(active)setWorlds(items);})
+      .catch(err=>{if(active)setError(String(err));});
+    return()=>{active=false;};
+  },[current?.id,tab]);
 
   function open(item:Instance){
-    setSelected(item.id);setTab("content");setCategory("mods");setFileFilter("");
+    setSelected(item.id);setTab("content");setCategory("mods");setFileFilter("");setWorldFilter("");
     setEditName(item.name);setEditRam(item.memoryMb);setEditJava(item.javaPath||"");
     setActive(item.id);setVersion(item.version);setMemory(item.memoryMb);
   }
@@ -217,7 +228,19 @@ export function InstancesPanel({version,active,setActive,setVersion,setMemory,na
           </div>
           <button className="fre-instance-openfolder" onClick={()=>void openFolder(current,category==="mods"?"mods":category)}><FolderOpen size={15}/> Відкрити папку {category==="mods"?"mods":category==="resourcepacks"?"resourcepacks":"shaderpacks"} у Windows <ArrowRight size={14}/></button>
         </div>}
-        {tab==="worlds"&&<div className="fre-instance-tab-body"><h3>Світи й резервні копії</h3><p>Зберігай резервні копії перед зміною версії Minecraft або модів.</p><button className="secondary" onClick={()=>void openFolder(current,"saves")}><FolderOpen size={16}/> Відкрити світи</button><BackupsPanel instanceId={current.id} instanceName={current.name}/></div>}
+        {tab==="worlds"&&<div className="fre-instance-tab-body">
+          <div className="fre-instance-content-head"><h3>Світи Minecraft</h3><button className="secondary" onClick={()=>void openFolder(current,"saves")}><FolderOpen size={16}/> Папка світів</button></div>
+          <div className="fre-instance-content-search"><Search size={16}/><input value={worldFilter} onChange={e=>setWorldFilter(e.target.value)} placeholder="Пошук світів..."/></div>
+          <div className="fre-instance-world-list">
+            {worlds.filter(world=>world.name.toLowerCase().includes(worldFilter.toLowerCase())).map(world=><div className="fre-instance-world" key={world.name}>
+              <div className="fre-instance-world-art"><Layers3 size={25}/></div>
+              <div><strong>{world.name}</strong><small>{world.lastModified?new Date(world.lastModified*1000).toLocaleString("uk-UA"):"Час невідомий"} · Minecraft {current.version}</small></div>
+              <button className="secondary" onClick={()=>void openFolder(current,"saves")}><FolderOpen size={15}/> Файли</button>
+            </div>)}
+            {!worlds.some(world=>world.name.toLowerCase().includes(worldFilter.toLowerCase()))&&<p className="fre-instance-empty-content">Світи не знайдено. Створи світ у Minecraft або відкрий папку saves.</p>}
+          </div>
+          <BackupsPanel instanceId={current.id} instanceName={current.name}/>
+        </div>}
         {tab==="files"&&<div className="fre-instance-tab-body"><GameFolders instanceId={current.id} version={current.version}/></div>}
         {tab==="logs"&&<div className="fre-instance-tab-body"><h3>Журнали Minecraft</h3><p>Файли latest.log і fre-launch-game.log допоможуть знайти причину вильоту гри.</p><button className="secondary" onClick={()=>void openFolder(current,"logs")}><FolderOpen size={16}/> Відкрити папку журналів</button></div>}
         {tab==="settings"&&<div className="fre-instance-tab-body fre-instance-settings">
