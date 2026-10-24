@@ -130,6 +130,7 @@ export default function ModsPanel({version, instanceId, initialProject, onServer
     if(!opened)return;
     if(opened.project_type!=="modpack"&&(!selectedInstance||!instanceId)){setError("Спочатку обери збірку.");return;}
     if(!chosenVersion){setError("Спочатку обери версію проєкту.");return;}
+    if(opened.project_type!=="modpack"&&!selectedInstance){setError("Обери Minecraft-збірку для встановлення.");return;}
     setBusy(true);setError("");setMessage("");setPackProgress(null);
     try {
       if(opened.project_type==="modpack"){
@@ -139,6 +140,7 @@ export default function ModsPanel({version, instanceId, initialProject, onServer
         setMessage("Модпак встановлено: "+created.name+" · "+created.version);
         onPackInstalled?.(created);
       } else if(opened.project_type==="mod") {
+        if(!selectedInstance)throw Error("Обери Minecraft-збірку.");
         if(selectedInstance.loader!=="fabric")throw Error("Зараз автоматичне встановлення модів підтримує Fabric. Обери Fabric-збірку.");
         const update=modUpdates.find(u=>u.projectId===opened.project_id && u.versionId===chosenVersion);
         if(update && installed.some(m=>m.filename===update.filename && m.enabled)){
