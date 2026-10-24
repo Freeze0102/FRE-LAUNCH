@@ -1473,3 +1473,10 @@ input:focus-visible,button:focus-visible,select:focus-visible,textarea:focus-vis
 .fre-app .fre-nav-link:first-child.is-active{color:#5ef398}
 .fre-app .fre-updates{flex:0 0 auto;margin-top:0}
 @media(max-width:630px){.fre-app .fre-nav{flex:1;overflow-x:auto;overflow-y:hidden}.fre-app .fre-nav-link.fre-sidebar-other:nth-last-child(2){margin-top:0}}
+
+/* Instance avatars in the quick-access rail; independent of licensed Modrinth assets. */
+.fre-app .fre-sidebar-instance{padding:4px!important;background:transparent;border:1px solid transparent}
+.fre-app .fre-sidebar-avatar{display:grid;place-items:center;width:38px;height:38px;min-width:38px;border-radius:10px;color:#f5f7f6;font:800 12px/1 "Segoe UI",sans-serif;text-shadow:0 1px 3px #0008;overflow:hidden}
+.fre-app .fre-sidebar-instance:hover{background:#324238;border-color:#3d784e}
+.fre-app .fre-sidebar-instance.is-active{border-color:#4cbd73;background:#203b2b}
+.fre-app .fre-sidebar-instance:hover .fre-sidebar-avatar{filter:brightness(1.15)}
