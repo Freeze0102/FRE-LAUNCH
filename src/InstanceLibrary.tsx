@@ -22,6 +22,7 @@ type Props={
   version:string;active:string;setActive:(id:string)=>void;
   setVersion:(v:string)=>void;setMemory:(mb:number)=>void;
   navigateHome:()=>void;navigateMods:()=>void;navigateVersions:()=>void;onPlayInstance:(item:Instance)=>void;requestedId?:string;
+  showWorlds:boolean;showFiles:boolean;
 };
 const categories:{id:Category;label:string}[]=[
   {id:"mods",label:"Моди"},{id:"resourcepacks",label:"Ресурс-паки"},{id:"shaderpacks",label:"Шейдери"}
@@ -31,7 +32,7 @@ function loaderLabel(instance:Instance){
 }
 function sizeLabel(bytes:number){return bytes>=1048576?(bytes/1048576).toFixed(1)+" MB":Math.round(bytes/1024)+" KB";}
 
-export function InstancesPanel({version,active,setActive,setVersion,setMemory,navigateHome,navigateMods,navigateVersions,onPlayInstance,requestedId}:Props){
+export function InstancesPanel({version,active,setActive,setVersion,setMemory,navigateHome,navigateMods,navigateVersions,onPlayInstance,showWorlds,showFiles,requestedId}:Props){
   const [instances,setInstances]=useState<Instance[]>([]);
   const [search,setSearch]=useState("");
   const [sort,setSort]=useState("name");
@@ -54,6 +55,7 @@ export function InstancesPanel({version,active,setActive,setVersion,setMemory,na
   const [notice,setNotice]=useState("");
 
   useEffect(()=>{if(requestedId)setSelected(requestedId);},[requestedId]);
+  useEffect(()=>{if((tab==="worlds"&&!showWorlds)||(tab==="files"&&!showFiles))setTab("content");},[tab,showWorlds,showFiles]);
   const current=instances.find(item=>item.id===selected)||null;
   const filtered=useMemo(()=>{
     const items=instances.filter(item=>(item.name+" "+item.version+" "+item.loader).toLowerCase().includes(search.toLowerCase()));
@@ -209,7 +211,7 @@ export function InstancesPanel({version,active,setActive,setVersion,setMemory,na
           {([
             ["content","Вміст",Package],["files","Файли",FolderOpen],["worlds","Світи",Archive],
             ["logs","Журнали",FileText],["settings","Налаштування",Settings2]
-          ] as const).map(([key,label,Icon])=><button key={key} className={tab===key?"active":""} onClick={()=>setTab(key)}><Icon size={16}/>{label}</button>)}
+          ] as const).filter(([key])=>(key!=="worlds"||showWorlds)&&(key!=="files"||showFiles)).map(([key,label,Icon])=><button key={key} className={tab===key?"active":""} onClick={()=>setTab(key)}><Icon size={16}/>{label}</button>)}
         </nav>
         {tab==="content"&&<div className="fre-instance-content">
           <div className="fre-instance-content-head"><h3>Додатковий контент</h3><div>
