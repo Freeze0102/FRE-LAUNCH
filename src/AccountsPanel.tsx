@@ -6,6 +6,7 @@ type Account = {id:string;nickname:string;offlineUuid:string};
 export type MicrosoftAccount = {name:string;id:string};
 type DeviceChallenge = {userCode:string;verificationUri:string;expiresIn:number;interval:number};
 type PollStatus = {status:"pending"|"connected";account:MicrosoftAccount|null;interval:number;persisted?:boolean};
+type BrowserLoginResult={account:MicrosoftAccount;persisted:boolean};
 export default function AccountsPanel({nickname,onSelect,microsoft,onMicrosoftSelect}:{
   nickname:string;onSelect:(name:string)=>void;microsoft:MicrosoftAccount|null;onMicrosoftSelect:(account:MicrosoftAccount|null)=>void;
 }){
@@ -47,6 +48,19 @@ export default function AccountsPanel({nickname,onSelect,microsoft,onMicrosoftSe
       await refresh();
     }catch(e){setError(String(e));}
     finally{setBusy(false);}
+  }
+  const canLogin=hasBuiltInId||(showDeveloperOptions&&/^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$/.test(clientId.trim()));
+  async function beginBrowserLogin(){
+    setAuthBusy(true);setAuthError("");setAuthNotice("");setChallenge(null);
+    try{
+      const result=await invoke<BrowserLoginResult>("microsoft_browser_login",{clientId:showDeveloperOptions?clientId.trim()||null:null});
+      if(showDeveloperOptions)try{localStorage.setItem("fre-ms-client-id",clientId.trim());}catch{}
+      onMicrosoftSelect(result.account);
+      setAuthNotice(result.persisted?
+        "Minecraft Java підключено через Microsoft. Вхід збережено в Windows Credential Manager.":
+        "Minecraft Java підключено, але Windows не підтвердила збереження входу. Можливо, знадобиться повторна авторизація.");
+    }catch(e){setAuthError(String(e));}
+    finally{setAuthBusy(false);}
   }
   async function beginMicrosoft(){
     setAuthBusy(true);setAuthError("");setAuthNotice("");setChallenge(null);
@@ -97,14 +111,20 @@ export default function AccountsPanel({nickname,onSelect,microsoft,onMicrosoftSe
       {microsoft?<><div className="fre-ms-signed"><UserCheck size={23}/><div><strong>{microsoft.name}</strong><small>Microsoft Minecraft · {microsoft.id}</small></div><button className="secondary" disabled={authBusy} onClick={()=>void logoutMicrosoft()}><LogOut size={15}/> Вийти</button></div>{authNotice&&<p className="notice">{authNotice}</p>}</>:
         <div className="fre-ms-login">
           <div className="fre-ms-form">
-            <button className="primary" disabled={authBusy||(!hasBuiltInId&&!showDeveloperOptions)} onClick={()=>void beginMicrosoft()}><LogIn size={16}/> {authBusy?"Підключення…":"Увійти через Microsoft"}</button>
-            <button className="secondary" onClick={()=>setShowDeveloperOptions(v=>!v)}>Для розробника</button>
+            <button className="primary" disabled={authBusy||!canLogin} onClick={()=>void beginBrowserLogin()}>
+              <LogIn size={16}/> {authBusy?"Очікуємо підтвердження…":"Увійти через Microsoft"}
+            </button>
+            <button className="secondary" disabled={authBusy||!canLogin} onClick={()=>void beginMicrosoft()}>Увійти за кодом</button>
+            <button className="secondary" disabled={authBusy} onClick={()=>setShowDeveloperOptions(v=>!v)}>Для розробника</button>
           </div>
-          {hasBuiltInId?<p className="muted">Відкриється офіційна сторінка Microsoft у браузері. Підтвердь вхід за одноразовим кодом — пароль залишається у Microsoft.</p>:<p className="muted">У поточну збірку FRE LAUNCH ще не додано схвалений Minecraft Client ID. Без нього справжній вхід у Minecraft не працюватиме. Розробник повинен схвалити застосунок і встановити FRE_MS_CLIENT_ID під час збірки.</p>}
+          {authBusy&&<p className="notice" role="status">Відкривається системний браузер Microsoft. Увійди в потрібний акаунт і повернися в FRE LAUNCH. Підтвердження може тривати до 5 хвилин.</p>}
+          {hasBuiltInId?
+            <p className="muted">Вхід відкриває офіційний сайт Microsoft у браузері й автоматично завершується у FRE LAUNCH. Якщо локальний браузер заблокований, обери «Увійти за кодом».</p>:
+            <p className="muted">FRE LAUNCH ще не має власного схваленого Minecraft Client ID. Поки розробник не отримає дозвіл Minecraft Services та не додасть ID до збірки, ліцензійний Microsoft-вхід не запрацює. Локальний нікнейм можна використовувати окремо.</p>}
           {showDeveloperOptions&&<div className="fre-ms-dev-options">
             <label className="field-label">Власний Minecraft-схвалений Application Client ID</label>
             <input className="input" value={clientId} onChange={e=>setClientId(e.target.value)} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" autoComplete="off"/>
-            <p className="muted">Тільки для перевірки своєї реєстрації застосунку. Вхід через звичайний Client ID без дозволу Minecraft Services завершиться 403.</p>
+            <p className="muted">Тільки для власного схваленого Minecraft Client ID. Для входу через браузер додай в Microsoft Entra платформу «Mobile and desktop applications» з redirect URI http://localhost. Вхід за кодом не потребує redirect URI. Звичайний Client ID без дозволу Minecraft Services може отримати HTTP 403.</p>
           </div>}
           {challenge&&<div className="fre-ms-challenge">
             <span>Підтвердь вхід у Microsoft</span><strong>{challenge.userCode}</strong>
