@@ -245,3 +245,85 @@
   .fre-app .fre-switcher-menu{right:8px!important;left:auto!important}
   .fre-app .fre-switcher{margin-left:auto}
 }
+
+
+/* Discover uses the same neutral-surface filter rail as other app views. */
+@media(min-width:681px){
+  .fre-app .fre-discover-shell{
+    grid-template-columns:minmax(0,1fr) 285px;
+    gap:22px;
+  }
+  .fre-app .fre-discover-sidebar{
+    background:#22242b;
+    border:1px solid #383a43;
+    border-radius:12px;
+    top:8px;
+  }
+  .fre-app .fre-discover-side-section{
+    padding:17px;
+    border-bottom:1px solid #343740;
+  }
+  .fre-app .fre-discover-side-section h3{color:#e5e9ed;font-size:13px}
+  .fre-app .fre-discover-side-section h3>span{color:#9da3ad}
+  .fre-app .fre-discover-side-footer p{color:#abb1bc}
+  .fre-app .fre-discover-category-list{gap:4px}
+  .fre-app .fre-discover-category-list button{
+    min-height:35px;
+    font-size:12px;
+    color:#adb5bc;
+    border-radius:8px;
+  }
+  .fre-app .fre-discover-category-list button:hover:not(.selected){
+    background:#32363d;color:#f5f5f7;
+  }
+  .fre-app .fre-discover-category-list button.selected{
+    background:#2b4a37;
+    color:#69f0a1;
+  }
+  .fre-app .fre-discover-category-symbol{background:#343841;color:#cbd2d5}
+  .fre-app .fre-discover-search .search,
+  .fre-app .fre-discover-filters select,
+  .fre-app .fre-discover-categories{
+    border-color:#373a42!important;
+  }
+  .fre-app .fre-discover-categories{
+    background:#272a31!important;
+    margin-bottom:13px!important;
+  }
+  .fre-app .fre-discover-categories button{font-size:12px!important}
+  .fre-app .fre-discover-categories button.active{
+    background:#255039!important;
+    color:#65ec9a!important;
+  }
+  .fre-app .fre-discover-shell .mod-grid>.mod-card{
+    grid-template-columns:57px minmax(0,1fr) auto!important;
+    grid-template-areas:"icon copy actions"!important;
+    min-height:83px!important;
+    padding:11px!important;
+    background:#272930!important;
+    border-color:#373a43!important;
+  }
+  .fre-app .fre-discover-shell .mod-grid .fre-mod-card-actions{
+    border:0!important;padding:0!important;
+    flex-direction:column!important;
+  }
+}
+@media(min-width:681px) and (max-width:1120px){
+  .fre-app .fre-discover-shell{grid-template-columns:minmax(0,1fr) 225px;gap:12px}
+  .fre-app .fre-discover-shell .mod-grid>.mod-card{
+    grid-template-columns:55px minmax(0,1fr)!important;
+    grid-template-areas:"icon copy" "actions actions"!important;
+  }
+  .fre-app .fre-discover-shell .mod-grid .fre-mod-card-actions{
+    flex-direction:row!important;justify-content:flex-end;
+    border-top:1px solid #373b42!important;padding-top:7px!important;
+  }
+}
+/* Updated desktop instance tab bar: labels only, compact active pill. */
+@media(min-width:631px){
+  .fre-app .fre-instance-tabs>button>svg{display:none}
+  .fre-app .fre-instance-tabs>button{font-size:13px!important}
+  .fre-app .fre-instance-content-search{background:#292b33;border-color:#3b3d45}
+  .fre-app .fre-instance-file{min-height:65px}
+  .fre-app .fre-instance-detail-head h2{font-size:24px}
+}
