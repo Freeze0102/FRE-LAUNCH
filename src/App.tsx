@@ -475,6 +475,7 @@ export default function App() {
           activeInstanceId={activeInstanceId}
           memoryMb={memoryMb}
           nickname={nickname}
+          onSelectOffline={selectOffline}
           java={java}
           recoveryMode={recoveryMode}
           onPage={dest=>{if(dest==="Mods")setFeaturedProject(null);setPage(dest);}}
