@@ -9,6 +9,43 @@ use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 use uuid::Uuid;
 
+const KEYRING_SERVICE:&str="FRE-LAUNCH-Minecraft";
+const KEYRING_USER:&str="MicrosoftRefreshToken";
+#[derive(Serialize,Deserialize)]
+struct SavedMicrosoftLogin{client_id:String,refresh_token:String}
+fn credential()->Result<keyring::Entry,String>{
+    keyring::Entry::new(KEYRING_SERVICE,KEYRING_USER)
+        .map_err(|_|"Windows Credential Manager недоступний".to_string())
+}
+fn configured_client_id()->Option<String>{
+    option_env!("FRE_MS_CLIENT_ID").and_then(|s|Uuid::parse_str(s.trim()).ok())
+        .map(|id|id.to_string())
+}
+fn store_refresh(client_id:&str,refresh_token:&str)->Result<(),String>{
+    let data=serde_json::to_string(&SavedMicrosoftLogin{
+        client_id:client_id.into(),refresh_token:refresh_token.into()
+    }).map_err(|_|"Неможливо підготувати захищену сесію")?;
+    credential()?.set_password(&data)
+        .map_err(|_|"Windows Credential Manager не зміг зберегти вхід".to_string())
+}
+fn saved_refresh()->Result<Option<SavedMicrosoftLogin>,String>{
+    match credential()?.get_password(){
+        Ok(text)=>serde_json::from_str(&text).map(Some)
+            .map_err(|_|"Збережений токен Microsoft пошкоджений".into()),
+        Err(keyring::Error::NoEntry)=>Ok(None),
+        Err(_)=>Err("Не вдалося прочитати вхід із Windows Credential Manager".into())
+    }
+}
+fn delete_refresh()->Result<(),String>{
+    match credential()?.delete_credential(){
+        Ok(())|Err(keyring::Error::NoEntry)=>Ok(()),
+        Err(_)=>Err("Не вдалося видалити збережений Microsoft-вхід".into())
+    }
+}
+#[tauri::command]
+pub fn microsoft_login_configuration()->bool{configured_client_id().is_some()}
+
+
 #[derive(Clone)]
 struct Pending {
     client_id: String,
@@ -78,8 +115,13 @@ fn safe_profile(name: &str, id: &str) -> bool {
 }
 
 #[tauri::command]
-pub async fn microsoft_begin_login(client_id:String) -> Result<DeviceChallenge,String> {
-    let id = Uuid::parse_str(client_id.trim()).map_err(|_| "Потрібен справжній UUID Microsoft Application Client ID".to_string())?;
+pub async fn microsoft_begin_login(client_id:Option<String>) -> Result<DeviceChallenge,String> {
+    let configured=configured_client_id();
+    let supplied=client_id.as_deref().map(str::trim).filter(|v|!v.is_empty());
+    let provided=supplied.or(configured.as_deref()).ok_or(
+        "У FRE LAUNCH ще немає схваленого Minecraft Client ID. Розробник повинен зареєструвати й схвалити застосунок, а потім додати FRE_MS_CLIENT_ID до збірки."
+    )?;
+    let id = Uuid::parse_str(provided).map_err(|_| "Потрібен справжній UUID Microsoft Application Client ID".to_string())?;
     let client_id = id.to_string();
     let client = http()?;
     let response = client.post("https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode")
@@ -103,6 +145,7 @@ pub async fn microsoft_begin_login(client_id:String) -> Result<DeviceChallenge,S
         expires_at:Instant::now()+Duration::from_secs(grant.expires_in.min(1800)),
         interval,next_poll:Instant::now()+Duration::from_secs(interval),
     });
+    let _=webbrowser::open(&grant.verification_uri);
     Ok(DeviceChallenge{
         user_code:grant.user_code, verification_uri:grant.verification_uri,
         expires_in:grant.expires_in,interval
