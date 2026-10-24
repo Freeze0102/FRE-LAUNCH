@@ -1,9 +1,21 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { UserRound, Plus, Trash2, ShieldCheck, UserCheck } from "lucide-react";
+import { UserRound, Plus, Trash2, ShieldCheck, UserCheck, ExternalLink, LogIn, LogOut } from "lucide-react";
 
 type Account = {id:string;nickname:string;offlineUuid:string};
-export default function AccountsPanel({nickname,onSelect}:{nickname:string;onSelect:(name:string)=>void}){
+export type MicrosoftAccount = {name:string;id:string};
+type DeviceChallenge = {userCode:string;verificationUri:string;expiresIn:number;interval:number};
+type PollStatus = {status:"pending"|"connected";account:MicrosoftAccount|null;interval:number};
+export default function AccountsPanel({nickname,onSelect,microsoft,onMicrosoftSelect}:{
+  nickname:string;onSelect:(name:string)=>void;microsoft:MicrosoftAccount|null;onMicrosoftSelect:(account:MicrosoftAccount|null)=>void;
+}){
+  const [clientId,setClientId]=useState(()=>{
+    try{return localStorage.getItem("fre-ms-client-id")||"";}catch{return "";}
+  });
+  const [challenge,setChallenge]=useState<DeviceChallenge|null>(null);
+  const [authBusy,setAuthBusy]=useState(false);
+  const [authError,setAuthError]=useState("");
+  const checking=useRef(false);
   const [accounts,setAccounts]=useState<Account[]>([]);
   const [name,setName]=useState("");
   const [error,setError]=useState("");
@@ -32,9 +44,71 @@ export default function AccountsPanel({nickname,onSelect}:{nickname:string;onSel
     }catch(e){setError(String(e));}
     finally{setBusy(false);}
   }
+  async function beginMicrosoft(){
+    setAuthBusy(true);setAuthError("");setChallenge(null);
+    try{
+      const code=await invoke<DeviceChallenge>("microsoft_begin_login",{clientId:clientId.trim()});
+      try{localStorage.setItem("fre-ms-client-id",clientId.trim());}catch{/* public app identifier only */}
+      setChallenge(code);
+    }catch(e){setAuthError(String(e));}
+    finally{setAuthBusy(false);}
+  }
+  async function logoutMicrosoft(){
+    setAuthBusy(true);setAuthError("");
+    try{await invoke("microsoft_logout");onMicrosoftSelect(null);setChallenge(null);}
+    catch(e){setAuthError(String(e));}
+    finally{setAuthBusy(false);}
+  }
+  useEffect(()=>{
+    if(!challenge)return;
+    let active=true;
+    const ms=Math.max(5,Math.min(60,challenge.interval))*1000;
+    const timer=window.setInterval(async()=>{
+      if(checking.current)return;
+      checking.current=true;
+      try{
+        const result=await invoke<PollStatus>("microsoft_poll_login");
+        if(!active)return;
+        if(result.status==="connected"&&result.account){
+          setChallenge(null);
+          onMicrosoftSelect(result.account);
+          setAuthError("");
+        }
+      }catch(err){
+        if(active){setAuthError(String(err));setChallenge(null);}
+      }finally{checking.current=false;}
+    },ms);
+    return()=>{active=false;window.clearInterval(timer);};
+  },[challenge,onMicrosoftSelect]);
   return <section className="panel">
-    <div className="panel-heading"><h3>FRE ACCOUNTS</h3><UserRound size={20}/></div>
-    <p>Додавай локальні офлайн-профілі. Вони зберігаються в SQLite, мають стабільний UUID і швидко перемикаються.</p>
+    <div className="panel-heading"><h3>Акаунти Minecraft</h3><UserRound size={20}/></div>
+    <div className="fre-ms-account">
+      <div className="fre-ms-head">
+        <span className="fre-ms-logo">M</span>
+        <div><h3>Microsoft · Minecraft Java Edition</h3><p>Справжній вхід через Microsoft → Xbox → Minecraft. Пароль вводиться тільки на сайті Microsoft.</p></div>
+      </div>
+      {microsoft?<div className="fre-ms-signed"><UserCheck size={23}/><div><strong>{microsoft.name}</strong><small>Microsoft Minecraft · {microsoft.id}</small></div><button className="secondary" disabled={authBusy} onClick={()=>void logoutMicrosoft()}><LogOut size={15}/> Вийти</button></div>:
+        <div className="fre-ms-login">
+          <label className="field-label">Microsoft Application (Client) ID</label>
+          <div className="fre-ms-form"><input className="input" value={clientId} onChange={e=>setClientId(e.target.value)} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" autoComplete="off"/>
+            <button className="primary" disabled={authBusy||!/^[-0-9a-fA-F]{36}$/.test(clientId.trim())} onClick={()=>void beginMicrosoft()}><LogIn size={16}/> {authBusy?"Підключення…":"Увійти"}</button></div>
+          <p className="muted">Потрібен Client ID власного публічного застосунку, якому Minecraft дозволив доступ до Minecraft Services. Звичайний акаунт Microsoft або випадковий Client ID самі по собі не підійдуть.</p>
+          {challenge&&<div className="fre-ms-challenge">
+            <span>Підтвердь вхід у Microsoft</span><strong>{challenge.userCode}</strong>
+            <p>Відкрий офіційний сайт Microsoft, введи цей код і підтвердь вхід. Перевірка виконується автоматично.</p>
+            <a href="https://www.microsoft.com/link" target="_blank" rel="noopener noreferrer">Відкрити Microsoft <ExternalLink size={15}/></a>
+            <button className="secondary" onClick={()=>setChallenge(null)}>Приховати код</button>
+          </div>}
+          {authError&&<div className="error">{authError}</div>}
+          <div className="fre-ms-links">
+            <a href="https://entra.microsoft.com/" target="_blank" rel="noopener noreferrer">Реєстрація власного застосунку <ExternalLink size={12}/></a>
+            <a href="https://help.minecraft.net/hc/en-us/articles/16254801392141" target="_blank" rel="noopener noreferrer">Дозвіл Minecraft на Client ID <ExternalLink size={12}/></a>
+          </div>
+        </div>}
+      <p className="fre-ms-caution">Безпека: токени Microsoft/Minecraft існують тільки в пам'яті процесу; при перезапуску лаунчера треба увійти заново. Ні паролі, ні токени не записуються у файл, SQLite чи localStorage.</p>
+    </div>
+    <h3 className="fre-offline-title">Офлайн-профілі</h3>
+    <p>Додавай локальні імена Minecraft. Вони не є Microsoft-акаунтами та не дають ліцензійного доступу.</p>
     <div className="toolbar create-form">
       <input className="input" value={name} maxLength={16} onChange={e=>setName(e.target.value.replace(/[^a-zA-Z0-9_]/g,""))} placeholder="Новий Minecraft-нікнейм"/>
       <button className="primary" onClick={()=>void add()} disabled={!name || busy}><Plus size={17}/> Додати акаунт</button>
@@ -49,6 +123,6 @@ export default function AccountsPanel({nickname,onSelect}:{nickname:string;onSel
       </article>)}
     </div>
     {accounts.length===0&&<div className="small-empty"><UserRound size={32}/><h3>Додай свій перший акаунт</h3><p>Локальні профілі працюють з офлайн-сумісними середовищами.</p></div>}
-    <p className="muted"><ShieldCheck size={14}/> Це лише локальні офлайн-профілі — не вхід у Microsoft/Minecraft. Нікнейм сам по собі не дає доступу до твого ліцензійного акаунта. На серверах з окремою реєстрацією (/register або /login) пароль і прив'язка профілю визначаються самим сервером. Якщо нік уже зайнятий, не намагайся входити в чужий обліковий запис. Microsoft OAuth ще не реалізовано.</p>
+    <p className="muted"><ShieldCheck size={14}/> Це лише локальні офлайн-профілі — не вхід у Microsoft/Minecraft. Нікнейм сам по собі не дає доступу до твого ліцензійного акаунта. На серверах з окремою реєстрацією (/register або /login) пароль і прив'язка профілю визначаються самим сервером. Якщо нік уже зайнятий, не намагайся входити в чужий обліковий запис.</p>
   </section>;
 }
