@@ -79,13 +79,13 @@ function themesafe(theme:unknown):string {
 }
 
 const menus = [
-  {name:"Home",label:"Головна",icon:House,index:"01"},
-  {name:"Mods",label:"Пошук модів",icon:Puzzle,index:"02"},
+  {name:"Home",label:"Грати",icon:Play,index:"01"},
+  {name:"Mods",label:"Пошук контенту",icon:Puzzle,index:"02"},
   {name:"Skins",label:"Скіни",icon:Shirt,index:"03"},
-  {name:"Instances",label:"Бібліотека збірок",icon:Boxes,index:"04"},
+  {name:"Screenshots",label:"Скріншоти",icon:Images,index:"04"},
   {name:"Servers",label:"Ігрові сервери",icon:Server,index:"05"},
-  {name:"Versions",label:"Версії Minecraft",icon:Layers3,index:"06"},
-  {name:"Screenshots",label:"Скріншоти",icon:Images,index:"07"},
+  {name:"Instances",label:"Бібліотека збірок",icon:Boxes,index:"06"},
+  {name:"Versions",label:"Версії Minecraft",icon:Layers3,index:"07"},
   {name:"Backups",label:"Резервні копії",icon:Archive,index:"08"},
   {name:"Accounts",label:"Облікові записи",icon:UserRound,index:"09"},
   {name:"Downloads",label:"Завантаження",icon:Download,index:"10"},
@@ -339,7 +339,7 @@ export default function App() {
       </button>
       <div className="fre-rail-divider"><span>НАВІГАЦІЯ</span></div>
       <nav className="fre-nav" aria-label="Розділи лаунчера">
-        {menus.slice(0,4).filter(item=>item.name!=="Skins"||featureSettings.showSkins).map(({name,label,icon:Icon,index})=><button key={name}
+        {menus.filter(item=>["Home","Mods","Skins","Screenshots","Servers"].includes(item.name)).filter(item=>(item.name!=="Skins"||featureSettings.showSkins)&&(item.name!=="Screenshots"||featureSettings.showScreenshots)).map(({name,label,icon:Icon,index})=><button key={name}
           className={"fre-nav-link"+(page===name?" is-active":"")}
           onClick={()=>{if(name==="Instances")setLibraryFocusId("");if(name==="Mods")setFeaturedProject(null);setPage(name);}}
           aria-current={page===name?"page":undefined}
@@ -357,7 +357,7 @@ export default function App() {
         <button className="fre-nav-link fre-sidebar-add" title="Створити збірку" aria-label="Створити збірку"
           onClick={()=>{setLibraryFocusId("");setPage("Instances");}}><Plus size={21}/></button>
         <div className="fre-sidebar-divider" aria-hidden="true"/>
-        {menus.slice(4).filter(item=>item.name!=="Screenshots"||featureSettings.showScreenshots).map(({name,label,icon:Icon,index})=><button key={name}
+        {menus.filter(item=>item.name==="Accounts"||item.name==="Settings").map(({name,label,icon:Icon,index})=><button key={name}
           className={"fre-nav-link fre-sidebar-other"+(page===name?" is-active":"")}
           onClick={()=>setPage(name)}
           aria-current={page===name?"page":undefined}
