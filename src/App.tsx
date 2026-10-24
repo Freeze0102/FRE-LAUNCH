@@ -135,6 +135,8 @@ function progressPercent(progress:Progress|null){
 export default function App() {
   const {page,setPage,selected,setSelected,nickname,setNickname,memoryMb,setMemoryMb,activeInstanceId,setActiveInstanceId,theme,setTheme}=useApp();
   const [versions,setVersions]=useState<Version[]>([]);
+  const [sidebarInstances,setSidebarInstances]=useState<{id:string;name:string;version:string;memoryMb:number;favorite:boolean}[]>([]);
+  const [libraryFocusId,setLibraryFocusId]=useState("");
   const [microsoftAccount,setMicrosoftAccount]=useState<MicrosoftAccount|null>(null);
   const [useMicrosoft,setUseMicrosoft]=useState(false);
   const [loading,setLoading]=useState(false);
@@ -162,6 +164,14 @@ export default function App() {
   const activeLabel=menus.find(item=>item.name===page)?.index??"01";
 
   useEffect(()=>{document.documentElement.dataset.theme=theme;},[theme]);
+  useEffect(()=>{
+    let live=true;
+    void invoke<{id:string;name:string;version:string;memoryMb:number;favorite:boolean}[]>("list_instances")
+      .then(items=>{if(live)setSidebarInstances(items);})
+      .catch(()=>{});
+    return()=>{live=false;};
+  },[page]);
+
   useEffect(()=>{
     void invoke("mark_frontend_mounted").catch(()=>{});
     void invoke<boolean>("software_rendering").then(setRecoveryMode).catch(()=>{});
@@ -296,14 +306,31 @@ export default function App() {
       </button>
       <div className="fre-rail-divider"><span>НАВІГАЦІЯ</span></div>
       <nav className="fre-nav" aria-label="Розділи лаунчера">
-        {menus.map(({name,label,icon:Icon,index})=><button key={name}
+        {menus.slice(0,4).map(({name,label,icon:Icon,index})=><button key={name}
           className={"fre-nav-link"+(page===name?" is-active":"")}
+          onClick={()=>{if(name==="Instances")setLibraryFocusId("");setPage(name);}}
+          aria-current={page===name?"page":undefined}
+          title={label}>
+          <span className="fre-nav-index">{index}</span><Icon size={19} strokeWidth={1.9}/>
+          <span className="fre-nav-label">{label}</span>
+        </button>)}
+        <div className="fre-sidebar-divider" aria-hidden="true"/>
+        {sidebarInstances.slice(0,5).map(item=><button
+          key={item.id} className={"fre-nav-link fre-sidebar-instance"+(activeInstanceId===item.id&&page==="Instances"?" is-active":"")}
+          onClick={()=>{setActiveInstanceId(item.id);setSelected(item.version);setMemoryMb(item.memoryMb);setLibraryFocusId(item.id);setPage("Instances");}}
+          title={item.name+" · "+item.version} aria-label={"Відкрити збірку "+item.name}>
+          <Boxes size={20}/>
+        </button>)}
+        <button className="fre-nav-link fre-sidebar-add" title="Створити збірку" aria-label="Створити збірку"
+          onClick={()=>{setLibraryFocusId("");setPage("Instances");}}><Plus size={21}/></button>
+        <div className="fre-sidebar-divider" aria-hidden="true"/>
+        {menus.slice(4).map(({name,label,icon:Icon,index})=><button key={name}
+          className={"fre-nav-link fre-sidebar-other"+(page===name?" is-active":"")}
           onClick={()=>setPage(name)}
           aria-current={page===name?"page":undefined}
           title={label}>
-          <span className="fre-nav-index">{index}</span><Icon size={18} strokeWidth={1.8}/>
+          <span className="fre-nav-index">{index}</span><Icon size={19} strokeWidth={1.9}/>
           <span className="fre-nav-label">{label}</span>
-          {page===name&&<ChevronRight size={15} strokeWidth={2}/>}
         </button>)}
       </nav>
       <UpdateCenter/>
@@ -373,7 +400,7 @@ export default function App() {
 
         {task==="installing" && progress && <div className="fre-install-activity" aria-live="polite"><div><span>ПРОЦЕС: {stages[progress.stage]??progress.stage.toUpperCase()}</span><strong>{progress.message}</strong></div><span className="fre-install-percent">{percent}%</span><div className="fre-install-track"><div style={{width:percent+"%"}}/></div><button onClick={()=>setPage("Downloads")}>ДЕТАЛІ <ArrowRight size={14}/></button></div>}
 
-        {page==="Instances"&&<div className="fre-module"><InstancesPanel version={selected} active={activeInstanceId} setActive={setActiveInstanceId} setVersion={setSelected} setMemory={setMemoryMb} navigateHome={()=>setPage("Home")} navigateMods={()=>setPage("Mods")} navigateVersions={()=>setPage("Versions")}/></div>}
+        {page==="Instances"&&<div className="fre-module"><InstancesPanel version={selected} active={activeInstanceId} setActive={setActiveInstanceId} setVersion={setSelected} setMemory={setMemoryMb} navigateHome={()=>setPage("Home")} navigateMods={()=>setPage("Mods")} navigateVersions={()=>setPage("Versions")} requestedId={libraryFocusId}/></div>}
         {page==="Mods"&&<div className="fre-module"><ModsPanel version={selected} instanceId={activeInstanceId}/></div>}
         {page==="Skins"&&<div className="fre-module"><Suspense fallback={<div className="fre-log-mini-empty">Завантажуємо 3D-студію скінів…</div>}><SkinStudio/></Suspense></div>}
               {page==="Screenshots"&&<div className="fre-module"><ScreenshotsPanel instanceId={activeInstanceId}/></div>}
