@@ -28,6 +28,7 @@ import ServersPanel from "./ServersPanel";
 type Version = { id: string; type: string; url: string; time: string; releaseTime: string };
 type Progress = {stage: string; current: number; total: number; message: string};
 type Diagnostics = {logPath:string; contents:string};
+type GameCrash = {version:string;instanceId:string|null;exitCode:number|null;summary:string;logPath:string;crashReportPath:string|null};
 type LastInstall = {version:string;status:"installing"|"complete"|"error"|"interrupted";message:string;time:string};
 function previousInstall():LastInstall|null {
   try {
@@ -167,6 +168,7 @@ export default function App() {
   const [featuredProject,setFeaturedProject]=useState<DiscoverHit|null>(null);
   const [microsoftAccount,setMicrosoftAccount]=useState<MicrosoftAccount|null>(null);
   const [useMicrosoft,setUseMicrosoft]=useState(false);
+  const [gameCrash,setGameCrash]=useState<GameCrash|null>(null);
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState("");
   const [message,setMessage]=useState("");
@@ -260,7 +262,13 @@ export default function App() {
       setTask(status==="running"?"running":"idle");
       if(status!=="running")busyRef.current=false;
     });
-    return ()=>{void a.then(stop=>stop());void b.then(stop=>stop());void c.then(stop=>stop());};
+    const d=listen<GameCrash>("game-crash",event=>{
+      setGameCrash(event.payload);
+      setError("Minecraft завершився аварійно: "+event.payload.summary);
+      setPage("Logs");
+      void loadDiagnostics();
+    });
+    return ()=>{void a.then(stop=>stop());void b.then(stop=>stop());void c.then(stop=>stop());void d.then(stop=>stop());};
   },[]);
   useEffect(()=>{
     let current=true;
@@ -318,7 +326,7 @@ export default function App() {
       if(!ready){await installVersion(playVersion);return;}
     }catch(e){setError("Не вдалося перевірити Minecraft: "+humanError(e));return;}
     busyRef.current=true;
-    setTask("launching");setError("");setMessage("");setLogs([]);
+    setTask("launching");setError("");setMessage("");setLogs([]);setGameCrash(null);
     try{
       const response=await invoke<string>("launch_game",{version:playVersion,nickname,memoryMb:playMemory,instanceId:playInstance||null,useMicrosoft:useMicrosoft&&!!microsoftAccount});
       setMessage(response);
@@ -500,6 +508,18 @@ export default function App() {
 
 
         {page==="Logs"&&<section className="fre-diag-sheet fre-diagnostics">
+          {gameCrash&&<div className="fre-game-crash-card" role="alert">
+            <h3><AlertTriangle size={18}/> Minecraft аварійно завершився</h3>
+            <p>{gameCrash.summary}</p>
+            <p><strong>Версія:</strong> {gameCrash.version} · <strong>Код завершення:</strong> {gameCrash.exitCode??"Невідомий"}</p>
+            <p><strong>latest.log:</strong> <code>{gameCrash.logPath}</code></p>
+            {gameCrash.crashReportPath&&<p><strong>Crash report:</strong> <code>{gameCrash.crashReportPath}</code></p>}
+            <button className="secondary" onClick={()=>void copyText(
+              "Minecraft "+gameCrash.version+"; Exit "+String(gameCrash.exitCode)+"; "+gameCrash.summary+
+              "\nlatest.log: "+gameCrash.logPath+
+              (gameCrash.crashReportPath?"\nCrash report: "+gameCrash.crashReportPath:"")
+            )}><Copy size={15}/> Копіювати короткий звіт</button>
+          </div>}
           <div className="fre-module-label"><span>FRE / DIAGNOSTICS · LOCAL ONLY</span><ShieldCheck size={19}/></div>
           <div className="fre-diag-header"><div><h2>СИСТЕМНИЙ ЖУРНАЛ.</h2><p>Остання спроба та повідомлення про збої зберігаються локально. Дані не надсилаються нікуди.</p></div><span className="fre-diag-index">D / 01</span></div>
           <div className="fre-diag-overview">
