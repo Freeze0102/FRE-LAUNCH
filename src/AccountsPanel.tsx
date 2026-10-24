@@ -32,7 +32,7 @@ export default function AccountsPanel({nickname,onSelect,microsoft,onMicrosoftSe
   async function add(){
     setBusy(true);setError("");
     try{
-      const newAccount=await invoke<Account>("create_offline_account",{nickname:name});
+      const newAccount=await invoke<Account>("ensure_offline_account",{nickname:name});
       onSelect(newAccount.nickname);
       setName("");
       await refresh();
