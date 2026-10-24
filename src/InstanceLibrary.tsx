@@ -1,9 +1,10 @@
+import "./instance-library.css";
 import {useCallback,useEffect,useMemo,useState} from "react";
 import {invoke} from "@tauri-apps/api/core";
 import {
-  ArrowLeft,ArrowRight,Boxes,Check,ChevronDown,FolderOpen,HardDriveDownload,
+  ArrowLeft,ArrowRight,Boxes,Check,FolderOpen,
   Layers3,Package,Plus,RefreshCw,Search,Settings2,ShieldCheck,Star,Trash2,
-  X,Play,FileText,Archive,Grid2X2,List,SlidersHorizontal
+  X,Play,FileText,Archive,Grid2X2,List
 } from "lucide-react";
 import FabricOptions from "./FabricOptions";
 import GameFolders from "./GameFolders";
