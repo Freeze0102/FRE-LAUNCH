@@ -1443,3 +1443,22 @@ input:focus-visible,button:focus-visible,select:focus-visible,textarea:focus-vis
 .fre-app .fre-sidebar-other{opacity:.72}
 .fre-app .fre-sidebar-other:hover,.fre-app .fre-sidebar-other.is-active{opacity:1}
 @media(max-width:630px){.fre-app .fre-sidebar-divider{display:none}.fre-app .fre-sidebar-instance,.fre-app .fre-sidebar-add{flex:0 0 40px;min-width:40px;height:40px;min-height:40px}}
+
+/* Saved Minecraft skins modeled after Modrinth's gallery; locally stored images. */
+.fre-app .fre-skin-gallery{gap:13px}
+.fre-skin-gallery>h3{font-size:16px;margin:10px 0 0;color:#f2f5f2}
+.fre-skin-saved,.fre-skin-defaults{display:grid;grid-template-columns:repeat(auto-fill,minmax(125px,1fr));gap:10px}
+.fre-skin-gallery-card{position:relative;display:flex;align-items:center;flex-direction:column;justify-content:center;gap:9px;min-height:148px;min-width:0;border:1px solid #454850;border-radius:10px;background:#30333e;color:#dfe5e2;overflow:hidden;text-align:center}
+.fre-skin-gallery-card.active{border:2px solid #34ce71;background:#2a4938;color:#b5ffcd}
+.fre-skin-gallery-card>button:first-child,.fre-skin-defaults .fre-skin-gallery-card{display:flex;flex-direction:column;justify-content:center;align-items:center;gap:8px;width:100%;min-height:146px;padding:11px;border:0;background:transparent;color:inherit}
+.fre-skin-gallery-card img{height:95px;width:94px;object-fit:contain;image-rendering:pixelated}
+.fre-skin-gallery-card span{font-size:11px;max-width:100%;text-overflow:ellipsis;overflow:hidden;white-space:nowrap}
+.fre-skin-gallery-card .fre-skin-gallery-delete{position:absolute;right:4px;top:4px;display:grid;place-items:center;padding:7px;border:0;border-radius:6px;background:#1a1d25d9;color:#dfe3e0}
+.fre-skin-gallery-card .fre-skin-gallery-delete:hover{color:#ffcaca;background:#4c2930}
+.fre-skin-gallery-add{cursor:pointer;border-style:dashed}
+.fre-skin-gallery-add:hover{background:#35443b;color:#a2efb9;border-color:#4cb36e}
+.fre-skin-gallery-add input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer}
+.fre-skin-gallery-card svg{flex-shrink:0}
+.fre-skin-defaults{margin-bottom:8px}
+.fre-skin-gallery .fre-skin-guide{margin:0}
+@media(max-width:860px){.fre-skin-saved,.fre-skin-defaults{grid-template-columns:repeat(auto-fill,minmax(118px,1fr))}}
