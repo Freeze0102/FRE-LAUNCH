@@ -298,10 +298,20 @@ pub async fn install_modrinth_modpack(app:AppHandle,project_id:String,version_id
             let instance=super::instances::set_instance_loader(app.clone(),id.clone(),loader.into(),loader_version)?;
             Ok(instance)
         })();
-        if placement.is_err(){
-            let _=super::instances::delete_instance(app.clone(),id,true);
+        match placement {
+            Ok(instance)=>{
+                // Verify all .jar archives before marking a new pack ready.
+                if let Err(error)=super::mods::scan_instance_mods(&app,&id).await {
+                    let _=super::instances::delete_instance(app.clone(),id,true);
+                    return Err(format!("Перевірка модів завершилася помилкою: {error}"));
+                }
+                Ok(instance)
+            }
+            Err(error)=>{
+                let _=super::instances::delete_instance(app.clone(),id,true);
+                Err(error)
+            }
         }
-        placement
     }.await;
     if stage.exists(){let _=fs::remove_dir_all(&stage);}
     if let Ok(ref instance)=result {
