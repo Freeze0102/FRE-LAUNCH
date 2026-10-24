@@ -171,6 +171,7 @@ UI = {
 "user-restrictions.scope.version-write":"Редагувати версії та додавати файли"
 }
 NEW = {
+"fre-launch.welcome-screen.title":("Вітаємо у FRE LAUNCH","Welcome to FRE LAUNCH"),
 "fre-launch.offline.title":("Локальний нік","Local nickname"),
 "fre-launch.offline.placeholder":("Введи нік","Your nickname"),
 "fre-launch.offline.create":("Створити","Create"),
@@ -211,6 +212,10 @@ def apply(root):
             raise RuntimeError(f"Locale name collision: {key}")
         ua[key]={"message":uk}
         ea[key]={"message":en}
+    # A nickname-only profile completes onboarding without a Microsoft login;
+    # name this as choosing a profile, not signing into official services.
+    ea["onboarding-checklist.login-minecraft"]={"message":"Set up Minecraft profile"}
+    ua["onboarding-checklist.login-minecraft"]={"message":"Налаштувати профіль Minecraft"}
     # App settings must show the fork name rather than the upstream trademark.
     for catalog in (ea, ua):
         if "app.settings.app-version" in catalog:
