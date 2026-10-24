@@ -254,9 +254,9 @@ export default function App() {
     void invoke<InstallPreflight>("install_preflight").then(setPreflight).catch(e=>setPreflight({path:"",ready:false,detail:humanError(e)}));
     void refreshVersions(true);
     void invoke<string>("java_info").then(setJava).catch(e=>setJava("Java в PATH не знайдена: "+humanError(e)));
-    void invoke<MicrosoftAccount|null>("microsoft_current_account").then(account=>{
+    void invoke<MicrosoftAccount|null>("microsoft_restore_login").then(account=>{
       if(account){setMicrosoftAccount(account);setUseMicrosoft(true);setNickname(account.name);}
-    }).catch(()=>{});
+    }).catch(e=>setMessage("Microsoft: "+humanError(e)));
 
     const a=listen<Progress>("install-progress",event=>setProgress(event.payload));
     const b=listen<string>("game-log",event=>setLogs(prev=>[...prev.slice(-499),event.payload]));
