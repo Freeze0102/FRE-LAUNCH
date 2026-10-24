@@ -178,6 +178,14 @@ def customize(root,revision):
     hooks=root/"apps/app/nsis/hooks.nsi"
     if hooks.exists():
         hooks.write_text(hooks.read_text(encoding="utf-8").replace("the Modrinth App","FRE LAUNCH"),encoding="utf-8")
+    # The upstream Rust build and Vite expect packages/app-lib/.env.
+    # Use Modrinth's PUBLIC production API endpoints, never personal secrets.
+    app_lib=root/"packages/app-lib"
+    if not (app_lib/".env").exists():
+        production_env=app_lib/".env.prod"
+        if not production_env.is_file():
+            raise RuntimeError("Missing upstream app-lib/.env.prod configuration")
+        (app_lib/".env").write_text(production_env.read_text(encoding="utf-8"),encoding="utf-8")
     # Preserve the full desktop client and required workspace packages,
     # not the unrelated web/backend/docs apps that carry more reserved branding.
     for name in ("frontend","docs","labrinth","meta-generator","app-playground"):
