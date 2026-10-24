@@ -21,7 +21,14 @@ if (Test-Path $gitDirectory) {
 } else {
     # GitHub's "Download ZIP" excludes submodules. Download the same verified
     # upstream revision directly in that case, with no new branch or Actions.
-    if (-not (Test-Path $upstream)) {
+    if (-not (Test-Path (Join-Path $upstream '.git'))) {
+        if (Test-Path $upstream) {
+            if (Get-ChildItem -LiteralPath $upstream -Force | Select-Object -First 1) {
+                throw 'Existing vendor/modrinth directory is not a Git clone. Refusing to replace its contents.'
+            }
+            Remove-Item -LiteralPath $upstream -Force
+        }
+        New-Item -ItemType Directory -Force -Path (Split-Path $upstream -Parent) | Out-Null
         git clone --no-checkout --filter=blob:none https://github.com/modrinth/code.git "$upstream"
         if ($LASTEXITCODE -ne 0) { throw 'Cannot clone pinned Modrinth source.' }
     }
