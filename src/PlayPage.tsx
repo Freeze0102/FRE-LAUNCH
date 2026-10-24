@@ -21,6 +21,7 @@ type Props={
   onOpenProject:(project:DiscoverHit)=>void;
   onLaunchInstance:(instance:{id:string;version:string;memoryMb:number})=>void;
   onOpenInstance:(id:string,version:string,memory:number)=>void;
+  onCreateInstance:()=>void;
 };
 type IconSpec={symbol:string;color:string};
 type Group={id:string;name:string};
@@ -42,7 +43,7 @@ function Art({instance,overrides,large=false}:{instance:Instance;overrides:Recor
 }
 export default function PlayPage({
   versions,loading,selected,installed,isBusy,installAction,activeInstanceId,nickname,microsoftConnected,
-  onPage,onLaunch,onVersion,onSelectInstance,onRefresh,onOpenProject,onLaunchInstance,onOpenInstance
+  onPage,onLaunch,onVersion,onSelectInstance,onRefresh,onOpenProject,onLaunchInstance,onOpenInstance,onCreateInstance
 }:Props){
   const [instances,setInstances]=useState<Instance[]>([]);
   const [filter,setFilter]=useState("");
@@ -111,13 +112,13 @@ export default function PlayPage({
         </div>:<div className="freplay-first">
           <Package size={28}/><strong>Тут з'являться твої збірки</strong>
           <p>Створи першу збірку, щоб запускати Minecraft безпосередньо з головної сторінки.</p>
-          <button className="freplay-green" onClick={()=>onPage("Instances")}><Plus size={16}/> Створити збірку</button>
+          <button className="freplay-green" onClick={onCreateInstance}><Plus size={16}/> Створити збірку</button>
         </div>}
       </section>
       <section className="freplay-library">
         <div className="freplay-section-head"><h2>Бібліотека</h2><div className="freplay-header-actions">
           <button onClick={()=>setShowNewGroup(true)}><Plus size={14}/> Нова група</button>
-          <button className="freplay-green" onClick={()=>onPage("Instances")}><Plus size={14}/> Нова збірка</button>
+          <button className="freplay-green" onClick={onCreateInstance}><Plus size={14}/> Нова збірка</button>
         </div></div>
         <div className="freplay-search-row">
           <label className="freplay-search"><Search size={17}/><input value={filter} onChange={e=>setFilter(e.target.value)} placeholder="Пошук збірок..." aria-label="Пошук збірок"/></label>
@@ -155,7 +156,7 @@ export default function PlayPage({
           </article>)}
         </div>:<div className="freplay-nomatches"><BookOpen size={25}/><b>{instances.length?"Нічого не знайдено":"Тут буде твоя бібліотека"}</b>
           <p>{instances.length?"Зміни пошук або фільтр групи.":"Створи збірку для Vanilla, Fabric або Quilt."}</p>
-          <button onClick={()=>{setSelectedGroup("");setFilter("");onPage("Instances");}}>Створити збірку <ArrowRight size={14}/></button>
+          <button onClick={()=>{setSelectedGroup("");setFilter("");onCreateInstance();}}>Створити збірку <ArrowRight size={14}/></button>
         </div>}
       </section>
       <section className="freplay-discovery">
