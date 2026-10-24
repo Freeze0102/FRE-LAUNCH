@@ -218,13 +218,18 @@ export default function ModsPanel({version, instanceId}: {version: string; insta
       <div className="fre-mod-detail-hero">
         {opened.icon_url&&<img src={opened.icon_url} alt="" className="fre-mod-detail-icon"/>}
         <div><h2>{details?.project.title??opened.title}</h2><p>{details?.project.description??opened.description}</p>
-          <span className="muted"><DownloadCloud size={14}/> {(details?.project.downloads??opened.downloads).toLocaleString("uk-UA")} завантажень</span></div>
+          <span className="muted"><DownloadCloud size={14}/> {(details?.project.downloads??opened.downloads).toLocaleString("uk-UA")} завантажень · {opened.project_type==="modpack"?"Модпак":opened.project_type==="resourcepack"?"Ресурс-пак":opened.project_type==="shader"?"Шейдер":"Мод"}</span></div>
       </div>
       {detailBusy&&<p className="muted">Завантажуємо опис і версії з Modrinth…</p>}
       {details&&<>
+        <nav className="fre-mod-detail-tabs" aria-label="Перегляд проєкту">
+          <button className={detailTab==="about"?"active":""} onClick={()=>setDetailTab("about")}>Опис</button>
+          <button className={detailTab==="versions"?"active":""} onClick={()=>setDetailTab("versions")}>Версії ({details.versions.length})</button>
+        </nav>
         <div className="fre-mod-detail-layout">
-          <div className="fre-mod-detail-description"><h3><Info size={17}/> Про мод</h3>
-            <p>{details.project.body||details.project.description}</p>
+          <div className="fre-mod-detail-description">
+            {detailTab==="about"?<><h3><Info size={17}/> Про проєкт</h3><p>{details.project.body||details.project.description}</p></>:
+              <><h3>Вибір версії</h3><p>Вибери праворуч версію, сумісну з Minecraft та модлоадером твоєї збірки.</p></>}
           </div>
           <div className="fre-mod-detail-versions">
             <h3>Версії для {version}</h3>
@@ -248,7 +253,7 @@ export default function ModsPanel({version, instanceId}: {version: string; insta
     {!opened&&<div className="mod-grid">
       {hits.map(hit=><article className="mod-card" key={hit.project_id}>
         {hit.icon_url ? <img className="mod-icon" src={hit.icon_url} alt=""/> : <span className="mod-icon fallback"><Package size={24}/></span>}
-        <div className="mod-copy"><button className="fre-mod-open" onClick={()=>void openProject(hit)}><h3>{hit.title}</h3></button><p>{hit.description}</p><small><DownloadCloud size={13}/>{hit.downloads.toLocaleString("uk-UA")} завантажень</small></div>
+        <div className="mod-copy"><button className="fre-mod-open" onClick={()=>void openProject(hit)}><h3>{hit.title}</h3></button>{hit.author&&<div className="fre-mod-author">від {hit.author}</div>}<p>{hit.description}</p><small><DownloadCloud size={13}/>{hit.downloads.toLocaleString("uk-UA")} завантажень {hit.categories?.slice(0,2).map(cat=><span className="fre-mod-tag" key={cat}>{cat}</span>)}</small></div>
         <div className="fre-mod-card-actions">
           <button className="secondary" onClick={()=>void openProject(hit)}>Детальніше</button>
           {(kind==="mod"||kind==="resourcepack"||kind==="shader")
