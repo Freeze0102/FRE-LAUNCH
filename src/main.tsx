@@ -4,6 +4,7 @@ import App from "./App";
 import ErrorBoundary, { LAST_UI_CRASH } from "./ErrorBoundary";
 import "./style.css";
 import "./modrinth-shell.css";
+import "./modrinth-parity.css";
 
 // Collect JavaScript failures locally. No analytics or network transport.
 window.addEventListener("error",event=>{
