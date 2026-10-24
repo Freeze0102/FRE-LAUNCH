@@ -17,6 +17,7 @@ import ModsPanel from "./ModsPanel";
 const SkinStudio = lazy(() => import("./SkinStudio"));
 import BackupsPanel from "./BackupsPanel";
 import AccountsPanel from "./AccountsPanel";
+import type {MicrosoftAccount} from "./AccountsPanel";
 import JavaPanel from "./JavaPanel";
 import ScreenshotsPanel from "./ScreenshotsPanel";
 
@@ -134,6 +135,8 @@ function progressPercent(progress:Progress|null){
 export default function App() {
   const {page,setPage,selected,setSelected,nickname,setNickname,memoryMb,setMemoryMb,activeInstanceId,setActiveInstanceId,theme,setTheme}=useApp();
   const [versions,setVersions]=useState<Version[]>([]);
+  const [microsoftAccount,setMicrosoftAccount]=useState<MicrosoftAccount|null>(null);
+  const [useMicrosoft,setUseMicrosoft]=useState(false);
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState("");
   const [message,setMessage]=useState("");
@@ -266,7 +269,7 @@ export default function App() {
     busyRef.current=true;
     setTask("launching");setError("");setMessage("");setLogs([]);
     try{
-      const response=await invoke<string>("launch_game",{version:selected,nickname,memoryMb,instanceId:activeInstanceId||null});
+      const response=await invoke<string>("launch_game",{version:selected,nickname,memoryMb,instanceId:activeInstanceId||null,useMicrosoft:useMicrosoft&&!!microsoftAccount});
       setMessage(response);
       setTask("running");
     }catch(e){
@@ -318,7 +321,7 @@ export default function App() {
           {recoveryMode&&<span title="Відновлення після аварійного завершення: WebView2 без GPU-прискорення" className="fre-safe-mode-tag">RECOVERY</span>}
           <button className="fre-command-java" onClick={()=>setPage("Settings")} title="Стан Java"><Coffee size={16}/><span>{java.startsWith("Java в PATH")?"JAVA НЕ ЗНАЙДЕНА":"JAVA READY"}</span></button>
           <button className="fre-command-account" onClick={()=>setPage("Accounts")} title="Вибрати профіль">
-            <span className="fre-avatar">{nickname[0]?.toUpperCase()||"P"}</span><span>{nickname}</span><ChevronRight size={15}/>
+            <span className="fre-avatar">{nickname[0]?.toUpperCase()||"P"}</span><span>{nickname}{useMicrosoft&&microsoftAccount?" · Microsoft":""}</span><ChevronRight size={15}/>
           </button>
         </div>
       </header>
@@ -375,7 +378,14 @@ export default function App() {
         {page==="Skins"&&<div className="fre-module"><Suspense fallback={<div className="fre-log-mini-empty">Завантажуємо 3D-студію скінів…</div>}><SkinStudio/></Suspense></div>}
               {page==="Screenshots"&&<div className="fre-module"><ScreenshotsPanel instanceId={activeInstanceId}/></div>}
         {page==="Backups"&&<div className="fre-module"><BackupsPanel instanceId={activeInstanceId} instanceName={activeInstanceId?"ВИБРАНА ЗБІРКА":""}/></div>}
-        {page==="Accounts"&&<div className="fre-module"><AccountsPanel nickname={nickname} onSelect={setNickname}/></div>}
+        {page==="Accounts"&&<div className="fre-module"><AccountsPanel nickname={nickname}
+          microsoft={microsoftAccount}
+          onSelect={name=>{setNickname(name);setUseMicrosoft(false);}}
+          onMicrosoftSelect={account=>{
+            setMicrosoftAccount(account);setUseMicrosoft(!!account);
+            if(account)setNickname(account.name);
+            else setNickname("Player");
+          }}/></div>}
 
         {page==="Settings"&&<div className="fre-settings-stack">
           <section className="fre-control-paper"><div className="fre-module-label"><span>01 / ВИГЛЯД</span><Wrench size={18}/></div>
