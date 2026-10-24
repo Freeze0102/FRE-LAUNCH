@@ -190,7 +190,7 @@ async fn read_browser_callback(listener:tokio::net::TcpListener,expected_state:&
         if !path.starts_with('/')||path.starts_with("//"){continue;}
         let Ok(callback)=reqwest::Url::parse(&format!("http://localhost{path}")) else{continue};
         let pairs=callback.query_pairs().into_owned().collect::<std::collections::HashMap<_,_>>();
-        let state_matches=pairs.get("state").is_some_and(|s|s==expected_state);
+        let state_matches=pairs.get("state").is_some_and(|value|value.as_str()==expected_state);
         let outcome=if state_matches{
             if let Some(code)=pairs.get("code").filter(|s|!s.is_empty()&&s.len()<4096){
                 Some(Ok(code.clone()))
