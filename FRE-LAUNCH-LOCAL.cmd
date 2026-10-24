@@ -35,6 +35,9 @@ if errorlevel 1 (
   goto requirements
 )
 echo [OK] Node.js, npm and Rust found.
+echo [IMPORTANT] Local dev and release builds can use the same AppData
+echo             as your installed FRE LAUNCH.
+echo             Back up Minecraft worlds and settings before testing.
 echo [NOTE] You also need Microsoft C++ Build Tools with
 echo        "Desktop development with C++" and Microsoft Edge WebView2.
 echo        Official guide: https://v2.tauri.app/start/prerequisites/
