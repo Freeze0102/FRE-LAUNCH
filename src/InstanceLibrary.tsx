@@ -34,6 +34,10 @@ function sizeLabel(bytes:number){return bytes>=1048576?(bytes/1048576).toFixed(1
 
 export function InstancesPanel({version,active,setActive,setVersion,setMemory,navigateHome,navigateMods,navigateVersions,onPlayInstance,showWorlds,showFiles,onImportPack,importBusy,createRequest,requestedId}:Props){
   const [instances,setInstances]=useState<Instance[]>([]);
+  const [artById]=useState<Record<string,string>>(()=>{
+    try{return JSON.parse(localStorage.getItem("fre-play-instance-art")||"{}") as Record<string,string>;}
+    catch{return {};}
+  });
   const [search,setSearch]=useState("");
   const [sort,setSort]=useState("name");
   const [layout,setLayout]=useState<"grid"|"list">("grid");
@@ -207,7 +211,7 @@ export function InstancesPanel({version,active,setActive,setVersion,setMemory,na
       <div className={"fre-library-cards"+(layout==="list"?" is-list":"")}>
         {filtered.map(item=><article className={"fre-library-card"+(active===item.id?" is-chosen":"")} key={item.id}>
           <button className="fre-library-card-main" onClick={()=>open(item)} aria-label={`Відкрити ${item.name}`}>
-            <span className={"fre-library-card-art fre-loader-"+item.loader}><Boxes size={42}/></span>
+            <span className={"fre-library-card-art fre-loader-"+item.loader}><Boxes size={42}/>{artById[item.id]&&<img src={artById[item.id]} alt="" className="fre-library-art-img" loading="lazy" onError={e=>{e.currentTarget.style.display="none";}}/>}</span>
             <span className="fre-library-card-info"><strong title={item.name}>{item.name}</strong><small>{item.version} · {loaderLabel(item)}</small><em>{item.memoryMb/1024} GB RAM</em></span>
           </button>
           <div className="fre-library-card-actions">
@@ -255,7 +259,7 @@ export function InstancesPanel({version,active,setActive,setVersion,setMemory,na
       <div className="fre-instance-detail">
         <button className="fre-instance-back" onClick={()=>setSelected(null)}><ArrowLeft size={16}/> Бібліотека</button>
         <header className="fre-instance-detail-head">
-          <span className={"fre-instance-detail-cover fre-loader-"+current.loader}><Boxes size={38}/></span>
+          <span className={"fre-instance-detail-cover fre-loader-"+current.loader}><Boxes size={38}/>{artById[current.id]&&<img src={artById[current.id]} alt="" className="fre-library-art-img" onError={e=>{e.currentTarget.style.display="none";}}/>}</span>
           <div><h2>{current.name}</h2><p><Layers3 size={14}/> {loaderLabel(current)} {current.version} <span className="fre-instance-head-dot">•</span> {current.memoryMb/1024} GB RAM</p></div>
           <button className="fre-instance-head-settings" onClick={()=>setTab("settings")} title="Налаштування збірки" aria-label="Налаштування збірки"><Settings2 size={21}/></button>
           <button className="fre-instance-head-favorite" onClick={()=>void favorite(current)} title={current.favorite?"Прибрати з обраного":"У вибране"}><Star size={17} fill={current.favorite?"currentColor":"none"}/></button>
