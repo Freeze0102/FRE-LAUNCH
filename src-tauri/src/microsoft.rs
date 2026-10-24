@@ -1,6 +1,7 @@
 //! Microsoft device-code sign-in for a Minecraft Java account.
 //! Requires a developer-owned, Minecraft-Services-approved public Client ID.
-//! Tokens are held in memory ONLY, never exposed to the React webview or saved.
+//! Minecraft bearer tokens stay in Rust memory. The Microsoft refresh token is saved only
+//! in the Windows Credential Manager, never in JavaScript or project configuration.
 //! Do not log bearer tokens, device codes, requests, or responses.
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -310,6 +311,7 @@ pub async fn microsoft_upload_skin(png_base64:String, variant:String) -> Result<
     if width!=64||!(height==32||height==64){
         return Err("Minecraft Services приймає скіни 64×64 або 64×32. Зменш HD-скін перед завантаженням.".into());
     }
+    let _=microsoft_restore_login().await?;
     let token={
         let guard=session().lock().map_err(|_|"Стан авторизації недоступний")?;
         let current=guard.as_ref().ok_or("Спочатку увійди до Minecraft через Microsoft")?;
@@ -333,6 +335,7 @@ pub async fn microsoft_upload_skin(png_base64:String, variant:String) -> Result<
 
 #[tauri::command]
 pub async fn microsoft_reset_skin() -> Result<String,String> {
+    let _=microsoft_restore_login().await?;
     let token={
         let guard=session().lock().map_err(|_|"Стан авторизації недоступний")?;
         let current=guard.as_ref().ok_or("Увійди до Minecraft через Microsoft")?;
