@@ -23,6 +23,7 @@ type Props={
   onOpenInstance:(id:string,version:string,memory:number)=>void;
   onCreateInstance:()=>void;
   onImportPack:()=>void;importBusy:boolean;
+  onSelectOffline:(nickname:string)=>void;
 };
 type IconSpec={symbol:string;color:string};
 type Group={id:string;name:string};
@@ -47,7 +48,7 @@ function Art({instance,overrides,sources,large=false}:{instance:Instance;overrid
 }
 export default function PlayPage({
   versions,loading,selected,installed,isBusy,installAction,activeInstanceId,nickname,microsoftConnected,
-  onPage,onLaunch,onVersion,onSelectInstance,onRefresh,onOpenProject,onLaunchInstance,onOpenInstance,onCreateInstance,onImportPack,importBusy
+  onPage,onLaunch,onVersion,onSelectInstance,onRefresh,onOpenProject,onLaunchInstance,onOpenInstance,onCreateInstance,onImportPack,importBusy,onSelectOffline
 }:Props){
   const [instances,setInstances]=useState<Instance[]>([]);
   const [filter,setFilter]=useState("");
@@ -64,6 +65,8 @@ export default function PlayPage({
   const [menuFor,setMenuFor]=useState("");
   const [featured,setFeatured]=useState<DiscoverHit[]>([]);
   const [error,setError]=useState("");
+  const [quickNickname,setQuickNickname]=useState("");
+  const [savingNickname,setSavingNickname]=useState(false);
   const refresh=()=>{
     void invoke<Instance[]>("list_instances").then(setInstances).catch(e=>setError(String(e)));
   };
@@ -98,6 +101,21 @@ export default function PlayPage({
     const id=Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,7);
     setGroups(current=>[...current,{id,name}]);setSelectedGroup(id);
     setShowNewGroup(false);setNewGroupName("");
+  }
+  async function chooseNickname(){
+    const name=quickNickname.trim();
+    if(!/^[A-Za-z0-9_]{1,16}$/.test(name)){
+      setError("Нік має містити від 1 до 16 латинських літер, цифр або _.");
+      return;
+    }
+    setSavingNickname(true);
+    setError("");
+    try{
+      const profile=await invoke<{nickname:string}>("ensure_offline_account",{nickname:name});
+      onSelectOffline(profile.nickname);
+      setQuickNickname("");
+    }catch(e){setError("Не вдалося створити локальний профіль: "+String(e));}
+    finally{setSavingNickname(false);}
   }
   return <div className="freplay-layout">
     <div className="freplay-content">
@@ -193,6 +211,13 @@ export default function PlayPage({
       <section className="freplay-account-tile">
         <h3>Профіль Minecraft</h3>
         <button onClick={()=>onPage("Accounts")}><span className="freplay-user-avatar">{nickname.charAt(0).toUpperCase()}</span><span><b>{nickname}</b><small>{microsoftConnected?"Microsoft Minecraft":"Локальний профіль"}</small></span><ChevronDown size={14}/></button>
+        <form className="freplay-quick-nick" onSubmit={event=>{event.preventDefault();void chooseNickname();}}>
+          <label htmlFor="freplay-quick-nickname">Створити профіль за ніком</label>
+          <div><input id="freplay-quick-nickname" value={quickNickname} maxLength={16}
+            autoComplete="off" placeholder="Введи свій нік" onChange={event=>setQuickNickname(event.target.value.replace(/[^A-Za-z0-9_]/g,""))}/>
+            <button type="submit" title="Зберегти й обрати нік" aria-label="Зберегти й обрати нік" disabled={!quickNickname||savingNickname}><Plus size={16}/></button></div>
+          <small>Для локальної гри й серверів, які дозволяють офлайн-профілі. На сервері може знадобитися окрема реєстрація.</small>
+        </form>
       </section>
       <section className="freplay-shortcuts">
         <h3>Швидкі дії</h3>
