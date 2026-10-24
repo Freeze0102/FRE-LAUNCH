@@ -4,7 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import {
-  ArrowRight, AlertTriangle, Boxes, Check, ChevronRight, CircleHelp, Coffee, Copy, Download, FolderOpen, HardDriveDownload, House, Images, Layers3, ListFilter, Orbit, Play, Puzzle, RefreshCw, Search, Settings2, ShieldCheck, Shirt, SlidersHorizontal, Terminal, UserRound, Wrench, X, Archive, ScrollText
+  ArrowRight, AlertTriangle, Boxes, Check, ChevronRight, CircleHelp, Coffee, Copy, Download, FolderOpen, HardDriveDownload, House, Images, Layers3, ListFilter, Orbit, Play, Plus, Puzzle, RefreshCw, Search, Settings2, ShieldCheck, Shirt, SlidersHorizontal, Terminal, UserRound, Wrench, X, Archive, ScrollText
 } from "lucide-react";
 import InstallDeck from "./InstallDeck";
 import GameFolders from "./GameFolders";
