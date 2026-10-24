@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { open as selectLocalFile } from "@tauri-apps/plugin-dialog";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import {
@@ -183,6 +184,8 @@ export default function App() {
     try{localStorage.setItem("fre-auth-choice","microsoft");}catch{}
   }
   const [gameCrash,setGameCrash]=useState<GameCrash|null>(null);
+  const [importingPack,setImportingPack]=useState(false);
+  const [importProgress,setImportProgress]=useState<{current:number;total:number;message:string}|null>(null);
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState("");
   const [message,setMessage]=useState("");
@@ -286,7 +289,8 @@ export default function App() {
       setPage("Logs");
       void loadDiagnostics();
     });
-    return ()=>{void a.then(stop=>stop());void b.then(stop=>stop());void c.then(stop=>stop());void d.then(stop=>stop());};
+    const e=listen<{current:number;total:number;message:string}>("fre-modpack-progress",event=>setImportProgress(event.payload));
+    return ()=>{void a.then(stop=>stop());void b.then(stop=>stop());void c.then(stop=>stop());void d.then(stop=>stop());void e.then(stop=>stop());};
   },[]);
   useEffect(()=>{
     let current=true;
@@ -368,6 +372,22 @@ export default function App() {
       void loadDiagnostics();
     }
   }
+  async function importMrpack(){
+    if(importingPack||isBusy)return;
+    setError("");setMessage("");
+    try{
+      const path=await selectLocalFile({multiple:false,directory:false,
+        title:"Імпортувати модпак Modrinth",
+        filters:[{name:"Modrinth Modpack",extensions:["mrpack"]}]});
+      if(!path||typeof path!=="string")return;
+      setImportingPack(true);setImportProgress({current:0,total:1,message:"Читання архіву"});
+      const profile=await invoke<{id:string;name:string;version:string;memoryMb:number}>("install_local_mrpack",{path});
+      setActiveInstanceId(profile.id);setSelected(profile.version);setMemoryMb(profile.memoryMb);
+      setLibraryFocusId(profile.id);setPage("Instances");
+      setMessage("Збірку "+profile.name+" імпортовано. Можна переглянути моди й запустити Minecraft.");
+    }catch(e){setError("Не вдалося імпортувати .mrpack: "+humanError(e));}
+    finally{setImportingPack(false);setImportProgress(null);}
+  }
   async function copyText(text:string){
     try{await navigator.clipboard.writeText(text);setMessage("Скопійовано в буфер обміну.");}
     catch(e){setError("Не вдалося скопіювати: "+humanError(e));}
@@ -437,6 +457,10 @@ export default function App() {
             {page!=="Home"&&<button className="fre-return" onClick={()=>setPage("Home")}><House size={16}/> Грати <ArrowRight size={15}/></button>}
           </div>
         </div>}
+        {importingPack&&importProgress&&<div className="fre-pack-import-banner" role="status" aria-live="polite">
+          <Package size={17}/><div><strong>Встановлення модпака</strong><span>{importProgress.message}</span></div>
+          <b>{importProgress.total?Math.round(importProgress.current/importProgress.total*100):0}%</b>
+        </div>}
         {error&&<div className="fre-incident" role="alert"><AlertTriangle size={16}/><span title={error}>{error}</span><button onClick={()=>setPage("Logs")}><Terminal size={14}/> ЖУРНАЛ <ArrowRight size={13}/></button><button onClick={()=>setError("")} title="Приховати повідомлення" aria-label="Приховати повідомлення"><X size={16}/></button></div>}
         {message&&<div className="fre-flash" role="status"><Check size={17}/><span>{message}</span><button onClick={()=>setMessage("")} title="Закрити"><X size={16}/></button></div>}
 
@@ -457,6 +481,7 @@ export default function App() {
           onLaunch={()=>void launch()}
           onLaunchInstance={item=>void launch(item)}
           onCreateInstance={()=>{setLibraryFocusId("");setCreateInstanceRequest(v=>v+1);setPage("Instances");}}
+          onImportPack={()=>void importMrpack()} importBusy={importingPack}
           onOpenInstance={(id,version,memory)=>{setLibraryFocusId(id);setActiveInstanceId(id);setSelected(version);setMemoryMb(memory);setPage("Instances");}}
           microsoftConnected={!!microsoftAccount}
           onVersion={id=>{setSelected(id);setActiveInstanceId("");}}
@@ -483,8 +508,8 @@ export default function App() {
 
         {task==="installing" && progress && <div className="fre-install-activity" aria-live="polite"><div><span>ПРОЦЕС: {stages[progress.stage]??progress.stage.toUpperCase()}</span><strong>{progress.message}</strong></div><span className="fre-install-percent">{percent}%</span><div className="fre-install-track"><div style={{width:percent+"%"}}/></div><button onClick={()=>setPage("Downloads")}>ДЕТАЛІ <ArrowRight size={14}/></button></div>}
 
-        {page==="Instances"&&<div className="fre-module"><InstancesPanel version={selected} active={activeInstanceId} setActive={setActiveInstanceId} setVersion={setSelected} setMemory={setMemoryMb} navigateHome={()=>setPage("Home")} navigateMods={()=>{setFeaturedProject(null);setPage("Mods");}} navigateVersions={()=>setPage("Versions")} onPlayInstance={item=>void launch(item)} showWorlds={featureSettings.showWorlds} showFiles={featureSettings.showFiles} createRequest={createInstanceRequest} requestedId={libraryFocusId}/></div>}
-        {page==="Mods"&&<div className="fre-module"><ModsPanel version={selected} instanceId={activeInstanceId} initialProject={featuredProject?{...featuredProject,slug:featuredProject.slug||""}:null} onServers={()=>setPage("Servers")}
+        {page==="Instances"&&<div className="fre-module"><InstancesPanel version={selected} active={activeInstanceId} setActive={setActiveInstanceId} setVersion={setSelected} setMemory={setMemoryMb} navigateHome={()=>setPage("Home")} navigateMods={()=>{setFeaturedProject(null);setPage("Mods");}} navigateVersions={()=>setPage("Versions")} onPlayInstance={item=>void launch(item)} showWorlds={featureSettings.showWorlds} showFiles={featureSettings.showFiles} onImportPack={()=>void importMrpack()} importBusy={importingPack} createRequest={createInstanceRequest} requestedId={libraryFocusId}/></div>}
+        {page==="Mods"&&<div className="fre-module"><ModsPanel version={selected} instanceId={activeInstanceId} initialProject={featuredProject?{...featuredProject,slug:featuredProject.slug||""}:null} onServers={()=>setPage("Servers")} onImportPack={()=>void importMrpack()} importBusy={importingPack}
           onPackInstalled={instance=>{setActiveInstanceId(instance.id);setSelected(instance.version);setMemoryMb(instance.memoryMb);setLibraryFocusId(instance.id);setPage("Instances");}}/></div>}
         {page==="Skins"&&<div className="fre-module"><Suspense fallback={<div className="fre-log-mini-empty">Завантажуємо 3D-студію скінів…</div>}><SkinStudio microsoftConnected={!!microsoftAccount&&useMicrosoft}/></Suspense></div>}
          {page==="Servers"&&<div className="fre-module"><ServersPanel/></div>}
