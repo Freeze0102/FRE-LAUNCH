@@ -4,7 +4,7 @@ import {invoke} from "@tauri-apps/api/core";
 import {
   ArrowLeft,ArrowRight,Boxes,Check,FolderOpen,
   Layers3,Package,Plus,RefreshCw,Search,Settings2,ShieldCheck,Star,Trash2,
-  X,Play,FileText,Archive,Grid2X2,List
+  X,Play,FileText,Archive,Grid2X2,List,Upload
 } from "lucide-react";
 import FabricOptions from "./FabricOptions";
 import GameFolders from "./GameFolders";
@@ -22,7 +22,7 @@ type Props={
   version:string;active:string;setActive:(id:string)=>void;
   setVersion:(v:string)=>void;setMemory:(mb:number)=>void;
   navigateHome:()=>void;navigateMods:()=>void;navigateVersions:()=>void;onPlayInstance:(item:Instance)=>void;requestedId?:string;
-  showWorlds:boolean;showFiles:boolean;createRequest:number;
+  showWorlds:boolean;showFiles:boolean;createRequest:number;onImportPack:()=>void;importBusy:boolean;
 };
 const categories:{id:Category;label:string}[]=[
   {id:"mods",label:"Моди"},{id:"resourcepacks",label:"Ресурс-паки"},{id:"shaderpacks",label:"Шейдери"}
@@ -32,7 +32,7 @@ function loaderLabel(instance:Instance){
 }
 function sizeLabel(bytes:number){return bytes>=1048576?(bytes/1048576).toFixed(1)+" MB":Math.round(bytes/1024)+" KB";}
 
-export function InstancesPanel({version,active,setActive,setVersion,setMemory,navigateHome,navigateMods,navigateVersions,onPlayInstance,showWorlds,showFiles,createRequest,requestedId}:Props){
+export function InstancesPanel({version,active,setActive,setVersion,setMemory,navigateHome,navigateMods,navigateVersions,onPlayInstance,showWorlds,showFiles,onImportPack,importBusy,createRequest,requestedId}:Props){
   const [instances,setInstances]=useState<Instance[]>([]);
   const [search,setSearch]=useState("");
   const [sort,setSort]=useState("name");
@@ -189,7 +189,10 @@ export function InstancesPanel({version,active,setActive,setVersion,setMemory,na
 
       <div className="fre-library-heading">
         <div><h2>Бібліотека</h2><p>Усі твої профілі Minecraft в одному місці.</p></div>
-        <button className="primary" onClick={()=>setCreateOpen(true)}><Plus size={17}/> Створити збірку</button>
+        <div className="fre-library-new-actions">
+          <button className="secondary" disabled={importBusy} onClick={onImportPack}><Upload size={17}/> Імпорт .mrpack</button>
+          <button className="primary" onClick={()=>setCreateOpen(true)}><Plus size={17}/> Створити збірку</button>
+        </div>
       </div>
       <div className="fre-library-toolbar">
         <div className="search"><Search size={16}/><input aria-label="Пошук збірки" placeholder="Пошук збірок..." value={search} onChange={e=>setSearch(e.target.value)}/></div>
@@ -223,8 +226,12 @@ export function InstancesPanel({version,active,setActive,setVersion,setMemory,na
             <button className="fre-wizard-option" onClick={()=>{setCreateStep("custom");setCreateVersion(version);setCreateError("");}}>
               <span><Layers3 size={20}/></span><span><b>Власна збірка</b><small>Створи збірку з потрібною версією Minecraft і модлоадером.</small></span><ArrowRight size={17}/></button>
             <button className="fre-wizard-option" onClick={()=>{setCreateOpen(false);navigateMods();}}>
-              <span><Package size={20}/></span><span><b>Знайти мод або модпак</b><small>Переглянути каталог Modrinth. Автоматичне встановлення .mrpack ще в розробці.</small></span><ArrowRight size={17}/></button>
-            <div className="fre-wizard-soon"><FolderOpen size={16}/> Імпорт готових .mrpack і перенесення чужих збірок поки не підтримуються.</div>
+              <span><Package size={20}/></span><span><b>Знайти мод або модпак</b><small>Переглянути каталог та встановити сумісний модпак.</small></span><ArrowRight size={17}/></button>
+            <button className="fre-wizard-option" disabled={importBusy} onClick={()=>{setCreateOpen(false);onImportPack();}}>
+              <span><Upload size={20}/></span><span><b>Імпорт .mrpack з комп'ютера</b>
+              <small>Вибери готовий архів збірки Modrinth. Створимо новий профіль.</small></span><ArrowRight size={17}/>
+            </button>
+            <div className="fre-wizard-soon"><ShieldCheck size={16}/> Forge/NeoForge наразі не підтримуються. Імпорт перевіряє файли й хеші.</div>
           </>:<>
             <button className="fre-wizard-back" onClick={()=>setCreateStep("choose")}><ArrowLeft size={15}/> Вибір типу</button>
             <label>Назва</label><input className="input" autoFocus maxLength={48} placeholder="Моя збірка" value={createName} onChange={e=>setCreateName(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")void create();}}/>
