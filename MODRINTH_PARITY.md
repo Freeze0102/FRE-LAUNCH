@@ -1,3 +1,15 @@
+## Native Microsoft browser login — 24 October 2026
+
+- [x] Added OAuth 2.0 Authorization Code + PKCE S256 browser flow in `src-tauri/src/microsoft.rs`.
+- [x] Opens official `login.microsoftonline.com` in the user's system browser, binds a random callback port on `127.0.0.1`, validates CSRF state, enforces 5-minute timeout, exchanges authorization code in Rust only.
+- [x] Reuses Xbox Live → XSTS → Minecraft Services verification, saves refresh token in Windows Credential Manager, and uses existing profile name/UUID.
+- [x] Account UI defaults to **«Увійти через Microsoft»**, with device-code sign-in as fallback; a developer may enter only their own authorized Client ID.
+- [x] Fixed a React rerender that reset the device-code polling timer; added RFC 7636 PKCE test vector and a random-verifier format test.
+- [x] Windows GitHub Actions can embed `FRE_MS_CLIENT_ID` from an Actions variable, if the project owner obtains an independently approved Minecraft Services registration.
+- [ ] Actual Microsoft Services approval for FRE LAUNCH is not verified; without it end-user premium login cannot be guaranteed. The account registration must include a native `http://localhost` redirect for browser PKCE.
+- [ ] Full Rust/TypeScript compilation on Windows and actual Microsoft OAuth/browser callback testing **have not run** on the new commit.
+- [ ] Pixel-perfect UI parity with Modrinth across all screens is not achieved; do not describe current UI as 1:1.
+
 ## Local Modrinth pack import and visual parity pass
 
 - [x] Native Windows `.mrpack` picker from Play, Discover and the Create Instance wizard (`@tauri-apps/plugin-dialog`); only .mrpack files, regular-file metadata and 128 MiB cap accepted.
