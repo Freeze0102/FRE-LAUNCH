@@ -59,3 +59,28 @@
 .fre-app .fre-discover-categories button{flex:1 1 auto}
 .fre-app .fre-discover-heading{flex-wrap:wrap}
 }
+
+/* Two-column Discover from the user's Modrinth App video: results + facet rail. */
+.fre-app .fre-modrinth-page{max-width:none}
+.fre-discover-shell{display:grid;grid-template-columns:minmax(0,1fr) 224px;gap:17px;align-items:start;min-width:0}
+.fre-discover-main{min-width:0;overflow:visible}
+.fre-discover-sidebar{background:#203027;border:1px solid #34443a;border-radius:10px;min-width:0;position:sticky;top:10px;max-height:calc(100vh - 110px);overflow-y:auto;overflow-x:hidden}
+.fre-discover-side-section{border-bottom:1px solid #3b5040;padding:14px 11px}
+.fre-discover-side-section h3{display:flex;align-items:center;gap:7px;margin:0 0 13px;color:#ecf6ed;font-size:12px;font-weight:740}
+.fre-discover-side-section h3>span{margin-left:auto;color:#94a99b;font-size:10px;font-weight:500}
+.fre-side-check{display:flex;align-items:flex-start;gap:8px;font-size:11px;line-height:1.45;color:#bdcec1}
+.fre-side-check input{width:15px;height:15px;margin:0;accent-color:#30d171}
+.fre-discover-category-list{display:flex;flex-direction:column;gap:2px}
+.fre-discover-category-list button{display:flex;align-items:center;gap:10px;min-height:32px;background:transparent;border:0;border-radius:7px;color:#a8bfb0;font-size:11px;font-weight:540;padding:7px 8px;text-align:left}
+.fre-discover-category-list button.selected{background:#31543d;color:#6af097;font-weight:740}
+.fre-discover-category-list button:hover:not(.selected){color:#f0fbf2;background:#314038}
+.fre-discover-category-symbol{display:grid;place-items:center;width:17px;height:17px;background:#415b4c;border-radius:5px;color:#bbe6c5;font-size:10px;flex-shrink:0}
+.fre-discover-side-footer p{font-size:10px;color:#a5b5aa;line-height:1.55}
+.fre-discover-active-category{display:inline-flex;gap:7px;align-items:center;background:#245339;border:1px solid #397a4e;border-radius:8px;color:#72f4a0;padding:6px 9px;font-size:11px}
+.fre-app .fre-discover-filters .fre-filter-chip{display:none}
+.fre-app .fre-discover-shell .mod-grid>.mod-card{grid-template-columns:57px minmax(0,1fr)!important;grid-template-areas:"icon copy" "actions actions"!important;gap:10px!important}
+.fre-app .fre-discover-shell .mod-grid .mod-icon{width:55px!important;height:55px!important;min-width:55px}
+.fre-app .fre-discover-shell .mod-grid .fre-mod-card-actions{justify-content:flex-end;border-top:1px solid #363941;padding-top:7px}
+@media(min-width:1450px){.fre-app .fre-discover-shell .mod-grid>.mod-card{grid-template-columns:64px minmax(0,1fr) auto!important;grid-template-areas:"icon copy actions"!important}.fre-app .fre-discover-shell .mod-grid .fre-mod-card-actions{border-top:0;padding:0;justify-content:initial}}
+@media(max-width:960px){.fre-discover-shell{grid-template-columns:minmax(0,1fr) 190px;gap:10px}.fre-discover-sidebar{max-height:calc(100vh - 85px)}}
+@media(max-width:680px){.fre-discover-shell{display:flex;flex-direction:column}.fre-discover-main{width:100%}.fre-discover-sidebar{position:static;width:100%;max-height:250px}.fre-app .fre-discover-shell .mod-grid>.mod-card{grid-template-columns:54px minmax(0,1fr)!important}}
