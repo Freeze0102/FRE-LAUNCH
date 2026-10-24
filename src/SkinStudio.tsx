@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
+import {invoke} from "@tauri-apps/api/core";
 import { SkinViewer, WalkingAnimation, RunningAnimation } from "skinview3d";
-import { ImagePlus, RotateCcw, Footprints, Pause, Play, Upload, Plus, Trash2, Check } from "lucide-react";
+import { ImagePlus, RotateCcw, Footprints, Pause, Play, Upload, Plus, Trash2, Check, ShieldCheck } from "lucide-react";
 import SkinPixelEditor from "./SkinPixelEditor";
 import {builtInSkin} from "./defaultSkin";
 
@@ -23,7 +24,7 @@ function storedSkins():SavedSkin[]{
 }
 
 
-export default function SkinStudio() {
+export default function SkinStudio({microsoftConnected=false}:{microsoftConnected?:boolean}) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const viewer = useRef<SkinViewer | null>(null);
   const [skin, setSkin] = useState<string>(() => localStorage.getItem(STORAGE_SKIN) || builtInSkin());
@@ -33,6 +34,9 @@ export default function SkinStudio() {
   const [animation, setAnimation] = useState<Animate>("walk");
   const [spin, setSpin] = useState(true);
   const [error, setError] = useState("");
+  const [uploadBusy,setUploadBusy]=useState(false);
+  const [uploadNotice,setUploadNotice]=useState("");
+  const [skinVariant,setSkinVariant]=useState<"classic"|"slim">("classic");
 
   useEffect(() => {
     if (!canvas.current) return;
@@ -128,6 +132,21 @@ export default function SkinStudio() {
       if(skin===item.image)restoreDefault();
     }catch{setError("Не вдалося оновити галерею скінів.");}
   }
+  async function uploadToMinecraft(){
+    if(!custom||!skin.startsWith("data:image/png;base64,"))return;
+    setUploadBusy(true);setUploadNotice("");setError("");
+    try{
+      const message=await invoke<string>("microsoft_upload_skin",{pngBase64:skin.slice("data:image/png;base64,".length),variant:skinVariant});
+      setUploadNotice(message);
+    }catch(e){setError(String(e));}
+    finally{setUploadBusy(false);}
+  }
+  async function resetMinecraftSkin(){
+    setUploadBusy(true);setUploadNotice("");setError("");
+    try{setUploadNotice(await invoke<string>("microsoft_reset_skin"));}
+    catch(e){setError(String(e));}
+    finally{setUploadBusy(false);}
+  }
   function restoreDefault(){
     localStorage.removeItem(STORAGE_SKIN);
     setSkin(builtInSkin());
@@ -156,7 +175,7 @@ export default function SkinStudio() {
         </button>
       </div>
       <h3>Налаштування скіна</h3>
-      <div className="fre-skin-status">{custom?"Власний скін збережено":"Зараз стандартний скін"}</div>
+      <div className="fre-skin-status">{custom?"Скін вибрано для локального перегляду":"Стандартний скін у локальному перегляді"}</div>
       <div className="fre-skin-guide">
         <strong>1. Завантаж PNG</strong>
         <p>Вибери скін Minecraft 64×64 або 64×32. Побачиш його одразу зліва. Файл зберігається для наступного перегляду.</p>
@@ -176,9 +195,22 @@ export default function SkinStudio() {
         <button className="secondary" disabled={!custom} onClick={restoreDefault}><RotateCcw size={16}/> Повернути стандартний скін</button>
       </div>
       {error && <p className="error">{error}</p>}
-      <div className="fre-skin-guide">
-        <strong>Де працюватиме цей скін?</strong>
-        <p>Наразі це лише локальний перегляд і редактор. На Microsoft-акаунт та ігрові сервери скін звідси не завантажується.</p>
+      <div className="fre-skin-minecraft-upload">
+        <h3><ShieldCheck size={17}/> Застосувати скін у Minecraft Java</h3>
+        {microsoftConnected?
+          <><p>Ти увійшов через Microsoft. Обери модель персонажа й надішли цей PNG до Minecraft Services.</p>
+            <div className="segmented">
+              <button className={skinVariant==="classic"?"selected":""} onClick={()=>setSkinVariant("classic")}>Classic (Стів)</button>
+              <button className={skinVariant==="slim"?"selected":""} onClick={()=>setSkinVariant("slim")}>Slim (Алекс)</button>
+            </div>
+            <button className="primary" disabled={uploadBusy||!custom} onClick={()=>void uploadToMinecraft()}>
+              <Upload size={17}/> {uploadBusy?"Завантаження…":"Застосувати до Minecraft-акаунта"}
+            </button>
+            <button className="secondary" disabled={uploadBusy} onClick={()=>void resetMinecraftSkin()}>Повернути стандартний скін в акаунті</button>
+            {uploadNotice&&<p className="notice" role="status">{uploadNotice}</p>}
+          </>:
+          <p>Поки скін доступний лише у 3D-перегляді. Для зміни реального скіна потрібен підтверджений Microsoft/Minecraft-акаунт у FRE LAUNCH. Офлайн-нік не має доступу до Minecraft Services.</p>}
+        <p className="muted">Скін зберігається локально окремо від Minecraft-профілю. На серверах із власною системою скінів можуть діяти інші правила.</p>
       </div>
     </section>
   </div>{custom && skin && <SkinPixelEditor source={skin} onEdit={applySkin}/>}</>;
