@@ -216,7 +216,9 @@ def customize(root,revision):
     replace_art(root)
     from feature_local_accounts import apply as add_local_accounts
     from feature_ukrainian import apply as finish_ukrainian
+    from feature_skin_notice import apply as guard_offline_skins
     add_local_accounts(root)
+    guard_offline_skins(root)
     finish_ukrainian(root)
     print("Prepared distinct FRE LAUNCH source fork from",revision)
 
