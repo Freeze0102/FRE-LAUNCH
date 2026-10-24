@@ -1384,3 +1384,29 @@ input:focus-visible,button:focus-visible,select:focus-visible,textarea:focus-vis
 .fre-prose code{background:#32373a;border-radius:5px;padding:2px 5px;font-family:Consolas,monospace;font-size:.92em}
 .fre-prose pre code{background:transparent;padding:0}
 .fre-prose hr{border-top:1px solid #3a4145}
+
+/* Microsoft sign-in — native device-code flow, no embedded password webview. */
+.fre-ms-account{display:flex;flex-direction:column;gap:16px;background:#23252d;border:1px solid #3d4148;border-radius:12px;padding:19px;margin:16px 0 26px;color:#e9edf0}
+.fre-ms-head{display:flex;align-items:center;gap:14px}
+.fre-ms-logo{display:grid;place-items:center;flex:0 0 50px;height:50px;background:#256b44;border:1px solid #41995e;border-radius:12px;color:#c4ffd7;font:800 25px "Segoe UI",sans-serif}
+.fre-ms-head>div{min-width:0}.fre-ms-head h3{font-size:17px;color:#f4f6f3;margin:0 0 5px}
+.fre-ms-head p{font-size:12px;color:#aeb8b4;margin:0;line-height:1.45}
+.fre-ms-form{display:flex;gap:10px;align-items:center;min-width:0}
+.fre-ms-form .input{flex:1;min-width:0;min-height:42px}
+.fre-ms-form .primary{flex-shrink:0;min-height:42px;justify-content:center}
+.fre-ms-login>.muted{font-size:12px;line-height:1.55;margin-top:11px}
+.fre-ms-challenge{display:flex;flex-direction:column;align-items:flex-start;gap:11px;padding:16px;margin:14px 0;background:#192c22;border:1px solid #447852;border-radius:10px}
+.fre-ms-challenge>span{font-weight:700;font-size:12px;color:#b4f1c4}
+.fre-ms-challenge>strong{font:750 29px/1.25 Consolas,monospace;letter-spacing:3px;color:#efffe9;user-select:text}
+.fre-ms-challenge p{color:#b6ccb9;font-size:12px;line-height:1.5;margin:0}
+.fre-ms-challenge a,.fre-ms-links a{display:inline-flex;gap:6px;align-items:center;color:#7af0a3;text-decoration:none;font-size:12px;font-weight:650}
+.fre-ms-challenge a:hover,.fre-ms-links a:hover{text-decoration:underline}
+.fre-ms-challenge>.secondary{padding:8px 12px;font-size:11px}
+.fre-ms-links{display:flex;gap:14px;flex-wrap:wrap}
+.fre-ms-caution{font-size:11px;line-height:1.5;color:#aeb9b3;border-top:1px solid #3c4540;padding-top:10px;margin:0}
+.fre-ms-signed{display:flex;align-items:center;gap:12px;background:#1b3526;border:1px solid #426947;border-radius:10px;padding:12px;color:#a9f3c0}
+.fre-ms-signed>div{min-width:0;flex:1;display:flex;flex-direction:column;gap:4px}
+.fre-ms-signed strong{font-size:15px;color:#eefcf0}
+.fre-ms-signed small{font-size:10px;color:#b5cbbc;overflow-wrap:anywhere}
+.fre-offline-title{font-size:18px;margin:14px 0 8px;color:#f5f6f7}
+@media(max-width:650px){.fre-ms-form{flex-direction:column;align-items:stretch}.fre-ms-form>.primary{width:100%}}
