@@ -3,7 +3,7 @@ import {invoke} from "@tauri-apps/api/core";
 import {
   ArrowRight,BookOpen,Check,ChevronDown,Clock3,Compass,Download,
   FolderOpen,Grid2X2,Layers3,List,MoreHorizontal,Package,Palette,
-  Play,Plus,Search,Settings2,ShieldCheck,SlidersHorizontal,Trash2,Upload,UserRound,X
+  Play,Plus,Search,Settings2,ShieldCheck,SlidersHorizontal,Trash2,Upload,X
 } from "lucide-react";
 import "./play-page.css";
 
