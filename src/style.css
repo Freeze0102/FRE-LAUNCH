@@ -1487,3 +1487,11 @@ input:focus-visible,button:focus-visible,select:focus-visible,textarea:focus-vis
 .fre-game-crash-card p{font-size:12px;line-height:1.55;margin:8px 0}
 .fre-game-crash-card code{font-size:11px;color:#f7c7cf;user-select:text;word-break:break-all}
 .fre-game-crash-card .secondary{display:flex;align-items:center;gap:8px;font-size:11px;padding:9px 12px;margin-top:11px}
+
+/* Import progress is retained even if the user navigates while an archive is installing. */
+.fre-pack-import-banner{display:flex;align-items:center;gap:12px;margin:0 0 15px;padding:12px 15px;background:#263d30;border:1px solid #417e54;border-radius:11px;color:#d9ffe2}
+.fre-pack-import-banner>svg{flex:0 0 auto;color:#5beb89}
+.fre-pack-import-banner>div{flex:1;display:flex;flex-direction:column;gap:4px;min-width:0}
+.fre-pack-import-banner strong{font-size:12px}
+.fre-pack-import-banner span{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#b5d5be}
+.fre-pack-import-banner b{font-size:12px;color:#69e890}
