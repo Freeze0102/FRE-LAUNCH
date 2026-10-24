@@ -1462,3 +1462,14 @@ input:focus-visible,button:focus-visible,select:focus-visible,textarea:focus-vis
 .fre-skin-defaults{margin-bottom:8px}
 .fre-skin-gallery .fre-skin-guide{margin:0}
 @media(max-width:860px){.fre-skin-saved,.fre-skin-defaults{grid-template-columns:repeat(auto-fill,minmax(118px,1fr))}}
+
+/* Modrinth 0.22-style navigation: primary tools and profiles up top, account/settings near bottom. */
+.fre-app .fre-rail{overflow-y:hidden}
+.fre-app .fre-nav{flex:1;min-height:0;gap:7px;overflow-y:auto}
+.fre-app .fre-nav-link.fre-sidebar-other:nth-last-child(2){margin-top:auto}
+.fre-app .fre-nav-link.fre-sidebar-other{color:#9dabb2}
+.fre-app .fre-nav-link.fre-sidebar-other.is-active{color:#4fea8c}
+.fre-app .fre-nav-link:first-child{color:#c0c6d0}
+.fre-app .fre-nav-link:first-child.is-active{color:#5ef398}
+.fre-app .fre-updates{flex:0 0 auto;margin-top:0}
+@media(max-width:630px){.fre-app .fre-nav{flex:1;overflow-x:auto;overflow-y:hidden}.fre-app .fre-nav-link.fre-sidebar-other:nth-last-child(2){margin-top:0}}
