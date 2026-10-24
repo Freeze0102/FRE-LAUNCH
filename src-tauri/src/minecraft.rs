@@ -416,7 +416,7 @@ fn jvm_arg_replace(s: &str, base: &Path, natives: &Path, classpath: &str) -> Str
      .replace("${classpath_separator}", if cfg!(windows) { ";" } else { ":" })
 }
 
-fn game_arg_replace(s: &str, base: &Path, version: &str, dir: &Path, name: &str, uuid: &str, meta: &Value) -> String {
+fn game_arg_replace(s: &str, base: &Path, version: &str, dir: &Path, name: &str, uuid: &str, token: &str, user_type: &str, meta: &Value) -> String {
     let assets = base.join("assets");
     s.replace("${auth_player_name}", name)
      .replace("${version_name}", version)
@@ -425,9 +425,9 @@ fn game_arg_replace(s: &str, base: &Path, version: &str, dir: &Path, name: &str,
      .replace("${game_assets}", &assets.to_string_lossy())
      .replace("${assets_index_name}", meta["assets"].as_str().unwrap_or("legacy"))
      .replace("${auth_uuid}", uuid)
-     .replace("${auth_access_token}", "0")
-     .replace("${auth_session}", "0")
-     .replace("${user_type}", "legacy")
+     .replace("${auth_access_token}", token)
+     .replace("${auth_session}", token)
+     .replace("${user_type}", user_type)
      .replace("${version_type}", meta["type"].as_str().unwrap_or("release"))
      .replace("${user_properties}", "{}")
      .replace("${auth_xuid}", "0")
@@ -461,19 +461,19 @@ fn stable_uuid(name: &str) -> String {
 }
 
 #[tauri::command]
-pub async fn launch_game(app: AppHandle, version: String, nickname: String, memory_mb: u32, instance_id: Option<String>) -> Result<String, String> {
+pub async fn launch_game(app: AppHandle, version: String, nickname: String, memory_mb: u32, instance_id: Option<String>, use_microsoft: Option<bool>) -> Result<String, String> {
     validate_version(&version)?;
     if nickname.is_empty() || nickname.len()>16 || !nickname.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_') {
         return Err("Нікнейм: 1–16 латинських літер, цифр або _".into());
     }
     if !(512..=32768).contains(&memory_mb) { return Err("RAM must be between 512 and 32768 MB".into()); }
     if RUNNING.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst).is_err() { return Err("Minecraft уже запускається або працює".into()); }
-    let result = launch_inner(app.clone(), version, nickname, memory_mb, instance_id).await;
+    let result = launch_inner(app.clone(), version, nickname, memory_mb, instance_id, use_microsoft.unwrap_or(false)).await;
     if result.is_err() { RUNNING.store(false, Ordering::SeqCst); }
     result
 }
 
-async fn launch_inner(app: AppHandle, version: String, nickname: String, memory_mb: u32, instance_id: Option<String>) -> Result<String, String> {
+async fn launch_inner(app: AppHandle, version: String, nickname: String, memory_mb: u32, instance_id: Option<String>, use_microsoft: bool) -> Result<String, String> {
     let base = root(&app)?;
     let cached_metadata = base.join("versions").join(&version).join(format!("{version}.json"));
     // Installed games must remain launchable without contacting Mojang.
@@ -574,7 +574,10 @@ async fn launch_inner(app: AppHandle, version: String, nickname: String, memory_
     cp.push(base.join("versions").join(&version).join(format!("{version}.jar")).to_string_lossy().to_string());
     let classpath = cp.join(if cfg!(windows) { ";" } else { ":" });
     // The launcher passes a compact 32-digit Mojang-style UUID argument.
-    let uuid = stable_uuid(&nickname).replace('-', "");
+    let (uuid, auth_token, user_type) = if use_microsoft {
+        let (id,token) = super::microsoft::launch_credentials(&nickname)?;
+        (id.replace('-',""), token, "msa")
+    } else {(stable_uuid(&nickname).replace('-', ""), "0".to_string(), "legacy")};
     let natives = dir.join("natives");
     let native_libraries: Vec<PathBuf> = libraries(&meta, &base)?
         .into_iter().filter(|(_, _, _, native)| *native)
@@ -593,7 +596,7 @@ async fn launch_inner(app: AppHandle, version: String, nickname: String, memory_
     let game_args = if let Some(legacy) = meta["minecraftArguments"].as_str() {
         legacy.split_whitespace().map(str::to_string).collect::<Vec<String>>()
     } else { parse_arguments(&meta["arguments"]["game"]) };
-    args.extend(game_args.iter().map(|s| game_arg_replace(s, &base, &version, &dir, &nickname, &uuid, &meta)));
+    args.extend(game_args.iter().map(|s| game_arg_replace(s, &base, &version, &dir, &nickname, &uuid, &auth_token, user_type, &meta)));
 
     let mut command = Command::new(java_bin);
     // The game must not be terminated when the Tauri window or its runtime exits.
