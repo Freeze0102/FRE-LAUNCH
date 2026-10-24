@@ -134,3 +134,41 @@
 .fre-instance-world small{font-size:11px;color:#a2adb3}
 .fre-instance-world .secondary{display:inline-flex;align-items:center;gap:6px;padding:9px 11px;font-size:11px}
 @media(max-width:520px){.fre-instance-world{flex-wrap:wrap}.fre-instance-world .secondary{margin-left:auto}}
+
+/* 2026 Modrinth profile detail: dense, flat hero, native Play and pill tabs. */
+.fre-app .fre-instance-detail{background:#18191e;margin:-14px -12px -26px;padding:11px 15px 40px;min-height:calc(100vh - 100px)}
+.fre-app .fre-instance-back{color:#9fa4ad;padding:8px 0 15px;font-size:11px}
+.fre-app .fre-instance-detail-head{min-height:103px;gap:13px;padding:9px 1px 16px;margin:0 0 17px;border-bottom:1px solid #34353c}
+.fre-app .fre-instance-detail-cover{width:68px;height:68px;flex:0 0 68px;background:#3f5243!important;border:1px solid #637363;color:#9df5b9;border-radius:11px}
+.fre-app .fre-instance-detail-head h2{font-size:25px;letter-spacing:-.5px;color:#f4f4f5;margin-bottom:10px}
+.fre-app .fre-instance-detail-head p{display:flex;align-items:center;flex-wrap:wrap;gap:7px;color:#abb1bb;font-size:12px}
+.fre-app .fre-instance-head-dot{font-size:13px;color:#575d66}
+.fre-app .fre-instance-detail-head .fre-instance-head-play{display:flex;align-items:center;justify-content:center;gap:8px;background:#21e56d!important;color:#102317!important;padding:11px 17px!important;border:0!important;border-radius:11px!important;font-size:12px!important;font-weight:800!important;min-width:101px;height:45px}
+.fre-app .fre-instance-detail-head .fre-instance-head-play:hover{background:#54f18d!important}
+.fre-app .fre-instance-detail-head .fre-instance-head-settings,
+.fre-app .fre-instance-detail-head .fre-instance-head-favorite{display:grid;place-items:center;width:42px;height:42px;min-height:42px;border-radius:50%;background:#303238;color:#bbc3ca;border:0;padding:0}
+.fre-app .fre-instance-detail-head .fre-instance-head-settings:hover,
+.fre-app .fre-instance-detail-head .fre-instance-head-favorite:hover{color:#ebf8ef;background:#3e4249}
+.fre-app .fre-instance-tabs{display:flex;gap:3px;flex-wrap:wrap;width:max-content;max-width:100%;padding:4px;margin:0 0 17px;background:#303137;border:1px solid #383a43;border-radius:23px}
+.fre-app .fre-instance-tabs>button{display:flex;gap:8px;align-items:center;flex:0 0 auto;padding:8px 14px;color:#c5c8d0;border:0!important;border-radius:19px;font-size:12px;font-weight:700}
+.fre-app .fre-instance-tabs>button.active{background:#246b3c!important;color:#43f181!important}
+.fre-app .fre-instance-tabs>button:hover:not(.active){background:#3e4148}
+.fre-app .fre-instance-content{background:transparent;min-width:0}
+.fre-app .fre-instance-content-head{align-items:center;margin:12px 0 12px}
+.fre-app .fre-instance-content-head h3{font-size:17px;color:#f1f3f4;margin:0}
+.fre-app .fre-instance-content-head>div{display:flex;flex-wrap:wrap;gap:7px}
+.fre-app .fre-instance-content-head button{min-height:37px;padding:9px 12px;font-size:11px;border-radius:9px}
+.fre-app .fre-instance-browse-content{display:flex;align-items:center;gap:6px;background:#24dd68!important;border:0!important;color:#152a1c!important;font-weight:750!important}
+.fre-app .fre-instance-browse-content:hover{background:#4cf18b!important}
+.fre-app .fre-instance-content-search{margin-bottom:9px;min-height:41px;background:#33343c;border:1px solid #393b42}
+.fre-app .fre-instance-content-table{border:1px solid #393a42;background:#25262c;border-radius:10px}
+.fre-app .fre-instance-content-columns{background:#2f3037;border-bottom:1px solid #40424a;color:#aeb6c1;font-weight:600;font-size:11px}
+.fre-app .fre-instance-file{background:#24252c;padding:12px 15px;min-height:70px}
+.fre-app .fre-instance-file:hover{background:#2f3138}
+.fre-app .fre-instance-file-icon{background:#343941;color:#9ce9b2;width:43px;height:43px}
+.fre-app .fre-instance-file strong{font-size:13px}
+.fre-app .fre-instance-file small{font-size:10px;color:#9ea4b1}
+.fre-app .fre-instance-toggle>span{background:#54575e}
+.fre-app .fre-instance-toggle input:checked+span{background:#18e265}
+.fre-app .fre-instance-openfolder{color:#9cebad}
+@media(max-width:790px){.fre-app .fre-instance-detail{margin:-10px -8px -20px;padding:12px}.fre-app .fre-instance-detail-head{gap:8px}.fre-app .fre-instance-detail-head h2{font-size:20px}.fre-app .fre-instance-tabs{width:100%;overflow-x:auto;flex-wrap:nowrap}.fre-app .fre-instance-tabs>button{white-space:nowrap}}
