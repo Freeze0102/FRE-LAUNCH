@@ -137,7 +137,9 @@ def customize(root,revision):
     title=root/"apps/app-frontend/src/app/shell/title-bar/index.vue"
     edit(title,"defineMessages, IconButton, TextLogo, useVIntl","defineMessages, IconButton, useVIntl")
     edit(title,'<TextLogo class="h-7 w-auto shrink-0 text-contrast pointer-events-none" />','<span class="shrink-0 select-none text-base font-bold text-contrast">FRE LAUNCH</span>')
-    edit(root/"apps/app-frontend/src/components/ui/WelcomeScreen.vue","defaultMessage: 'Welcome to Modrinth',","defaultMessage: 'Welcome to FRE LAUNCH',")
+    welcome=root/"apps/app-frontend/src/components/ui/WelcomeScreen.vue"
+    edit(welcome,"id: 'app.welcome-screen.title',","id: 'fre-launch.welcome-screen.title',")
+    edit(welcome,"defaultMessage: 'Welcome to Modrinth',","defaultMessage: 'Welcome to FRE LAUNCH',")
     edit(root/"apps/app-frontend/index.html","<title>Modrinth App</title>","<title>FRE LAUNCH</title>")
     edit(root/"apps/app-frontend/index.html",'\t\t<script src="https://tally.so/widgets/embed.js" async></script>\n',"")
     edit(root/"apps/app/src/main.rs",'fn are_updates_enabled() -> bool {\n    cfg!(feature = "updater")\n        && env::var("MODRINTH_EXTERNAL_UPDATE_PROVIDER").is_err()\n}',"fn are_updates_enabled() -> bool {\n    false // Do not overwrite this fork with official Modrinth releases\n}")
