@@ -55,7 +55,7 @@ fn validate_project_id(id: &str) -> Result<(), String> {
 #[tauri::command]
 pub async fn search_modrinth(query: String, version: Option<String>, project_type: String, offset: Option<u32>, loader: Option<String>, sort: Option<String>) -> Result<Vec<ModrinthHit>, String> {
     if query.chars().count() > 100 { return Err("Search is too long".into()); }
-    if !["mod", "resourcepack", "shader", "modpack"].contains(&project_type.as_str()) {
+    if !["mod", "resourcepack", "shader", "modpack", "datapack"].contains(&project_type.as_str()) {
         return Err("Invalid Modrinth search category".into());
     }
     let offset = offset.unwrap_or(0);
