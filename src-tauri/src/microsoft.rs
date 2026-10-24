@@ -214,6 +214,64 @@ pub fn microsoft_logout() -> Result<(),String> {
     Ok(())
 }
 
+/// Official Mojang skins endpoint. The bearer token never reaches React.
+#[tauri::command]
+pub async fn microsoft_upload_skin(png_base64:String, variant:String) -> Result<String,String> {
+    use base64::Engine;
+    let variant=match variant.as_str(){
+        "classic"=>"classic","slim"=>"slim",
+        _=>return Err("Обери модель скіна Classic або Slim".into())
+    };
+    // Hard cap before decoding so a malformed browser payload cannot exhaust RAM.
+    if png_base64.len()>2_800_000{return Err("Скін завеликий: максимум 2 МБ PNG".into());}
+    let png=base64::engine::general_purpose::STANDARD.decode(&png_base64)
+        .map_err(|_|"Неправильне кодування PNG".to_string())?;
+    if png.len()<24||png.len()>2*1024*1024||!png.starts_with(b"\x89PNG\r\n\x1a\n") {
+        return Err("Некоректний файл PNG".into());
+    }
+    if &png[12..16]!=b"IHDR"{return Err("У PNG відсутній заголовок зображення".into());}
+    let width=u32::from_be_bytes(png[16..20].try_into().unwrap());
+    let height=u32::from_be_bytes(png[20..24].try_into().unwrap());
+    if width!=64||!(height==32||height==64){
+        return Err("Minecraft Services приймає скіни 64×64 або 64×32. Зменш HD-скін перед завантаженням.".into());
+    }
+    let token={
+        let guard=session().lock().map_err(|_|"Стан авторизації недоступний")?;
+        let current=guard.as_ref().ok_or("Спочатку увійди до Minecraft через Microsoft")?;
+        if Instant::now()>=current.expires_at{return Err("Термін Microsoft-сесії завершився. Увійди знову.".into());}
+        current.token.clone()
+    };
+    let form=reqwest::multipart::Form::new()
+        .text("variant",variant.to_string())
+        .part("file",reqwest::multipart::Part::bytes(png)
+            .file_name("fre-skin.png")
+            .mime_str("image/png").map_err(|_|"Неможливо створити PNG-запит")?);
+    let response=http()?.post("https://api.minecraftservices.com/minecraft/profile/skins")
+        .bearer_auth(token)
+        .multipart(form)
+        .send().await.map_err(|_|"Не вдалося завантажити скін до Minecraft Services")?;
+    if !response.status().is_success(){
+        return Err(format!("Minecraft Services не прийняв скін (HTTP {}). Переконайся, що акаунт ліцензійний та сесія активна.",response.status()));
+    }
+    Ok("Скін завантажено до Minecraft-профілю. У грі може знадобитися перепідключення.".into())
+}
+
+#[tauri::command]
+pub async fn microsoft_reset_skin() -> Result<String,String> {
+    let token={
+        let guard=session().lock().map_err(|_|"Стан авторизації недоступний")?;
+        let current=guard.as_ref().ok_or("Увійди до Minecraft через Microsoft")?;
+        if Instant::now()>=current.expires_at{return Err("Microsoft-сесія закінчилася".into());}
+        current.token.clone()
+    };
+    let response=http()?.delete("https://api.minecraftservices.com/minecraft/profile/skins/active")
+        .bearer_auth(token).send().await.map_err(|_|"Не вдалося відновити стандартний скін")?;
+    if !response.status().is_success(){
+        return Err(format!("Minecraft Services відхилив відновлення скіна (HTTP {})",response.status()));
+    }
+    Ok("Minecraft-профіль повернуто до стандартного скіна".into())
+}
+
 /// Only Rust launch code can read access tokens. They must never enter JS.
 pub(super) fn launch_credentials(expected_name:&str)->Result<(String,String),String>{
     let guard=session().lock().map_err(|_|"Стан авторизації недоступний")?;
