@@ -51,6 +51,9 @@ pub async fn get_local_skin(profile_id: uuid::Uuid) -> Result<Option<String>> {
         "\tif (skin.texture.startsWith('data:image/png;base64,')) return skin.texture\n")
     skins=root/"apps/app-frontend/src/pages/Skins.vue"
     exactly(skins,
+        "\tequip_skin,\n",
+        "\tdetermineModelType,\n\tequip_skin,\n")
+    exactly(skins,
         "async function loadSkins() {",
         """function skinFingerprint(base64: string): string {
     let checksum = 2166136261
@@ -75,7 +78,7 @@ async function loadSkins() {""")
                     source: 'custom_external',
                     texture_key: 'fre-local-' + currentUserId.value + '-' + skinFingerprint(pngBase64),
                     texture: 'data:image/png;base64,' + pngBase64,
-                    variant: 'CLASSIC',
+                    variant: await determineModelType('data:image/png;base64,' + pngBase64),
                     is_equipped: true,
                     name: currentUser.value?.profile.name ?? 'Local skin',
                 }
