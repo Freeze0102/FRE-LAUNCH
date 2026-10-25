@@ -87,6 +87,7 @@ export default function AccountsPanel({nickname,onSelect,microsoft,onMicrosoftSe
   // localhost callback. Respect server-advised slow_down intervals.
   useEffect(()=>{
     if(!challenge)return;
+    const pollInterval=challenge.interval;
     let active=true;
     let timer:number|undefined;
     const expiresAt=Date.now()+challenge.expiresIn*1000;
@@ -99,7 +100,7 @@ export default function AccountsPanel({nickname,onSelect,microsoft,onMicrosoftSe
     }
     async function poll(){
       if(!active)return;
-      if(checking.current){schedule(challenge.interval);return;}
+      if(checking.current){schedule(pollInterval);return;}
       checking.current=true;
       try{
         const result=await invoke<PollStatus>("microsoft_poll_login");
@@ -112,13 +113,13 @@ export default function AccountsPanel({nickname,onSelect,microsoft,onMicrosoftSe
             "Minecraft-акаунт підключено. Windows збереже вхід для наступного запуску.":
             "Minecraft-акаунт підключено, але збереження сесії у Windows не підтверджене.");
         }else{
-          schedule(result.interval||challenge.interval);
+          schedule(result.interval||pollInterval);
         }
       }catch(err){
         if(active){setAuthError(String(err));setChallenge(null);}
       }finally{checking.current=false;}
     }
-    schedule(challenge.interval);
+    schedule(pollInterval);
     return()=>{active=false;window.clearInterval(countdown);if(timer!==undefined)window.clearTimeout(timer);};
   },[challenge]);
   async function copyDeviceCode(){
