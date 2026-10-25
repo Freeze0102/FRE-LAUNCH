@@ -90,7 +90,7 @@ def verify(root):
     # checks passed: duplicate invoke imports and a missing message comma.
     accounts_vue=(root/"apps/app-frontend/src/features/minecraft-accounts/accounts-card.vue").read_text(encoding="utf-8")
     assert accounts_vue.count("import { invoke } from '@tauri-apps/api/core'")==1, "Duplicate Tauri invoke import breaks Vue compiler"
-    assert re.search(r"javaUnavailable:\\s*\\{[^\\n]*\\},\\s*\\n\\s*guestAlreadySaved:", accounts_vue), "Missing comma after Java nickname message breaks Vue compiler"
+    assert re.search(r"javaUnavailable:\s*\{[^\n]*\},\s*\n\s*guestAlreadySaved:", accounts_vue), "Missing comma after Java nickname message breaks Vue compiler"
 
     nickname_api=(root/"packages/app-lib/src/api/minecraft_auth.rs").read_text(encoding="utf-8")
     assert 'StatusCode::OK => Ok("used")' in nickname_api and 'StatusCode::NOT_FOUND => Ok("no_profile")' in nickname_api, "Public Java lookup must distinguish taken and unregistered profile"
