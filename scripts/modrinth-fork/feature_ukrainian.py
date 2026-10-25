@@ -172,7 +172,10 @@ UI = {
 }
 NEW = {
 "fre-launch.welcome-screen.title":("Вітаємо у FRE LAUNCH","Welcome to FRE LAUNCH"),
-"fre-launch.skins.local-notice":("Це локальний нік, а не Microsoft-акаунт. Тут можна переглядати скіни, але їх застосування через Minecraft Services потребує ліцензійного акаунта.","This is a local nickname, not a Microsoft account. You can preview skins here, but applying an online skin requires a licensed Minecraft account."),
+"fre-launch.skins.local-notice":("Локальний нік не має Microsoft-авторизації. Ти можеш вибрати скін або завантажити PNG (64×64 чи 64×32); FRE LAUNCH збереже його для цього ніку та підготує для запуску гри.","This local nickname has no Microsoft authentication. You can select a skin or upload a PNG (64x64 or 64x32); FRE LAUNCH will save it for this nickname and prepare it when launching Minecraft."),
+"fre-launch.skins.local-upload":("Вибрати PNG-скін","Choose PNG skin"),
+"fre-launch.skins.local-saved":("Локальний скін збережено для цього ніку","Local skin saved for this nickname"),
+"fre-launch.skins.local-mod":("Щоб скін з’явився в Minecraft, встанови сумісний клієнтський мод (наприклад CustomSkinLoader) у цю збірку. Звичайна Vanilla не показує непідписані офлайн-скіни. Інші гравці можуть його не бачити.","For the skin to appear in Minecraft, install a compatible client-side skin mod (such as CustomSkinLoader) in this game instance. Vanilla Minecraft does not show unsigned offline skins. Other players may not see it."),
 "fre-launch.offline.title":("Локальний нік","Local nickname"),
 "fre-launch.offline.placeholder":("Введи нік","Your nickname"),
 "fre-launch.offline.create":("Створити","Create"),
