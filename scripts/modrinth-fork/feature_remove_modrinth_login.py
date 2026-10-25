@@ -36,13 +36,14 @@ def apply(root: Path):
     exactly(sidebar,
         '\t\t\t\t\t\tv-show="showFriendsList"\n',
         '\t\t\t\t\t\tv-if="false && showFriendsList"\n')
-    # Campaign/brand panels are not part of a Minecraft launcher.
-    exactly(sidebar,
-        '\t\t\t\t\t<PrideFundraiserBanner\n',
-        '\t\t\t\t\t<PrideFundraiserBanner v-if="false"\n')
-    exactly(sidebar,
-        '\t\t\t\t\t<NewsSidebar :style="promotionPaddingStyle" />',
-        '\t\t\t\t\t<NewsSidebar v-if="false" :style="promotionPaddingStyle" />')
+    # prepare.py already removes the campaign, news and ad markup from
+    # this same sidebar. Do not try to patch deleted elements a second time.
+    # Check the final template instead, so a changed upstream layout fails
+    # clearly without silently restoring promotional panels.
+    final_sidebar = sidebar.read_text(encoding="utf-8")
+    for tag in ("<PrideFundraiserBanner", "<NewsSidebar", '<Promotion v-if="showAd"'):
+        if tag in final_sidebar:
+            raise RuntimeError(f"Promotional sidebar element was not removed by prepare.py: {tag}")
 
     onboarding = root / "apps/app-frontend/src/features/onboarding/checklist.vue"
     exactly(onboarding,
