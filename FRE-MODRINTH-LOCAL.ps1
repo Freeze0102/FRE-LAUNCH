@@ -105,6 +105,12 @@ if ($LASTEXITCODE -ne 0) { throw 'Pillow dependency installation failed.' }
 py -3 "$converter" "$destination" --upstream-sha $revision
 if ($LASTEXITCODE -ne 0) { throw 'Customization failed, source remains in FRE-Modrinth-Source for inspection.' }
 }
+$missingPreparedFiles = @($requiredSourceFiles | Where-Object {
+    -not (Test-Path -LiteralPath (Join-Path $destination $_) -PathType Leaf)
+})
+if ($missingPreparedFiles.Count -gt 0) {
+    throw ("Pinned source copy is incomplete after preparation: " + ($missingPreparedFiles -join ', '))
+}
 Write-Host 'Verifying nickname auth, locale coverage and app identity...' -ForegroundColor Cyan
 py -3 "$projectRoot\scripts\modrinth-fork\verify.py" "$destination"
 if ($LASTEXITCODE -ne 0) { throw 'FRE LAUNCH verification failed; refusing Windows compilation.' }
