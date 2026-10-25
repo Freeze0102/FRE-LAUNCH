@@ -1,7 +1,7 @@
-"""Explain Microsoft-only skin sync for locally created nickname accounts.
+"""Keep Minecraft Services skin writes exclusive to authenticated accounts.
 
-Local nicknames are not authenticated Mojang users. Preserve the preview
-experience while blocking remote skin write operations and misleading success.
+Local nickname players can use a separate client-side PNG flow installed by
+feature_offline_skins.py; this never pretends to upload to Mojang.
 """
 from pathlib import Path
 
@@ -37,7 +37,7 @@ def apply(root: Path):
         "\tdemoTitle: {\n",
         "\tlocalNicknameSkinNote: {\n"
         "\t\tid: 'fre-launch.skins.local-notice',\n"
-        "\t\tdefaultMessage: 'This is a local nickname, not a Microsoft account. You can preview skins here, but applying an online skin requires a licensed Minecraft account.',\n"
+        "\t\tdefaultMessage: 'This local nickname has no Microsoft authentication. You can select a skin or upload a PNG (64x64 or 64x32); FRE LAUNCH will save it for this nickname and prepare it when launching Minecraft.',\n"
         "\t},\n"
         "\tdemoTitle: {\n")
     print("Added offline-nickname skin notice and read-only Minecraft Services skin protection")
