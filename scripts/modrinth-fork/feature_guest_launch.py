@@ -192,6 +192,19 @@ pub async fn instance_kill(instance_id: &str) -> Result<()> {""")
             <datalist :id="guestNickListId">
                 <option v-for="name in guestNickSuggestions" :key="name" :value="name" />
             </datalist>
+            <div class="mt-1 flex flex-wrap items-center gap-2">
+                <button
+                    type="button"
+                    class="rounded-lg border border-solid border-surface-5 bg-bg-raised px-3 py-2 text-sm text-contrast cursor-pointer hover:bg-button-bg-hover"
+                    :disabled="!guestNicknameValid || guestSkinBusy"
+                    @click="guestSkinFileInput?.click()"
+                >
+                    {{ formatMessage(messages.uploadGuestSkin) }}
+                </button>
+                <span v-if="guestSkinStatus" class="text-xs text-brand">{{ guestSkinStatus }}</span>
+            </div>
+            <input ref="guestSkinFileInput" class="hidden" type="file"
+                accept=".png,image/png" @change="onGuestSkinFilePicked" />
             <p class="m-0 text-xs text-secondary">
                 {{ formatMessage(messages.guestNotice) }}
             </p>
@@ -210,7 +223,7 @@ pub async fn instance_kill(instance_id: &str) -> Result<()> {""")
     exactly(card, "\t\t<OfflineProfileCreator />\n",
                  "\t\t<OfflineProfileCreator />\n") # validate existing no-accounts form
     exactly(card, "import { computed, onMounted, onUnmounted, ref } from 'vue'",
-                 "import { computed, onMounted, onUnmounted, ref, useId, watch } from 'vue'")
+                 "import { computed, onMounted, onUnmounted, ref, useId, watch } from 'vue'\nimport { invoke } from '@tauri-apps/api/core'")
     exactly(card,
         "const accounts: Ref<MinecraftCredential[]> = ref([])",
         """const accounts: Ref<MinecraftCredential[]> = ref([])
@@ -235,9 +248,41 @@ const guestNicknameId = useId()
 const guestNickListId = useId()
 const useSavedAccount = ref(localStorage.getItem('fre-launch-account-mode') !== 'nickname')
 const guestNickname = ref(localStorage.getItem('fre-launch-guest-nickname') ?? '')
+const guestNicknameValid = computed(() => /^[A-Za-z0-9_]{1,16}$/.test(guestNickname.value))
+const guestSkinFileInput = ref<HTMLInputElement | null>(null)
+const guestSkinBusy = ref(false)
+const guestSkinStatus = ref('')
+async function onGuestSkinFilePicked(event: Event) {
+    const input = event.target as HTMLInputElement
+    const file = input.files?.[0]
+    input.value = ''
+    if (!file || !guestNicknameValid.value || guestSkinBusy.value) return
+    if (!file.name.toLowerCase().endsWith('.png') || file.size > 512 * 1024) {
+        handleError(new Error('Choose a PNG skin under 512 KiB (64x64 or 64x32)'))
+        return
+    }
+    guestSkinBusy.value = true
+    const nickname = guestNickname.value
+    try {
+        const bytes = new Uint8Array(await file.arrayBuffer())
+        let binary = ''
+        for (let i = 0; i < bytes.length; i += 8192) {
+            binary += String.fromCharCode(...bytes.subarray(i, i + 8192))
+        }
+        await invoke('plugin:auth|save_guest_skin', { nickname, pngBase64: btoa(binary) })
+        guestSkinStatus.value = formatMessage(messages.guestSkinSaved)
+    } catch (error) {
+        handleError(error)
+    } finally {
+        guestSkinBusy.value = false
+    }
+}
 watch(useSavedAccount, (enabled) =>
     localStorage.setItem('fre-launch-account-mode', enabled ? 'account' : 'nickname'))
-watch(guestNickname, (name) => localStorage.setItem('fre-launch-guest-nickname', name))""")
+watch(guestNickname, (name) => {
+    localStorage.setItem('fre-launch-guest-nickname', name)
+    guestSkinStatus.value = ''
+})""")
     exactly(card,
         "async function setAccount(account: MinecraftCredential) {\n",
         "async function setAccount(account: MinecraftCredential) {\n    useSavedAccount.value = true\n")
@@ -248,6 +293,8 @@ watch(guestNickname, (name) => localStorage.setItem('fre-launch-guest-nickname',
         "\tnotSignedIn: {\n",
         """    useAccount: { id: 'fre-launch.guest.use-account', defaultMessage: 'Use saved account' },
     guestNickname: { id: 'fre-launch.guest.nickname', defaultMessage: 'Nickname (without account)' },
+    uploadGuestSkin: { id: 'fre-launch.guest.upload-skin', defaultMessage: 'Upload PNG skin for this nickname' },
+    guestSkinSaved: { id: 'fre-launch.guest.skin-saved', defaultMessage: 'Saved. Install CustomSkinLoader in this instance, then restart Minecraft.' },
     guestPlaceholder: { id: 'fre-launch.guest.placeholder', defaultMessage: 'Enter nickname' },
     guestNotice: { id: 'fre-launch.guest.notice', defaultMessage: 'No Microsoft login needed. For servers allowing non-premium players, use the same nickname you registered there and enter your server password when prompted.' },
     guestInvalid: { id: 'fre-launch.guest.invalid', defaultMessage: 'Use 1-16 English letters, numbers, or underscores.' },
