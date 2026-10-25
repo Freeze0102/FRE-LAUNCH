@@ -89,6 +89,64 @@ Write-Host 'Verifying nickname auth, locale coverage and app identity...' -Foreg
 py -3 "$projectRoot\scripts\modrinth-fork\verify.py" "$destination"
 if ($LASTEXITCODE -ne 0) { throw 'FRE LAUNCH verification failed; refusing Windows compilation.' }
 Set-Content -LiteralPath $signaturePath -Value $signature -Encoding UTF8
+
+# FRE LAUNCH creates source archives while migrating between patch revisions.
+# Only purge confirmed generated-code archives after a fresh source passes
+# verification. Never delete the active source, vendor, game data, or user files.
+$sourceArchives = @(Get-ChildItem -LiteralPath $projectRoot -Directory -Filter 'FRE-Modrinth-Source-archive-*' -ErrorAction SilentlyContinue)
+foreach ($sourceArchive in $sourceArchives) {
+    if ($sourceArchive.Name -notmatch '^FRE-Modrinth-Source-archive-\\d{8}-\\d{6}
+Write-Host 'Separate old FRE LAUNCH profiles and worlds have not been changed.'
+if ($BuildWindows -or $RunDev) {
+    Push-Location $destination
+    try {
+        pnpm.cmd install --frozen-lockfile
+        if ($LASTEXITCODE -ne 0) { throw 'pnpm install failed' }
+        # Upstream Modrinth does not commit this generated TypeScript file.
+        # It must exist BEFORE checking the Vue frontend or compilation fails.
+        pnpm.cmd -w i18n:coverage
+        if ($LASTEXITCODE -ne 0) { throw 'Modrinth locale coverage generation failed' }
+        pnpm.cmd --filter '@modrinth/app-frontend' run tsc:check
+        if ($LASTEXITCODE -ne 0) { throw 'Vue typecheck failed' }
+        if ($RunDev) {
+            Write-Host 'Starting ORIGINAL Modrinth Vue/Tauri Minecraft launcher...' -ForegroundColor Green
+            pnpm.cmd --filter '@modrinth/app' tauri dev
+            if ($LASTEXITCODE -ne 0) { throw 'Tauri dev failed' }
+        } else {
+            pnpm.cmd --filter '@modrinth/app' tauri build --bundles nsis
+            if ($LASTEXITCODE -ne 0) { throw 'Tauri build failed' }
+            Write-Host 'Windows NSIS installer generated under FRE-Modrinth-Source/target/release/bundle/nsis' -ForegroundColor Green
+        }
+    } finally { Pop-Location }
+}
+) { continue }
+    if (($sourceArchive.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) { continue }
+    $archiveReadme = Join-Path $sourceArchive.FullName 'FRE_LAUNCH_FORK.md'
+    $archiveSignature = Join-Path $sourceArchive.FullName '.fre-launch-source-signature'
+    if (-not (Test-Path -LiteralPath $archiveReadme -PathType Leaf) -or
+        -not (Test-Path -LiteralPath $archiveSignature -PathType Leaf)) {
+        Write-Warning "Keeping unverified archive: $($sourceArchive.Name)"
+        continue
+    }
+    $gameFolders = @('instances', 'saves', 'worlds', 'mods', 'resourcepacks', 'shaderpacks', 'screenshots', '.minecraft', 'minecraft')
+    $containsGameFiles = $false
+    foreach ($folder in $gameFolders) {
+        if (Test-Path -LiteralPath (Join-Path $sourceArchive.FullName $folder)) {
+            $containsGameFiles = $true
+            break
+        }
+    }
+    if ($containsGameFiles) {
+        Write-Warning "Keeping archive with possible game files: $($sourceArchive.Name)"
+        continue
+    }
+    try {
+        Remove-Item -LiteralPath $sourceArchive.FullName -Recurse -Force -ErrorAction Stop
+        Write-Host "Removed outdated generated source archive: $($sourceArchive.Name)" -ForegroundColor DarkGray
+    } catch {
+        Write-Warning "Archive cleanup skipped ($($sourceArchive.Name)): $_"
+    }
+}
 Write-Host "FRE LAUNCH modified Modrinth GPLv3 source: $destination" -ForegroundColor Green
 Write-Host 'Separate old FRE LAUNCH profiles and worlds have not been changed.'
 if ($BuildWindows -or $RunDev) {
