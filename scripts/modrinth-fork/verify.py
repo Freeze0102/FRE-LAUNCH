@@ -60,17 +60,18 @@ def verify(root):
         assert app_uk[key]["message"]==ua
 
     checks={
-        "apps/app/src/api/auth.rs":["create_offline_user","save_local_skin","has_local_skin","theseus::offline_skins::save_local_skin","theseus::offline_skins::has_local_skin","Sign in to Minecraft with Microsoft"],
+        "apps/app/src/api/auth.rs":["create_offline_user","save_local_skin","has_local_skin","get_local_skin","theseus::offline_skins::save_local_skin","theseus::offline_skins::has_local_skin","Sign in to Minecraft with Microsoft"],
         "apps/app/build.rs":["create_offline_user","save_local_skin","has_local_skin"],
         "packages/app-lib/src/api/minecraft_auth.rs":["pub async fn create_offline_user","OfflinePlayer:","md5::compute","mark_logged_into_minecraft"],
         "packages/app-lib/src/state/minecraft_auth.rs":["pub fn is_offline_profile","fre-offline:"],
         "packages/app-lib/src/launcher/args.rs":['access_token.starts_with("fre-offline:")'],
-        "apps/app-frontend/src/features/minecraft-accounts/accounts-card.vue":["OfflineProfileCreator", "fre-launch-offline-account-created"],
+        "apps/app-frontend/src/features/minecraft-accounts/accounts-card.vue":["OfflineProfileCreator", "fre-launch-offline-account-created", "confirmRemove", "messages.microsoft"],
         "apps/app-frontend/src/features/minecraft-accounts/offline-profile-creator.vue":["v-model.trim","create_offline_user","@submit.prevent"],
         "apps/app-frontend/src/helpers/auth.js":["plugin:auth|create_offline_user"],
-        "apps/app-frontend/src/pages/Skins.vue":["isLocalAccount", "fre-launch.skins.local-notice", "onLocalSkinFileSelected", "plugin:auth|save_local_skin"],
+        "apps/app-frontend/src/helpers/skins.ts":["if (skin.texture.startsWith('data:image/png;base64,'))"],
+        "apps/app-frontend/src/pages/Skins.vue":["isLocalAccount", "fre-launch.skins.local-notice", "onLocalSkinFileSelected", "plugin:auth|save_local_skin", "plugin:auth|get_local_skin", "localSkinHelpExpanded", "skinFingerprint"],
         "apps/app-frontend/src/components/ui/skin/VirtualSkinSectionList.vue":["allowOfflineSelection"],
-        "packages/app-lib/src/api/offline_skins.rs":["pub async fn save_local_skin","pub async fn prepare_instance_skin","CustomSkinLoader","validate_skin_png"],
+        "packages/app-lib/src/api/offline_skins.rs":["pub async fn save_local_skin","pub async fn get_local_skin","pub async fn prepare_instance_skin","CustomSkinLoader","validate_skin_png"],
         "packages/app-lib/src/launcher/mod.rs":["crate::api::offline_skins::prepare_instance_skin"],
         "packages/app-lib/src/api/mod.rs":["pub mod offline_skins;"],
         "apps/app-frontend/src/app/shell/title-bar/index.vue":["FRE LAUNCH"],
