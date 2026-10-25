@@ -11,7 +11,7 @@ from pathlib import Path
 def verify(root):
     root=root.resolve()
     path=Path(__file__).resolve().parent
-    for item in ("prepare.py","feature_local_accounts.py","feature_skin_notice.py","feature_offline_skins.py","feature_local_skin_preview.py","feature_ui_polish.py","feature_guest_launch.py","feature_java_nickname_lookup.py","feature_ukrainian.py","verify.py"):
+    for item in ("prepare.py","feature_local_accounts.py","feature_skin_notice.py","feature_offline_skins.py","feature_local_skin_preview.py","feature_ui_polish.py","feature_guest_launch.py","feature_java_nickname_lookup.py","feature_remove_modrinth_login.py","feature_ukrainian.py","verify.py"):
         py_compile.compile(str(path/item),doraise=True)
     expected={"Notch":"b50ad385-829d-3141-a216-7e7d7539ba7f",
               "Steve":"5627dd98-e6be-3c21-b8a8-e92344183641"}
@@ -58,6 +58,12 @@ def verify(root):
     for key,(ua,en) in NEW.items():
         assert app_en[key]["message"]==en
         assert app_uk[key]["message"]==ua
+    from feature_ukrainian import POLISH_EXISTING_APP, POLISH_EXISTING_UI
+    for key,expected_uk in POLISH_EXISTING_APP.items():
+        assert app_uk[key]["message"]==expected_uk, f"Ukrainian app polish missing: {key}"
+    for key,expected_uk in POLISH_EXISTING_UI.items():
+        assert ui_uk[key]["defaultMessage"]==expected_uk, f"Ukrainian UI polish missing: {key}"
+
 
     checks={
         "apps/app/src/api/auth.rs":["create_offline_user","save_local_skin","has_local_skin","get_local_skin","save_guest_skin","has_guest_skin","lookup_java_nickname","theseus::offline_skins::save_guest_skin","theseus::minecraft_auth::lookup_java_nickname","Sign in to Minecraft with Microsoft"],
@@ -79,6 +85,9 @@ def verify(root):
         "apps/app/src/api/instance.rs":["pub async fn instance_run_guest","theseus::instance::run_guest"],
         "packages/app-lib/src/api/mod.rs":["pub mod offline_skins;"],
         "apps/app-frontend/src/app/shell/title-bar/index.vue":["FRE LAUNCH"],
+        "apps/app-frontend/src/features/onboarding/checklist.vue":['v-if="isReady && showChecklist && !hasCreatedInstance"'],
+        "apps/app-frontend/src/features/settings/app-settings-modal/index.vue":['tab.category !== tabCategories.account'],
+        "apps/app-frontend/src/app/shell/sidebar/index.vue":['v-if="false && showFriendsList"'],
         "apps/app-frontend/src/components/ui/WelcomeScreen.vue":["OfflineProfileCreator", "fre-launch.welcome-screen.title"],
     }
     for relative,snippets in checks.items():
@@ -113,6 +122,11 @@ def verify(root):
     assert "ads" not in config["app"]["security"]["capabilities"]
     assert config["productName"]=="FRE LAUNCH"
     app=(root/"apps/app-frontend/src/App.vue").read_text(encoding="utf-8")
+    assert 'v-tooltip.right="profileButtonTooltip"' not in app, "Modrinth account login button still present in launcher"
+    assert '<ModrinthAccountRequiredModal ref="modrinthLoginModal"' in app, "Keep internal Modrinth auth flow available for platform-only features"
+    onboarding=(root/"apps/app-frontend/src/features/onboarding/checklist.vue").read_text(encoding="utf-8")
+    assert "id: 'login-modrinth'," not in onboarding.split("const steps = computed(",1)[1].split("const accordionButtonClass",1)[0], "Onboarding must not require Modrinth login"
+
     assert 'to="/hosting/manage"' not in app
     assert ':show-ad="false"' in app
     assert 'watch(\n\t[stateInitialized, showAd, adConsentAvailable],' not in app
