@@ -188,6 +188,7 @@ NEW = {
 "fre-launch.guest.nickname":("Нік (без акаунта)","Nickname (without account)"),
 "fre-launch.guest.upload-skin":("Завантажити PNG-скін для цього ніку","Upload PNG skin for this nickname"),
 "fre-launch.guest.skin-saved":("Скін збережено. Встанови CustomSkinLoader у цю збірку та перезапусти Minecraft.","Saved. Install CustomSkinLoader in this instance, then restart Minecraft."),
+"fre-launch.guest.skin-invalid":("Обери PNG-скін Minecraft (64×64 або 64×32) розміром до 512 КіБ.","Choose a PNG Minecraft skin (64x64 or 64x32) under 512 KiB."),
 "fre-launch.guest.placeholder":("Введи нік","Enter nickname"),
 "fre-launch.guest.notice":("Microsoft-вхід не потрібен. На серверах без перевірки ліцензії введи свій раніше зареєстрований нік. Якщо сервер попросить пароль, увійди через його /login.","No Microsoft login needed. For servers allowing non-premium players, use the same nickname you registered there and enter your server password when prompted."),
 "fre-launch.guest.invalid":("Дозволено 1–16 англійських літер, цифр або символів _.","Use 1-16 English letters, numbers, or underscores."),
@@ -200,6 +201,38 @@ NEW = {
 "fre-launch.guest.java-unavailable":("Зараз неможливо перевірити нік Minecraft.","Minecraft name lookup is temporarily unavailable."),
 "fre-launch.offline.disclaimer":("Для одиночної гри та серверів без перевірки ліцензії. Це не Microsoft-акаунт.","For single-player and offline-mode servers only. Not a Microsoft account.")
 }
+
+# Finish untranslated proper UI labels and visible skin-series names.
+# Never overwrite a Ukrainian value that differs from the upstream English.
+POLISH_EXISTING_APP = {
+    "app.skins.section.builders-and-biomes": "Будівельники й біоми",
+    "app.skins.section.chaos-cubed": "Кубічний хаос",
+    "app.skins.section.chase-the-skies": "Назустріч небесам",
+    "app.skins.section.mounts-of-mayhem": "Верхи хаосу",
+    "app.skins.section.striding-hero": "Герой-мандрівник",
+    "app.skins.section.the-copper-age": "Мідна доба",
+    "app.skins.section.the-garden-awakens": "Пробудження саду",
+    "app.skins.section.tiny-takeover": "Маленький переворот",
+    "app.skins.section.wilderness-bound": "Назустріч дикій природі",
+}
+POLISH_EXISTING_UI = {
+    "changelog.product.app": "Застосунок",
+    "changelog.product.hosting": "Хостинг",
+    "tag.category.oneblock": "Один блок",
+}
+
+
+def _polish_untranslated_labels(english, ukrainian, suggested, field):
+    changed = 0
+    for key, translation in suggested.items():
+        if key not in english or key not in ukrainian:
+            raise RuntimeError(f"Ukrainian polish key not found: {key}")
+        # Preserve all Ukrainian translations already supplied by contributors.
+        if ukrainian[key][field] == english[key][field]:
+            ukrainian[key][field] = translation
+            changed += 1
+    return changed
+
 
 def _complete(english, ukrainian, curated, field):
     unexpected=set(curated)-set(english)
@@ -229,6 +262,8 @@ def apply(root):
     uu=json.loads(ui_uk.read_text(encoding="utf-8"))
     app,_a=_complete(ea,ua,APP,"message")
     ui,_u=_complete(eu,uu,UI,"defaultMessage")
+    polished_app=_polish_untranslated_labels(ea,ua,POLISH_EXISTING_APP,"message")
+    polished_ui=_polish_untranslated_labels(eu,uu,POLISH_EXISTING_UI,"defaultMessage")
     for key,(uk,en) in NEW.items():
         if key in ua or key in ea:
             raise RuntimeError(f"Locale name collision: {key}")
@@ -245,4 +280,5 @@ def apply(root):
     for path, content in [(app_en,ea),(app_uk,ua),(ui_uk,uu)]:
         path.write_text(json.dumps(content,ensure_ascii=False,indent=2,sort_keys=True)+"\n",encoding="utf-8")
     print(f"Ukrainian translations completed: app={app}, UI={ui}, new profiles={len(NEW)}. "
-          f"English-only fallback strings app={_a}, UI={_u}.")
+          f"English-only fallback strings app={_a}, UI={_u}. "
+          f"Existing untranslated labels polished: app={polished_app}, UI={polished_ui}.")
