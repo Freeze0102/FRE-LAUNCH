@@ -115,11 +115,24 @@ foreach ($sourceArchive in $sourceArchives) {
         Write-Warning "Keeping archive with possible game files: $($sourceArchive.Name)"
         continue
     }
+    # Remove long nested Rust/Java build paths with Robocopy. PowerShell 5.1
+    # Remove-Item -Recurse can fail on MAX_PATH while leaving a half-deleted tree.
+    $emptyArchiveDirectory = Join-Path $env:TEMP ('fre-empty-' + [guid]::NewGuid().ToString('N'))
     try {
-        Remove-Item -LiteralPath $sourceArchive.FullName -Recurse -Force -ErrorAction Stop
+        New-Item -Path $emptyArchiveDirectory -ItemType Directory -Force | Out-Null
+        & robocopy.exe $emptyArchiveDirectory $sourceArchive.FullName /MIR /XJ /R:1 /W:1 /NFL /NDL /NJH /NJS /NP | Out-Null
+        $mirrorExitCode = $LASTEXITCODE
+        if ($mirrorExitCode -ge 8) {
+            throw "Robocopy could not clean this archive (exit $mirrorExitCode)"
+        }
+        Remove-Item -LiteralPath $sourceArchive.FullName -Force -ErrorAction Stop
         Write-Host "Removed outdated generated source archive: $($sourceArchive.Name)" -ForegroundColor DarkGray
     } catch {
         Write-Warning "Archive cleanup skipped ($($sourceArchive.Name)): $_"
+    } finally {
+        if (Test-Path -LiteralPath $emptyArchiveDirectory) {
+            Remove-Item -LiteralPath $emptyArchiveDirectory -Force -ErrorAction SilentlyContinue
+        }
     }
 }
 Write-Host "FRE LAUNCH modified Modrinth GPLv3 source: $destination" -ForegroundColor Green
