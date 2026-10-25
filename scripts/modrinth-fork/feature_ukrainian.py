@@ -184,6 +184,11 @@ NEW = {
 "fre-launch.offline.short":("Локальний","Local"),
 "fre-launch.offline.microsoft":("Microsoft","Microsoft"),
 "fre-launch.offline.confirm-remove":("Видалити профіль {nickname} із лаунчера?","Remove Minecraft profile {nickname} from this launcher?"),
+"fre-launch.guest.use-account":("Використовувати збережений акаунт","Use saved account"),
+"fre-launch.guest.nickname":("Нік (без акаунта)","Nickname (without account)"),
+"fre-launch.guest.placeholder":("Введи нік","Enter nickname"),
+"fre-launch.guest.notice":("Грай під цим ніком без акаунта. Працює в одиночній грі та на серверах без перевірки ліцензії.","Play as this nickname without an account. Works only on offline-mode servers and in single-player."),
+"fre-launch.guest.invalid":("Дозволено 1–16 англійських літер, цифр або символів _.","Use 1-16 English letters, numbers, or underscores."),
 "fre-launch.offline.disclaimer":("Для одиночної гри та серверів без перевірки ліцензії. Це не Microsoft-акаунт.","For single-player and offline-mode servers only. Not a Microsoft account.")
 }
 
