@@ -190,17 +190,9 @@ def customize(root,revision):
         if not production_env.is_file():
             raise RuntimeError("Missing upstream app-lib/.env.prod configuration")
         (app_lib/".env").write_text(production_env.read_text(encoding="utf-8"),encoding="utf-8")
-    # Preserve the full desktop client and required workspace packages,
-    # not the unrelated web/backend/docs apps that carry more reserved branding.
-    for name in ("frontend","docs","labrinth","meta-generator","app-playground"):
-        folder=root/"apps"/name
-        if folder.exists():
-            shutil.rmtree(folder)
-    cargo=root/"Cargo.toml"
-    raw=cargo.read_text(encoding="utf-8")
-    for name in ("labrinth","meta-generator","app-playground"):
-        raw=raw.replace('  "apps/'+name+'",\n',"")
-    cargo.write_text(raw,encoding="utf-8")
+    # Keep the ENTIRE pinned Modrinth monorepo, including the real Vue/Tauri/Rust
+    # engine and all workspace dependencies. This is a source fork, not an imitation.
+    # The Windows launcher builds only the desktop app target.
     (root/"FRE_LAUNCH_FORK.md").write_text(
         "# FRE LAUNCH: GPLv3 Modrinth desktop fork\n\n"
         "This is a modified copy of Modrinth App desktop source by Rinth, Inc.\n"
@@ -208,7 +200,7 @@ def customize(root,revision):
         "Pinned source revision: "+revision+"\n\n"
         "Changes: FRE LAUNCH identity and original neutral artwork; no hosting menu or routes,\n"
         "advertising window initialization, promotion banners or upstream auto-updater.\n"
-        "Unrelated website/API/docs applications were omitted; all desktop code is retained.\n\n"
+        "The complete pinned upstream source tree and all original license notices are retained.\n\n"
         "License: GPL-3.0-only for the Modrinth App code, with original copyright and\n"
         "license notices retained. Redistributors must provide corresponding source.\n"
         "Reserved Modrinth brand images have been replaced, not redistributed.\n"
