@@ -127,6 +127,10 @@ def verify(root):
     onboarding=(root/"apps/app-frontend/src/features/onboarding/checklist.vue").read_text(encoding="utf-8")
     assert "id: 'login-modrinth'," not in onboarding.split("const steps = computed(",1)[1].split("const accordionButtonClass",1)[0], "Onboarding must not require Modrinth login"
 
+    sidebar_vue=(root/"apps/app-frontend/src/app/shell/sidebar/index.vue").read_text(encoding="utf-8")
+    for tag in ("<PrideFundraiserBanner", "<NewsSidebar", '<Promotion v-if="showAd"'):
+        assert tag not in sidebar_vue, f"Sidebar still renders a removed promotional element: {tag}"
+
     assert 'to="/hosting/manage"' not in app
     assert ':show-ad="false"' in app
     assert 'watch(\n\t[stateInitialized, showAd, adConsentAvailable],' not in app
