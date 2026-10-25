@@ -60,12 +60,12 @@ def verify(root):
         assert app_uk[key]["message"]==ua
 
     checks={
-        "apps/app/src/api/auth.rs":["create_offline_user","save_local_skin","has_local_skin","get_local_skin","save_guest_skin","has_guest_skin","theseus::offline_skins::save_guest_skin","Sign in to Minecraft with Microsoft"],
+        "apps/app/src/api/auth.rs":["create_offline_user","save_local_skin","has_local_skin","get_local_skin","save_guest_skin","has_guest_skin","lookup_java_nickname","theseus::offline_skins::save_guest_skin","theseus::minecraft_auth::lookup_java_nickname","Sign in to Minecraft with Microsoft"],
         "apps/app/build.rs":["create_offline_user","save_local_skin","has_local_skin","save_guest_skin","has_guest_skin","instance_run_guest"],
-        "packages/app-lib/src/api/minecraft_auth.rs":["pub async fn create_offline_user","pub fn guest_credentials","OfflinePlayer:","md5::compute","mark_logged_into_minecraft"],
+        "packages/app-lib/src/api/minecraft_auth.rs":["pub async fn create_offline_user","pub fn guest_credentials","pub async fn lookup_java_nickname","api.minecraftservices.com/minecraft/profile/lookup/name","StatusCode::NOT_FOUND","OfflinePlayer:","md5::compute","mark_logged_into_minecraft"],
         "packages/app-lib/src/state/minecraft_auth.rs":["pub fn is_offline_profile","fre-offline:"],
         "packages/app-lib/src/launcher/args.rs":['access_token.starts_with("fre-offline:")'],
-        "apps/app-frontend/src/features/minecraft-accounts/accounts-card.vue":["OfflineProfileCreator", "fre-launch-offline-account-created", "confirmRemove", "messages.microsoft", "useSavedAccount", "guestNickname", "fre-launch.guest.use-account", "onGuestSkinFilePicked", "plugin:auth|save_guest_skin", "guestNicknameValid", "guestNicknameIsSaved", "messages.guestServerCheck"],
+        "apps/app-frontend/src/features/minecraft-accounts/accounts-card.vue":["OfflineProfileCreator", "fre-launch-offline-account-created", "confirmRemove", "messages.microsoft", "useSavedAccount", "guestNickname", "fre-launch.guest.use-account", "onGuestSkinFilePicked", "plugin:auth|save_guest_skin", "plugin:auth|lookup_java_nickname", "javaNicknameStatus", "javaNickLookupSequence", "guestNicknameValid", "guestNicknameIsSaved", "messages.guestServerCheck"],
         "apps/app-frontend/src/features/minecraft-accounts/offline-profile-creator.vue":["v-model.trim","create_offline_user","@submit.prevent"],
         "apps/app-frontend/src/helpers/auth.js":["plugin:auth|create_offline_user"],
         "apps/app-frontend/src/helpers/instance.ts":["plugin:instance|instance_run_guest","fre-launch-guest-nickname"],
@@ -86,6 +86,9 @@ def verify(root):
         for snippet in snippets:
             if snippet not in data: raise AssertionError(f"{relative}: missing {snippet}")
     assert "theseus::api::offline_skins::" not in (root/"apps/app/src/api/auth.rs").read_text(encoding="utf-8"), "Private Theseus API path causes Rust E0603" 
+    nickname_api=(root/"packages/app-lib/src/api/minecraft_auth.rs").read_text(encoding="utf-8")
+    assert 'StatusCode::OK => Ok("used")' in nickname_api and 'StatusCode::NOT_FOUND => Ok("no_profile")' in nickname_api, "Public Java lookup must distinguish taken and unregistered profile"
+    assert 'StatusCode::TOO_MANY_REQUESTS' not in nickname_api, "Rate limiting must not be mistaken for a free nickname"
     guest_skins=(root/"packages/app-lib/src/api/offline_skins.rs").read_text(encoding="utf-8")
     assert "guest_credentials(nickname)" in guest_skins, "Guest skins must use the same UUID as guest Minecraft launches"
     assert "save_skin_bytes(credentials.offline_profile.id" in guest_skins, "Guest PNG must be keyed by game UUID"
