@@ -24,6 +24,7 @@ if ($BuildWindows -or $RunDev) {
     if ($LASTEXITCODE -ne 0 -or [version]$pnpmVersionText -lt [version]'12.11.2') {
         throw "Original Modrinth code requires pnpm 12.11.2+. Detected $pnpmVersionText. Run: npm install -g pnpm@12.11.2"
     }
+}
 $prepared = Join-Path $destination 'FRE_LAUNCH_FORK.md'
 $signaturePath = Join-Path $destination '.fre-launch-source-signature'
 $patchNames = @('prepare.py','feature_local_accounts.py','feature_ukrainian.py','feature_skin_notice.py','verify.py')
