@@ -60,7 +60,7 @@ def verify(root):
         assert app_uk[key]["message"]==ua
 
     checks={
-        "apps/app/src/api/auth.rs":["create_offline_user","save_local_skin","has_local_skin","Sign in to Minecraft with Microsoft"],
+        "apps/app/src/api/auth.rs":["create_offline_user","save_local_skin","has_local_skin","theseus::offline_skins::save_local_skin","theseus::offline_skins::has_local_skin","Sign in to Minecraft with Microsoft"],
         "apps/app/build.rs":["create_offline_user","save_local_skin","has_local_skin"],
         "packages/app-lib/src/api/minecraft_auth.rs":["pub async fn create_offline_user","OfflinePlayer:","md5::compute","mark_logged_into_minecraft"],
         "packages/app-lib/src/state/minecraft_auth.rs":["pub fn is_offline_profile","fre-offline:"],
@@ -80,6 +80,7 @@ def verify(root):
         data=(root/relative).read_text(encoding="utf-8")
         for snippet in snippets:
             if snippet not in data: raise AssertionError(f"{relative}: missing {snippet}")
+    assert "theseus::api::offline_skins::" not in (root/"apps/app/src/api/auth.rs").read_text(encoding="utf-8"), "Private Theseus API path causes Rust E0603" 
     config=json.loads((root/"apps/app/tauri.conf.json").read_text(encoding="utf-8"))
     assert config["identifier"]=="app.frelaunch.modrinthfork"
     assert "ads" not in config["app"]["security"]["capabilities"]
