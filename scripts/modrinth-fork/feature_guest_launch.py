@@ -249,7 +249,7 @@ watch(guestNickname, (name) => localStorage.setItem('fre-launch-guest-nickname',
         """    useAccount: { id: 'fre-launch.guest.use-account', defaultMessage: 'Use saved account' },
     guestNickname: { id: 'fre-launch.guest.nickname', defaultMessage: 'Nickname (without account)' },
     guestPlaceholder: { id: 'fre-launch.guest.placeholder', defaultMessage: 'Enter nickname' },
-    guestNotice: { id: 'fre-launch.guest.notice', defaultMessage: 'Play as this nickname without an account. Works only on offline-mode servers and in single-player.' },
+    guestNotice: { id: 'fre-launch.guest.notice', defaultMessage: 'No Microsoft login needed. For servers allowing non-premium players, use the same nickname you registered there and enter your server password when prompted.' },
     guestInvalid: { id: 'fre-launch.guest.invalid', defaultMessage: 'Use 1-16 English letters, numbers, or underscores.' },
 \tnotSignedIn: {
 """)
