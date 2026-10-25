@@ -194,6 +194,10 @@ NEW = {
 "fre-launch.guest.format-ok":("Нік підходить для офлайн-запуску.","Nickname is valid for offline launch."),
 "fre-launch.guest.already-saved":("Цей нік є серед твоїх збережених локальних профілів. Гостьовий запуск не створить і не вибере такий акаунт.","This nickname is also in your saved local profiles. Guest launch will not create or use that saved account."),
 "fre-launch.guest.server-check":("Чи зареєстрований нік на MineBlaze, дізнаєшся при вході: сервер запропонує /register або /login.","Server registration cannot be checked here: MineBlaze will tell you to register or log in after connecting."),
+"fre-launch.guest.java-checking":("Перевірка ніку Minecraft Java...","Checking Minecraft Java name..."),
+"fre-launch.guest.java-used":("Цей нік уже належить чинному профілю Minecraft Java.","This name belongs to an active Minecraft Java profile."),
+"fre-launch.guest.java-no-profile":("Чинний Java-профіль із таким ніком не знайдено. Це не гарантує доступність імені.","No active Java profile found. Name availability is not guaranteed."),
+"fre-launch.guest.java-unavailable":("Зараз неможливо перевірити нік Minecraft.","Minecraft name lookup is temporarily unavailable."),
 "fre-launch.offline.disclaimer":("Для одиночної гри та серверів без перевірки ліцензії. Це не Microsoft-акаунт.","For single-player and offline-mode servers only. Not a Microsoft account.")
 }
 
