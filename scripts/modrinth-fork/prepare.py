@@ -165,6 +165,10 @@ def customize(root,revision):
     if settings["productName"]!="Modrinth App":
         raise RuntimeError("Unexpected app identity")
     settings["productName"]="FRE LAUNCH"
+    # The desktop fork omits website/docs apps, so run frontend directly.
+    # Avoid root-wide i18n / turbo tasks that require removed workspaces.
+    settings["build"]["beforeDevCommand"]="pnpm --filter @modrinth/app-frontend dev"
+    settings["build"]["beforeBuildCommand"]="pnpm --filter @modrinth/app-frontend build"
     settings["mainBinaryName"]="FRE LAUNCH"
     settings["identifier"]="app.frelaunch.modrinthfork"
     settings["bundle"]["targets"]=["nsis"]
