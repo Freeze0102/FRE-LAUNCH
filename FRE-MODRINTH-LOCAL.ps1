@@ -27,6 +27,19 @@ if ($BuildWindows -or $RunDev) {
 }
 $prepared = Join-Path $destination 'FRE_LAUNCH_FORK.md'
 $signaturePath = Join-Path $destination '.fre-launch-source-signature'
+# Essential files must survive between runs. In particular, damaged pnpm
+# workspaces must never be treated as a usable prepared source tree.
+$requiredSourceFiles = @(
+    'apps\app-frontend\src\locales\en-US\index.json',
+    'apps\app-frontend\src\locales\uk-UA\index.json',
+    'packages\ui\src\locales\en-US\index.json',
+    'packages\ui\src\locales\uk-UA\index.json',
+    'apps\app-frontend\package.json',
+    'apps\frontend\package.json',
+    'apps\app\package.json',
+    'pnpm-workspace.yaml',
+    'pnpm-lock.yaml'
+)
 $patchNames = @('prepare.py','feature_local_accounts.py','feature_ukrainian.py','feature_skin_notice.py','feature_offline_skins.py','feature_local_skin_preview.py','feature_ui_polish.py','feature_guest_launch.py','feature_java_nickname_lookup.py','feature_remove_modrinth_login.py','verify.py')
 $signature = ($revision + ':' + (($patchNames | ForEach-Object {
     $sourceFile = Join-Path $projectRoot ('scripts\modrinth-fork\' + $_)
@@ -38,7 +51,14 @@ if (Test-Path $destination) {
         throw "Found an incomplete generated source: $destination. Rename that folder and retry; no original game data is changed."
     }
     $previousSignature = if (Test-Path $signaturePath) { (Get-Content $signaturePath -Raw).Trim() } else { '' }
-    if ($previousSignature -ne $signature) {
+    $missingSourceFiles = @($requiredSourceFiles | Where-Object {
+        -not (Test-Path -LiteralPath (Join-Path $destination $_) -PathType Leaf)
+    })
+    if ($missingSourceFiles.Count -gt 0) {
+        Write-Warning ("Generated source is incomplete: " + ($missingSourceFiles -join ', '))
+        Write-Host 'Preserving the incomplete tree and regenerating from pinned upstream.' -ForegroundColor Yellow
+    }
+    if ($previousSignature -ne $signature -or $missingSourceFiles.Count -gt 0) {
         $archive = Join-Path $projectRoot ('FRE-Modrinth-Source-archive-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
         if (Test-Path $archive) { throw "Archive destination exists: $archive" }
         Write-Host 'Source converter changed. Preserving previous generated code in:' $archive -ForegroundColor Yellow
@@ -103,6 +123,13 @@ foreach ($sourceArchive in $sourceArchives) {
         Write-Warning "Keeping unverified archive: $($sourceArchive.Name)"
         continue
     }
+    $archiveMissingFiles = @($requiredSourceFiles | Where-Object {
+        -not (Test-Path -LiteralPath (Join-Path $sourceArchive.FullName $_) -PathType Leaf)
+    })
+    if ($archiveMissingFiles.Count -gt 0) {
+        Write-Warning "Keeping incomplete generated source for diagnosis: $($sourceArchive.Name)"
+        continue
+    }
     $gameFolders = @('instances', 'saves', 'worlds', 'mods', 'resourcepacks', 'shaderpacks', 'screenshots', '.minecraft', 'minecraft')
     $containsGameFiles = $false
     foreach ($folder in $gameFolders) {
@@ -149,6 +176,12 @@ if ($BuildWindows -or $RunDev) {
         if ($LASTEXITCODE -ne 0) { throw 'pnpm lockfile reconciliation failed' }
         pnpm.cmd install --frozen-lockfile
         if ($LASTEXITCODE -ne 0) { throw 'pnpm install failed' }
+        $missingAfterPnpm = @($requiredSourceFiles | Where-Object {
+            -not (Test-Path -LiteralPath (Join-Path $destination $_) -PathType Leaf)
+        })
+        if ($missingAfterPnpm.Count -gt 0) {
+            throw ("Required source files disappeared during pnpm installation: " + ($missingAfterPnpm -join ', '))
+        }
         # Upstream Modrinth does not commit this generated TypeScript file.
         # It must exist BEFORE checking the Vue frontend or compilation fails.
         pnpm.cmd -w i18n:coverage
