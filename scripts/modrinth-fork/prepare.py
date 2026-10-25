@@ -215,12 +215,14 @@ def customize(root,revision):
     from feature_local_skin_preview import apply as preserve_offline_skin_preview
     from feature_ui_polish import apply as polish_account_and_skin_ui
     from feature_guest_launch import apply as add_guest_nickname_launch
+    from feature_java_nickname_lookup import apply as add_java_nickname_lookup
     add_local_accounts(root)
     guard_offline_skins(root)
     add_offline_skin_support(root)
     preserve_offline_skin_preview(root)
     polish_account_and_skin_ui(root)
     add_guest_nickname_launch(root)
+    add_java_nickname_lookup(root)
     finish_ukrainian(root)
     print("Prepared distinct FRE LAUNCH source fork from",revision)
 
