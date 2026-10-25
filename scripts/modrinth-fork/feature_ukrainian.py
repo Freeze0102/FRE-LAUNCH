@@ -191,6 +191,9 @@ NEW = {
 "fre-launch.guest.placeholder":("Введи нік","Enter nickname"),
 "fre-launch.guest.notice":("Microsoft-вхід не потрібен. На серверах без перевірки ліцензії введи свій раніше зареєстрований нік. Якщо сервер попросить пароль, увійди через його /login.","No Microsoft login needed. For servers allowing non-premium players, use the same nickname you registered there and enter your server password when prompted."),
 "fre-launch.guest.invalid":("Дозволено 1–16 англійських літер, цифр або символів _.","Use 1-16 English letters, numbers, or underscores."),
+"fre-launch.guest.format-ok":("Нік підходить для офлайн-запуску.","Nickname is valid for offline launch."),
+"fre-launch.guest.already-saved":("Цей нік є серед твоїх збережених локальних профілів. Гостьовий запуск не створить і не вибере такий акаунт.","This nickname is also in your saved local profiles. Guest launch will not create or use that saved account."),
+"fre-launch.guest.server-check":("Чи зареєстрований нік на MineBlaze, дізнаєшся при вході: сервер запропонує /register або /login.","Server registration cannot be checked here: MineBlaze will tell you to register or log in after connecting."),
 "fre-launch.offline.disclaimer":("Для одиночної гри та серверів без перевірки ліцензії. Це не Microsoft-акаунт.","For single-player and offline-mode servers only. Not a Microsoft account.")
 }
 
