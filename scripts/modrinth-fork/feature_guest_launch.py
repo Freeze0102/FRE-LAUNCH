@@ -208,8 +208,17 @@ pub async fn instance_kill(instance_id: &str) -> Result<()> {""")
             <p class="m-0 text-xs text-secondary">
                 {{ formatMessage(messages.guestNotice) }}
             </p>
-            <p v-if="guestNickname && !/^[A-Za-z0-9_]{1,16}$/.test(guestNickname)" class="m-0 text-xs text-red">
+            <p v-if="guestNicknameValid" role="status" class="m-0 text-xs text-brand">
+                {{ formatMessage(messages.guestFormatOk) }}
+            </p>
+            <p v-else-if="guestNickname" role="status" class="m-0 text-xs text-red">
                 {{ formatMessage(messages.guestInvalid) }}
+            </p>
+            <p v-if="guestNicknameValid && guestNicknameIsSaved" class="m-0 text-xs text-secondary">
+                {{ formatMessage(messages.guestAlreadySaved) }}
+            </p>
+            <p v-if="guestNicknameValid" class="m-0 text-xs text-secondary">
+                {{ formatMessage(messages.guestServerCheck) }}
             </p>
         </div>
     </div>
@@ -249,6 +258,12 @@ const guestNickListId = useId()
 const useSavedAccount = ref(localStorage.getItem('fre-launch-account-mode') !== 'nickname')
 const guestNickname = ref(localStorage.getItem('fre-launch-guest-nickname') ?? '')
 const guestNicknameValid = computed(() => /^[A-Za-z0-9_]{1,16}$/.test(guestNickname.value))
+const guestNicknameIsSaved = computed(() =>
+    accounts.value.some((account) =>
+        account.access_token?.startsWith('fre-offline:') &&
+        account.profile.name.toLowerCase() === guestNickname.value.toLowerCase(),
+    ),
+)
 const guestSkinFileInput = ref<HTMLInputElement | null>(null)
 const guestSkinBusy = ref(false)
 const guestSkinStatus = ref('')
@@ -298,6 +313,9 @@ watch(guestNickname, (name) => {
     guestPlaceholder: { id: 'fre-launch.guest.placeholder', defaultMessage: 'Enter nickname' },
     guestNotice: { id: 'fre-launch.guest.notice', defaultMessage: 'No Microsoft login needed. For servers allowing non-premium players, use the same nickname you registered there and enter your server password when prompted.' },
     guestInvalid: { id: 'fre-launch.guest.invalid', defaultMessage: 'Use 1-16 English letters, numbers, or underscores.' },
+    guestFormatOk: { id: 'fre-launch.guest.format-ok', defaultMessage: 'Nickname is valid for offline launch.' },
+    guestAlreadySaved: { id: 'fre-launch.guest.already-saved', defaultMessage: 'This nickname is also in your saved local profiles. Guest launch will not create or use that saved account.' },
+    guestServerCheck: { id: 'fre-launch.guest.server-check', defaultMessage: 'Server registration cannot be checked here: MineBlaze will tell you to register or log in after connecting.' },
 \tnotSignedIn: {
 """)
     print("Guest nickname mode added: unchecked account box launches directly without DB account row or Microsoft token")
