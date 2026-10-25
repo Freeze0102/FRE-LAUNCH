@@ -12,6 +12,18 @@ $destination = Join-Path $projectRoot 'FRE-Modrinth-Source'
 $converter = Join-Path $projectRoot 'scripts\modrinth-fork\prepare.py'
 if (-not (Test-Path $converter)) { throw 'Full FRE LAUNCH repository not found.' }
 if ($BuildWindows -and $RunDev) { throw 'Choose either -BuildWindows or -RunDev.' }
+if ($BuildWindows -or $RunDev) {
+    Get-Command node -ErrorAction Stop | Out-Null
+    Get-Command pnpm -ErrorAction Stop | Out-Null
+    Get-Command cargo -ErrorAction Stop | Out-Null
+    $nodeVersionText = (& node -p "process.versions.node").Trim()
+    if ($LASTEXITCODE -ne 0 -or [version]$nodeVersionText -lt [version]'24.15.0') {
+        throw "Original Modrinth code requires Node.js 24.15+. Detected $nodeVersionText. Upgrade Node.js before building."
+    }
+    $pnpmVersionText = (& pnpm --version).Trim()
+    if ($LASTEXITCODE -ne 0 -or [version]$pnpmVersionText -lt [version]'12.11.2') {
+        throw "Original Modrinth code requires pnpm 12.11.2+. Detected $pnpmVersionText. Run: npm install -g pnpm@12.11.2"
+    }
 $prepared = Join-Path $destination 'FRE_LAUNCH_FORK.md'
 $signaturePath = Join-Path $destination '.fre-launch-source-signature'
 $patchNames = @('prepare.py','feature_local_accounts.py','feature_ukrainian.py','feature_skin_notice.py','verify.py')
@@ -79,17 +91,6 @@ Set-Content -LiteralPath $signaturePath -Value $signature -Encoding UTF8
 Write-Host "FRE LAUNCH modified Modrinth GPLv3 source: $destination" -ForegroundColor Green
 Write-Host 'Separate old FRE LAUNCH profiles and worlds have not been changed.'
 if ($BuildWindows -or $RunDev) {
-    Get-Command node -ErrorAction Stop | Out-Null
-    Get-Command pnpm -ErrorAction Stop | Out-Null
-    Get-Command cargo -ErrorAction Stop | Out-Null
-    $nodeVersionText = (& node -p "process.versions.node").Trim()
-    if ($LASTEXITCODE -ne 0 -or [version]$nodeVersionText -lt [version]'24.15.0') {
-        throw "Original Modrinth code requires Node.js 24.15+. Detected $nodeVersionText. Upgrade Node.js before building."
-    }
-    $pnpmVersionText = (& pnpm --version).Trim()
-    if ($LASTEXITCODE -ne 0 -or [version]$pnpmVersionText -lt [version]'12.11.2') {
-        throw "Original Modrinth code requires pnpm 12.11.2+. Detected $pnpmVersionText. Run: npm install -g pnpm@12.11.2"
-    }
     Push-Location $destination
     try {
         pnpm install --frozen-lockfile
