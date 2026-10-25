@@ -13,12 +13,28 @@ $converter = Join-Path $projectRoot 'scripts\modrinth-fork\prepare.py'
 if (-not (Test-Path $converter)) { throw 'Full FRE LAUNCH repository not found.' }
 if ($BuildWindows -and $RunDev) { throw 'Choose either -BuildWindows or -RunDev.' }
 $prepared = Join-Path $destination 'FRE_LAUNCH_FORK.md'
+$signaturePath = Join-Path $destination '.fre-launch-source-signature'
+$patchNames = @('prepare.py','feature_local_accounts.py','feature_ukrainian.py','feature_skin_notice.py','verify.py')
+$signature = ($revision + ':' + (($patchNames | ForEach-Object {
+    $sourceFile = Join-Path $projectRoot ('scripts\modrinth-fork\' + $_)
+    if (-not (Test-Path $sourceFile)) { throw "Missing source patcher: $sourceFile" }
+    (Get-FileHash $sourceFile -Algorithm SHA256).Hash
+}) -join ':'))
 if (Test-Path $destination) {
     if (-not (Test-Path $prepared)) {
         throw "Found an incomplete generated source: $destination. Rename that folder and retry; no original game data is changed."
     }
-    Write-Host 'Using existing generated Modrinth source. Verifying before launch...' -ForegroundColor Cyan
-} else {
+    $previousSignature = if (Test-Path $signaturePath) { (Get-Content $signaturePath -Raw).Trim() } else { '' }
+    if ($previousSignature -ne $signature) {
+        $archive = Join-Path $projectRoot ('FRE-Modrinth-Source-archive-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
+        if (Test-Path $archive) { throw "Archive destination exists: $archive" }
+        Write-Host 'Source converter changed. Preserving previous generated code in:' $archive -ForegroundColor Yellow
+        Move-Item -LiteralPath $destination -Destination $archive
+    } else {
+        Write-Host 'Using existing generated Modrinth source. Verifying before launch...' -ForegroundColor Cyan
+    }
+}
+if (-not (Test-Path $destination)) {
 Get-Command git -ErrorAction Stop | Out-Null
 Get-Command py -ErrorAction Stop | Out-Null
 Write-Host 'Fetching pinned original Modrinth source...' -ForegroundColor Cyan
@@ -59,6 +75,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Customization failed, source remains in FRE-Mo
 Write-Host 'Verifying nickname auth, locale coverage and app identity...' -ForegroundColor Cyan
 py -3 "$projectRoot\scripts\modrinth-fork\verify.py" "$destination"
 if ($LASTEXITCODE -ne 0) { throw 'FRE LAUNCH verification failed; refusing Windows compilation.' }
+Set-Content -LiteralPath $signaturePath -Value $signature -Encoding UTF8
 Write-Host "FRE LAUNCH modified Modrinth GPLv3 source: $destination" -ForegroundColor Green
 Write-Host 'Separate old FRE LAUNCH profiles and worlds have not been changed.'
 if ($BuildWindows -or $RunDev) {
