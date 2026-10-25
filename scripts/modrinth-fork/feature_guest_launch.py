@@ -232,7 +232,7 @@ pub async fn instance_kill(instance_id: &str) -> Result<()> {""")
     exactly(card, "\t\t<OfflineProfileCreator />\n",
                  "\t\t<OfflineProfileCreator />\n") # validate existing no-accounts form
     exactly(card, "import { computed, onMounted, onUnmounted, ref } from 'vue'",
-                 "import { computed, onMounted, onUnmounted, ref, useId, watch } from 'vue'\nimport { invoke } from '@tauri-apps/api/core'")
+                 "import { computed, onMounted, onUnmounted, ref, useId, watch } from 'vue'")
     exactly(card,
         "const accounts: Ref<MinecraftCredential[]> = ref([])",
         """const accounts: Ref<MinecraftCredential[]> = ref([])
