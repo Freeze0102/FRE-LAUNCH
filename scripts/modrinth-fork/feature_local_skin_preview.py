@@ -42,7 +42,25 @@ pub async fn get_local_skin(profile_id: uuid::Uuid) -> Result<Option<String>> {
     exactly(root/"apps/app/build.rs",
             '                        "has_local_skin",\n',
             '                        "has_local_skin",\n                        "get_local_skin",\n')
+    helper=root/"apps/app-frontend/src/helpers/skins.ts"
+    # Local PNGs are already valid data URLs. Do not pass them into the Rust
+    # URL-only downloader; this also makes the account avatar render correctly.
+    exactly(helper,
+        "export async function get_normalized_skin_texture(skin: Skin): Promise<string> {\n",
+        "export async function get_normalized_skin_texture(skin: Skin): Promise<string> {\n"
+        "\tif (skin.texture.startsWith('data:image/png;base64,')) return skin.texture\n")
     skins=root/"apps/app-frontend/src/pages/Skins.vue"
+    exactly(skins,
+        "async function loadSkins() {",
+        """function skinFingerprint(base64: string): string {
+    let checksum = 2166136261
+    for (let i = 0; i < base64.length; i++) {
+        checksum = Math.imul(checksum ^ base64.charCodeAt(i), 16777619)
+    }
+    return (checksum >>> 0).toString(16)
+}
+
+async function loadSkins() {""")
     exactly(skins,
             "\t\tconst loadedSkins = (await get_available_skins()) ?? []",
             """\t\tconst loadedSkins = (await get_available_skins()) ?? []
@@ -55,7 +73,7 @@ pub async fn get_local_skin(profile_id: uuid::Uuid) -> Result<Option<String>> {
             if (pngBase64) {
                 const localSkin: Skin = {
                     source: 'custom_external',
-                    texture_key: 'fre-local-' + currentUserId.value,
+                    texture_key: 'fre-local-' + currentUserId.value + '-' + skinFingerprint(pngBase64),
                     texture: 'data:image/png;base64,' + pngBase64,
                     variant: 'CLASSIC',
                     is_equipped: true,
