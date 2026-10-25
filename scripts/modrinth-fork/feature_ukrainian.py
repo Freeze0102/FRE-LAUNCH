@@ -186,6 +186,8 @@ NEW = {
 "fre-launch.offline.confirm-remove":("Видалити профіль {nickname} із лаунчера?","Remove Minecraft profile {nickname} from this launcher?"),
 "fre-launch.guest.use-account":("Використовувати збережений акаунт","Use saved account"),
 "fre-launch.guest.nickname":("Нік (без акаунта)","Nickname (without account)"),
+"fre-launch.guest.upload-skin":("Завантажити PNG-скін для цього ніку","Upload PNG skin for this nickname"),
+"fre-launch.guest.skin-saved":("Скін збережено. Встанови CustomSkinLoader у цю збірку та перезапусти Minecraft.","Saved. Install CustomSkinLoader in this instance, then restart Minecraft."),
 "fre-launch.guest.placeholder":("Введи нік","Enter nickname"),
 "fre-launch.guest.notice":("Microsoft-вхід не потрібен. На серверах без перевірки ліцензії введи свій раніше зареєстрований нік. Якщо сервер попросить пароль, увійди через його /login.","No Microsoft login needed. For servers allowing non-premium players, use the same nickname you registered there and enter your server password when prompted."),
 "fre-launch.guest.invalid":("Дозволено 1–16 англійських літер, цифр або символів _.","Use 1-16 English letters, numbers, or underscores."),
