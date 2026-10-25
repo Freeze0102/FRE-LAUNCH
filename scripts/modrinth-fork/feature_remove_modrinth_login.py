@@ -35,7 +35,7 @@ def apply(root: Path):
     # expose its optional share/friend helpers elsewhere.
     exactly(sidebar,
         '\t\t\t\t\t\tv-show="showFriendsList"\n',
-        '\t\t\t\t\t\tv-if="false"\n')
+        '\t\t\t\t\t\tv-if="false && showFriendsList"\n')
     # Campaign/brand panels are not part of a Minecraft launcher.
     exactly(sidebar,
         '\t\t\t\t\t<PrideFundraiserBanner\n',
@@ -59,6 +59,8 @@ def apply(root: Path):
 \t\taction: () => emit('login-modrinth'),
 \t},
 """, "")
+    exactly(onboarding,
+        "\thasLoggedIntoMinecraft,\n\thasLoggedIntoModrinth,\n", "")
     # Don't keep asking for a Microsoft or Modrinth login. Show the quick
     # checklist only while the user has not created their first game instance.
     exactly(onboarding,
