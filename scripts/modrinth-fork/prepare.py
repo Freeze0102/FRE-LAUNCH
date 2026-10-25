@@ -165,10 +165,8 @@ def customize(root,revision):
     if settings["productName"]!="Modrinth App":
         raise RuntimeError("Unexpected app identity")
     settings["productName"]="FRE LAUNCH"
-    # The desktop fork omits website/docs apps, so run frontend directly.
-    # Avoid root-wide i18n / turbo tasks that require removed workspaces.
-    settings["build"]["beforeDevCommand"]="pnpm --filter @modrinth/app-frontend dev"
-    settings["build"]["beforeBuildCommand"]="pnpm --filter @modrinth/app-frontend build"
+    # Preserve upstream Tauri build hooks: they generate the missing
+    # language-settings-coverage.generated.ts before Vue type checking.
     settings["mainBinaryName"]="FRE LAUNCH"
     settings["identifier"]="app.frelaunch.modrinthfork"
     settings["bundle"]["targets"]=["nsis"]
