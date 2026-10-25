@@ -89,6 +89,38 @@ async function loadSkins() {""")
     exactly(skins,
         "        localSkinSaved.value = true\n        addNotification({",
         "        localSkinSaved.value = true\n        await loadSkins()\n        addNotification({")
+    accounts=root/"apps/app-frontend/src/features/minecraft-accounts/accounts-card.vue"
+    exactly(accounts,
+        "import { getPlayerHeadUrl } from '@/helpers/rendering/player-head'",
+        "import { invoke } from '@tauri-apps/api/core'\n"
+        "import { getPlayerHeadUrl } from '@/helpers/rendering/player-head'")
+    exactly(accounts,
+        "\t\tconst skins = await get_available_skins()\n\t\tequippedSkin.value = skins.find((skin) => skin.is_equipped) ?? null\n",
+        """\t\tconst skins = await get_available_skins()
+        equippedSkin.value = skins.find((skin) => skin.is_equipped) ?? null
+        const active = accounts.value.find((account) => account.profile.id === defaultUser.value)
+        if (active?.access_token?.startsWith('fre-offline:') && defaultUser.value) {
+            const png = await invoke<string | null>('plugin:auth|get_local_skin', {
+                profileId: defaultUser.value,
+            })
+            if (png) {
+                let checksum = 2166136261
+                for (let i = 0; i < png.length; i++) {
+                    checksum = Math.imul(checksum ^ png.charCodeAt(i), 16777619)
+                }
+                equippedSkin.value = {
+                    texture_key: 'fre-local-' + defaultUser.value + '-' + (checksum >>> 0).toString(16),
+                    texture: 'data:image/png;base64,' + png,
+                    variant: 'CLASSIC',
+                    source: 'custom_external',
+                    is_equipped: true,
+                }
+            }
+        }
+""")
+    exactly(accounts,
+        "\treturn `https://mc-heads.net/avatar/${account.profile.id}/128`",
+        "\treturn account.access_token?.startsWith('fre-offline:') ? 'https://launcher-files.modrinth.com/assets/steve_head.png' : `https://mc-heads.net/avatar/${account.profile.id}/128`")
     print("Launcher avatar and gallery remember last PNG for each local nickname across restarts")
 
 if __name__=="__main__":
