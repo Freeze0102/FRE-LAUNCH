@@ -149,9 +149,19 @@ pub async fn instance_kill(instance_id: &str) -> Result<()> {""")
         if (!/^[A-Za-z0-9_]{1,16}$/.test(nickname)) {
             throw new Error('Enter a nickname (1-16 English letters, digits or underscores)')
         }
-        return await invoke('plugin:instance|instance_run_guest', {
+        const result = await invoke('plugin:instance|instance_run_guest', {
             instanceId, serverAddress, nickname,
         })
+        // Remember the text of recent nicks, not auth records or tokens.
+        let recent: string[] = []
+        try {
+            const parsed = JSON.parse(localStorage.getItem('fre-launch-guest-history') ?? '[]')
+            if (Array.isArray(parsed)) recent = parsed.filter((name): name is string =>
+                typeof name === 'string' && /^[A-Za-z0-9_]{1,16}$/.test(name))
+        } catch { /* optional history */ }
+        localStorage.setItem('fre-launch-guest-history',
+            JSON.stringify([nickname, ...recent.filter((name) => name !== nickname)].slice(0, 12)))
+        return result
     }
 \treturn await invoke('plugin:instance|instance_run', { instanceId, serverAddress })""")
 
@@ -170,6 +180,7 @@ pub async fn instance_kill(instance_id: &str) -> Result<()> {""")
             <input
                 :id="guestNicknameId"
                 v-model.trim="guestNickname"
+                :list="guestNickListId"
                 type="text"
                 maxlength="16"
                 pattern="[A-Za-z0-9_]{1,16}"
@@ -178,6 +189,9 @@ pub async fn instance_kill(instance_id: &str) -> Result<()> {""")
                 :placeholder="formatMessage(messages.guestPlaceholder)"
                 class="w-full min-w-0 rounded-lg border border-solid border-surface-5 bg-bg-raised px-3 py-2 text-sm text-contrast outline-none focus:border-brand"
             />
+            <datalist :id="guestNickListId">
+                <option v-for="name in guestNickSuggestions" :key="name" :value="name" />
+            </datalist>
             <p class="m-0 text-xs text-secondary">
                 {{ formatMessage(messages.guestNotice) }}
             </p>
@@ -198,9 +212,27 @@ pub async fn instance_kill(instance_id: &str) -> Result<()> {""")
     exactly(card, "import { computed, onMounted, onUnmounted, ref } from 'vue'",
                  "import { computed, onMounted, onUnmounted, ref, useId, watch } from 'vue'")
     exactly(card,
+        "const accounts: Ref<MinecraftCredential[]> = ref([])",
+        """const accounts: Ref<MinecraftCredential[]> = ref([])
+const guestNickSuggestions = computed(() => {
+    let recent: string[] = []
+    try {
+        const saved = JSON.parse(localStorage.getItem('fre-launch-guest-history') ?? '[]')
+        if (Array.isArray(saved)) recent = saved.filter((name): name is string =>
+            typeof name === 'string' && /^[A-Za-z0-9_]{1,16}$/.test(name))
+    } catch {
+        // Ignore damaged nickname history.
+    }
+    const offline = accounts.value
+        .filter((account) => account.access_token?.startsWith('fre-offline:'))
+        .map((account) => account.profile.name)
+    return Array.from(new Set([...recent, ...offline])).slice(0, 12)
+})""")
+    exactly(card,
         "const loginDisabled = ref(false)",
         """const loginDisabled = ref(false)
 const guestNicknameId = useId()
+const guestNickListId = useId()
 const useSavedAccount = ref(localStorage.getItem('fre-launch-account-mode') !== 'nickname')
 const guestNickname = ref(localStorage.getItem('fre-launch-guest-nickname') ?? '')
 watch(useSavedAccount, (enabled) =>
