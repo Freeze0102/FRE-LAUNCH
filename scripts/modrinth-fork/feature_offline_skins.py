@@ -125,12 +125,6 @@ pub async fn prepare_instance_skin(
     tokio::fs::create_dir_all(&custom_skin_loader).await?;
     tokio::fs::write(custom_skin_loader.join(format!("{name}.png")), &bytes).await?;
 
-    // Compatibility with community OfflineSkins/LocalSkins Fabric mods.
-    for folder in ["offlineskins", "localskins"] {
-        let directory = instance_path.join("config").join(folder);
-        tokio::fs::create_dir_all(&directory).await?;
-        tokio::fs::write(directory.join(format!("{name}.png")), &bytes).await?;
-    }
     Ok(())
 }
 
@@ -311,4 +305,4 @@ function isSkinImagePath(path: string) {""")
     if count != 4:
         raise RuntimeError(f"VirtualSkinSectionList selection controls changed: {count}")
     virtual.write_text(content.replace(':disabled="readOnly"',':disabled="readOnly && !allowOfflineSelection"'),encoding="utf-8")
-    print("Added per-local-nickname skin PNG saving and game-instance CustomSkinLoader/OfflineSkins integration")
+    print("Added per-local-nickname skin PNG saving and official CustomSkinLoader LocalSkin folder integration")
