@@ -159,12 +159,12 @@ mod tests {
 /// Saves a client-side PNG for a local nickname profile; NEVER uploads to Mojang.
 #[tauri::command]
 pub async fn save_local_skin(profile_id: uuid::Uuid, png_base64: String) -> Result<()> {
-    Ok(theseus::api::offline_skins::save_local_skin(profile_id, &png_base64).await?)
+    Ok(theseus::offline_skins::save_local_skin(profile_id, &png_base64).await?)
 }
 
 #[tauri::command]
 pub async fn has_local_skin(profile_id: uuid::Uuid) -> Result<bool> {
-    Ok(theseus::api::offline_skins::has_local_skin(profile_id).await?)
+    Ok(theseus::offline_skins::has_local_skin(profile_id).await?)
 }
 """)
     exactly(root/"apps/app/build.rs",
