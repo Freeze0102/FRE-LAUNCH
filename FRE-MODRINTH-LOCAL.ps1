@@ -27,7 +27,7 @@ if ($BuildWindows -or $RunDev) {
 }
 $prepared = Join-Path $destination 'FRE_LAUNCH_FORK.md'
 $signaturePath = Join-Path $destination '.fre-launch-source-signature'
-$patchNames = @('prepare.py','feature_local_accounts.py','feature_ukrainian.py','feature_skin_notice.py','verify.py')
+$patchNames = @('prepare.py','feature_local_accounts.py','feature_ukrainian.py','feature_skin_notice.py','feature_offline_skins.py','verify.py')
 $signature = ($revision + ':' + (($patchNames | ForEach-Object {
     $sourceFile = Join-Path $projectRoot ('scripts\modrinth-fork\' + $_)
     if (-not (Test-Path $sourceFile)) { throw "Missing source patcher: $sourceFile" }
