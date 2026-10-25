@@ -11,7 +11,7 @@ from pathlib import Path
 def verify(root):
     root=root.resolve()
     path=Path(__file__).resolve().parent
-    for item in ("prepare.py","feature_local_accounts.py","feature_skin_notice.py","feature_ukrainian.py","verify.py"):
+    for item in ("prepare.py","feature_local_accounts.py","feature_skin_notice.py","feature_offline_skins.py","feature_ukrainian.py","verify.py"):
         py_compile.compile(str(path/item),doraise=True)
     expected={"Notch":"b50ad385-829d-3141-a216-7e7d7539ba7f",
               "Steve":"5627dd98-e6be-3c21-b8a8-e92344183641"}
@@ -60,15 +60,19 @@ def verify(root):
         assert app_uk[key]["message"]==ua
 
     checks={
-        "apps/app/src/api/auth.rs":["create_offline_user","Sign in to Minecraft with Microsoft"],
-        "apps/app/build.rs":["create_offline_user"],
+        "apps/app/src/api/auth.rs":["create_offline_user","save_local_skin","has_local_skin","Sign in to Minecraft with Microsoft"],
+        "apps/app/build.rs":["create_offline_user","save_local_skin","has_local_skin"],
         "packages/app-lib/src/api/minecraft_auth.rs":["pub async fn create_offline_user","OfflinePlayer:","md5::compute","mark_logged_into_minecraft"],
         "packages/app-lib/src/state/minecraft_auth.rs":["pub fn is_offline_profile","fre-offline:"],
         "packages/app-lib/src/launcher/args.rs":['access_token.starts_with("fre-offline:")'],
         "apps/app-frontend/src/features/minecraft-accounts/accounts-card.vue":["OfflineProfileCreator", "fre-launch-offline-account-created"],
         "apps/app-frontend/src/features/minecraft-accounts/offline-profile-creator.vue":["v-model.trim","create_offline_user","@submit.prevent"],
         "apps/app-frontend/src/helpers/auth.js":["plugin:auth|create_offline_user"],
-        "apps/app-frontend/src/pages/Skins.vue":["isLocalAccount", "fre-launch.skins.local-notice"],
+        "apps/app-frontend/src/pages/Skins.vue":["isLocalAccount", "fre-launch.skins.local-notice", "onLocalSkinFileSelected", "plugin:auth|save_local_skin"],
+        "apps/app-frontend/src/components/ui/skin/VirtualSkinSectionList.vue":["allowOfflineSelection"],
+        "packages/app-lib/src/api/offline_skins.rs":["pub async fn save_local_skin","pub async fn prepare_instance_skin","CustomSkinLoader","validate_skin_png"],
+        "packages/app-lib/src/launcher/mod.rs":["crate::api::offline_skins::prepare_instance_skin"],
+        "packages/app-lib/src/api/mod.rs":["pub mod offline_skins;"],
         "apps/app-frontend/src/app/shell/title-bar/index.vue":["FRE LAUNCH"],
         "apps/app-frontend/src/components/ui/WelcomeScreen.vue":["OfflineProfileCreator", "fre-launch.welcome-screen.title"],
     }
