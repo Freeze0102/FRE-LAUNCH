@@ -140,6 +140,13 @@ Write-Host 'Separate old FRE LAUNCH profiles and worlds have not been changed.'
 if ($BuildWindows -or $RunDev) {
     Push-Location $destination
     try {
+        # The pinned upstream pnpm 12 lockfile may describe workspace importers
+        # that are absent from the generated desktop source. Refresh the local
+        # lockfile metadata before enforcing a frozen dependency installation.
+        # This never edits the upstream checkout, existing worlds or profiles.
+        Write-Host 'Reconciling pnpm lockfile with local workspace packages...' -ForegroundColor Cyan
+        pnpm.cmd install --lockfile-only --no-frozen-lockfile
+        if ($LASTEXITCODE -ne 0) { throw 'pnpm lockfile reconciliation failed' }
         pnpm.cmd install --frozen-lockfile
         if ($LASTEXITCODE -ne 0) { throw 'pnpm install failed' }
         # Upstream Modrinth does not commit this generated TypeScript file.
