@@ -149,7 +149,7 @@ pub async fn instance_kill(instance_id: &str) -> Result<()> {""")
 
     card = root/"apps/app-frontend/src/features/minecraft-accounts/accounts-card.vue"
     # Account-mode switch is visible even if there are zero saved accounts.
-    exactly(card, '<template>\\n', """<template>
+    exactly(card, '<template>\n', """<template>
     <div class="mt-2 rounded-xl border border-solid border-surface-5 bg-button-bg p-3">
         <label class="flex items-center gap-2 text-sm text-primary cursor-pointer">
             <input v-model="useSavedAccount" type="checkbox" class="accent-brand" />
@@ -179,7 +179,7 @@ pub async fn instance_kill(instance_id: &str) -> Result<()> {""")
         </div>
     </div>
 """)
-    exactly(card, '\\t\\tv-if="accounts.length === 0"', '\\t\\tv-if="useSavedAccount && accounts.length === 0"')
+    exactly(card, '\t\tv-if="accounts.length === 0"', '\t\tv-if="useSavedAccount && accounts.length === 0"')
     exactly(card, "\t\tv-else\n\t\tclass=\"w-full mt-2 bg-button-bg border",
            "\t\tv-else-if=\"useSavedAccount\"\n\t\tclass=\"w-full mt-2 bg-button-bg border")
     exactly(card,
