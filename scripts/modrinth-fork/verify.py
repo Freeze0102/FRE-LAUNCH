@@ -65,7 +65,7 @@ def verify(root):
         "packages/app-lib/src/api/minecraft_auth.rs":["pub async fn create_offline_user","pub fn guest_credentials","OfflinePlayer:","md5::compute","mark_logged_into_minecraft"],
         "packages/app-lib/src/state/minecraft_auth.rs":["pub fn is_offline_profile","fre-offline:"],
         "packages/app-lib/src/launcher/args.rs":['access_token.starts_with("fre-offline:")'],
-        "apps/app-frontend/src/features/minecraft-accounts/accounts-card.vue":["OfflineProfileCreator", "fre-launch-offline-account-created", "confirmRemove", "messages.microsoft", "useSavedAccount", "guestNickname", "fre-launch.guest.use-account", "onGuestSkinFilePicked", "plugin:auth|save_guest_skin"],
+        "apps/app-frontend/src/features/minecraft-accounts/accounts-card.vue":["OfflineProfileCreator", "fre-launch-offline-account-created", "confirmRemove", "messages.microsoft", "useSavedAccount", "guestNickname", "fre-launch.guest.use-account", "onGuestSkinFilePicked", "plugin:auth|save_guest_skin", "guestNicknameValid", "guestNicknameIsSaved", "messages.guestServerCheck"],
         "apps/app-frontend/src/features/minecraft-accounts/offline-profile-creator.vue":["v-model.trim","create_offline_user","@submit.prevent"],
         "apps/app-frontend/src/helpers/auth.js":["plugin:auth|create_offline_user"],
         "apps/app-frontend/src/helpers/instance.ts":["plugin:instance|instance_run_guest","fre-launch-guest-nickname"],
@@ -95,6 +95,9 @@ def verify(root):
     assert "Credentials::get_default_credential(&state.pool)" in guest_runner, "Account-mode launches must retain default account"
     assert "run_credentials(instance_id, &credentials, quick_play_type).await" in guest_runner, "Guest nickname must reach Minecraft process"
     assert "upsert(" not in guest_runner.split("pub async fn run_guest(", 1)[1].split("async fn run_credentials(",1)[0], "Guest mode must not write credentials to database"
+    from feature_ukrainian import NEW
+    for key in ("fre-launch.guest.format-ok", "fre-launch.guest.already-saved", "fre-launch.guest.server-check"):
+        assert key in NEW, f"Missing guest nickname validation translation: {key}"
 
     config=json.loads((root/"apps/app/tauri.conf.json").read_text(encoding="utf-8"))
     assert config["identifier"]=="app.frelaunch.modrinthfork"
