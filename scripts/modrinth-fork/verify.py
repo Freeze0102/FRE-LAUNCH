@@ -86,6 +86,12 @@ def verify(root):
         for snippet in snippets:
             if snippet not in data: raise AssertionError(f"{relative}: missing {snippet}")
     assert "theseus::api::offline_skins::" not in (root/"apps/app/src/api/auth.rs").read_text(encoding="utf-8"), "Private Theseus API path causes Rust E0603" 
+    # Vue/Vite previously failed at runtime even though preliminary source
+    # checks passed: duplicate invoke imports and a missing message comma.
+    accounts_vue=(root/"apps/app-frontend/src/features/minecraft-accounts/accounts-card.vue").read_text(encoding="utf-8")
+    assert accounts_vue.count("import { invoke } from '@tauri-apps/api/core'")==1, "Duplicate Tauri invoke import breaks Vue compiler"
+    assert re.search(r"javaUnavailable:\\s*\\{[^\\n]*\\},\\s*\\n\\s*guestAlreadySaved:", accounts_vue), "Missing comma after Java nickname message breaks Vue compiler"
+
     nickname_api=(root/"packages/app-lib/src/api/minecraft_auth.rs").read_text(encoding="utf-8")
     assert 'StatusCode::OK => Ok("used")' in nickname_api and 'StatusCode::NOT_FOUND => Ok("no_profile")' in nickname_api, "Public Java lookup must distinguish taken and unregistered profile"
     assert 'StatusCode::TOO_MANY_REQUESTS' not in nickname_api, "Rate limiting must not be mistaken for a free nickname"
