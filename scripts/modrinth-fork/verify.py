@@ -60,19 +60,19 @@ def verify(root):
         assert app_uk[key]["message"]==ua
 
     checks={
-        "apps/app/src/api/auth.rs":["create_offline_user","save_local_skin","has_local_skin","get_local_skin","theseus::offline_skins::save_local_skin","theseus::offline_skins::has_local_skin","Sign in to Minecraft with Microsoft"],
-        "apps/app/build.rs":["create_offline_user","save_local_skin","has_local_skin","instance_run_guest"],
+        "apps/app/src/api/auth.rs":["create_offline_user","save_local_skin","has_local_skin","get_local_skin","save_guest_skin","has_guest_skin","theseus::offline_skins::save_guest_skin","Sign in to Minecraft with Microsoft"],
+        "apps/app/build.rs":["create_offline_user","save_local_skin","has_local_skin","save_guest_skin","has_guest_skin","instance_run_guest"],
         "packages/app-lib/src/api/minecraft_auth.rs":["pub async fn create_offline_user","pub fn guest_credentials","OfflinePlayer:","md5::compute","mark_logged_into_minecraft"],
         "packages/app-lib/src/state/minecraft_auth.rs":["pub fn is_offline_profile","fre-offline:"],
         "packages/app-lib/src/launcher/args.rs":['access_token.starts_with("fre-offline:")'],
-        "apps/app-frontend/src/features/minecraft-accounts/accounts-card.vue":["OfflineProfileCreator", "fre-launch-offline-account-created", "confirmRemove", "messages.microsoft", "useSavedAccount", "guestNickname", "fre-launch.guest.use-account"],
+        "apps/app-frontend/src/features/minecraft-accounts/accounts-card.vue":["OfflineProfileCreator", "fre-launch-offline-account-created", "confirmRemove", "messages.microsoft", "useSavedAccount", "guestNickname", "fre-launch.guest.use-account", "onGuestSkinFilePicked", "plugin:auth|save_guest_skin"],
         "apps/app-frontend/src/features/minecraft-accounts/offline-profile-creator.vue":["v-model.trim","create_offline_user","@submit.prevent"],
         "apps/app-frontend/src/helpers/auth.js":["plugin:auth|create_offline_user"],
         "apps/app-frontend/src/helpers/instance.ts":["plugin:instance|instance_run_guest","fre-launch-guest-nickname"],
         "apps/app-frontend/src/helpers/skins.ts":["if (skin.texture.startsWith('data:image/png;base64,'))"],
         "apps/app-frontend/src/pages/Skins.vue":["isLocalAccount", "fre-launch.skins.local-notice", "onLocalSkinFileSelected", "plugin:auth|save_local_skin", "plugin:auth|get_local_skin", "localSkinHelpExpanded", "skinFingerprint"],
         "apps/app-frontend/src/components/ui/skin/VirtualSkinSectionList.vue":["allowOfflineSelection"],
-        "packages/app-lib/src/api/offline_skins.rs":["pub async fn save_local_skin","pub async fn get_local_skin","pub async fn prepare_instance_skin","CustomSkinLoader","validate_skin_png"],
+        "packages/app-lib/src/api/offline_skins.rs":["pub async fn save_local_skin","pub async fn save_guest_skin","pub async fn has_guest_skin","pub async fn get_local_skin","pub async fn prepare_instance_skin","CustomSkinLoader.fre-launch-backup.json","validate_skin_png"],
         "packages/app-lib/src/launcher/mod.rs":["crate::api::offline_skins::prepare_instance_skin"],
         "packages/app-lib/src/api/instance/run.rs":["pub async fn run_guest","run_internal","guest_credentials: Option<Credentials>"],
         "packages/app-lib/src/api/instance.rs":["run_guest"],
@@ -86,6 +86,10 @@ def verify(root):
         for snippet in snippets:
             if snippet not in data: raise AssertionError(f"{relative}: missing {snippet}")
     assert "theseus::api::offline_skins::" not in (root/"apps/app/src/api/auth.rs").read_text(encoding="utf-8"), "Private Theseus API path causes Rust E0603" 
+    guest_skins=(root/"packages/app-lib/src/api/offline_skins.rs").read_text(encoding="utf-8")
+    assert "guest_credentials(nickname)" in guest_skins, "Guest skins must use the same UUID as guest Minecraft launches"
+    assert "save_skin_bytes(credentials.offline_profile.id" in guest_skins, "Guest PNG must be keyed by game UUID"
+    assert "list.insert(0, local);" in guest_skins, "CustomSkinLoader should prefer the user's local PNG"
     guest_runner=(root/"packages/app-lib/src/api/instance/run.rs").read_text(encoding="utf-8")
     assert "run_internal(instance_id, quick_play_type, Some(guest))" in guest_runner, "Guest launches must use unsaved credentials"
     assert "Credentials::get_default_credential(&state.pool)" in guest_runner, "Account-mode launches must retain default account"
