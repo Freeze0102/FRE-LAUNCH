@@ -14,15 +14,15 @@ if (-not (Test-Path $converter)) { throw 'Full FRE LAUNCH repository not found.'
 if ($BuildWindows -and $RunDev) { throw 'Choose either -BuildWindows or -RunDev.' }
 if ($BuildWindows -or $RunDev) {
     Get-Command node -ErrorAction Stop | Out-Null
-    Get-Command pnpm -ErrorAction Stop | Out-Null
+    Get-Command pnpm.cmd -ErrorAction Stop | Out-Null
     Get-Command cargo -ErrorAction Stop | Out-Null
     $nodeVersionText = (& node -p "process.versions.node").Trim()
     if ($LASTEXITCODE -ne 0 -or [version]$nodeVersionText -lt [version]'24.15.0') {
         throw "Original Modrinth code requires Node.js 24.15+. Detected $nodeVersionText. Upgrade Node.js before building."
     }
-    $pnpmVersionText = (& pnpm --version).Trim()
+    $pnpmVersionText = (& pnpm.cmd --version).Trim()
     if ($LASTEXITCODE -ne 0 -or [version]$pnpmVersionText -lt [version]'12.11.2') {
-        throw "Original Modrinth code requires pnpm 12.11.2+. Detected $pnpmVersionText. Run: npm install -g pnpm@12.11.2"
+        throw "Original Modrinth code requires pnpm 12.11.2+. Detected $pnpmVersionText. Run: npm.cmd install -g pnpm@12.11.2"
     }
 }
 $prepared = Join-Path $destination 'FRE_LAUNCH_FORK.md'
@@ -94,20 +94,20 @@ Write-Host 'Separate old FRE LAUNCH profiles and worlds have not been changed.'
 if ($BuildWindows -or $RunDev) {
     Push-Location $destination
     try {
-        pnpm install --frozen-lockfile
+        pnpm.cmd install --frozen-lockfile
         if ($LASTEXITCODE -ne 0) { throw 'pnpm install failed' }
         # Upstream Modrinth does not commit this generated TypeScript file.
         # It must exist BEFORE checking the Vue frontend or compilation fails.
-        pnpm -w i18n:coverage
+        pnpm.cmd -w i18n:coverage
         if ($LASTEXITCODE -ne 0) { throw 'Modrinth locale coverage generation failed' }
-        pnpm --filter '@modrinth/app-frontend' run tsc:check
+        pnpm.cmd --filter '@modrinth/app-frontend' run tsc:check
         if ($LASTEXITCODE -ne 0) { throw 'Vue typecheck failed' }
         if ($RunDev) {
             Write-Host 'Starting ORIGINAL Modrinth Vue/Tauri Minecraft launcher...' -ForegroundColor Green
-            pnpm --filter '@modrinth/app' tauri dev
+            pnpm.cmd --filter '@modrinth/app' tauri dev
             if ($LASTEXITCODE -ne 0) { throw 'Tauri dev failed' }
         } else {
-            pnpm --filter '@modrinth/app' tauri build --bundles nsis
+            pnpm.cmd --filter '@modrinth/app' tauri build --bundles nsis
             if ($LASTEXITCODE -ne 0) { throw 'Tauri build failed' }
             Write-Host 'Windows NSIS installer generated under FRE-Modrinth-Source/target/release/bundle/nsis' -ForegroundColor Green
         }
