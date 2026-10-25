@@ -237,7 +237,13 @@ pub async fn has_local_skin(profile_id: uuid::Uuid) -> Result<bool> {
         return
     }
     try {
-        const pngBase64 = arrayBufferToBase64(new Uint8Array(await file.arrayBuffer()))
+        // Chunk conversion so even a large valid PNG cannot overflow JS arg stack.
+        const bytes = new Uint8Array(await file.arrayBuffer())
+        let binary = ''
+        for (let i = 0; i < bytes.length; i += 8192) {
+            binary += String.fromCharCode(...bytes.subarray(i, i + 8192))
+        }
+        const pngBase64 = btoa(binary)
         await invoke('plugin:auth|save_local_skin', {
             profileId: currentUserId.value,
             pngBase64,
