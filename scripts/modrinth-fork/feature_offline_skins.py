@@ -63,6 +63,26 @@ async fn ensure_offline_account(id: Uuid, state: &State) -> crate::Result<()> {
 pub async fn save_local_skin(id: Uuid, encoded: &str) -> crate::Result<()> {
     let state = State::get().await?;
     ensure_offline_account(id, &state).await?;
+    save_skin_bytes(id, encoded, &state).await
+}
+
+// Guest nicknames are deliberately not inserted into minecraft_users.
+// A PNG can still be stored for their deterministic offline UUID.
+pub async fn save_guest_skin(nickname: &str, encoded: &str) -> crate::Result<()> {
+    let credentials = crate::minecraft_auth::guest_credentials(nickname)?;
+    let state = State::get().await?;
+    save_skin_bytes(credentials.offline_profile.id, encoded, &state).await
+}
+
+pub async fn has_guest_skin(nickname: &str) -> crate::Result<bool> {
+    let credentials = crate::minecraft_auth::guest_credentials(nickname)?;
+    let state = State::get().await?;
+    Ok(tokio::fs::try_exists(local_skin_path(
+        &state.directories.settings_dir, credentials.offline_profile.id,
+    )).await?)
+}
+
+async fn save_skin_bytes(id: Uuid, encoded: &str, state: &State) -> crate::Result<()> {
     if encoded.len() > MAX_PNG_BYTES * 4 / 3 + 16 {
         bail!("Minecraft skin file is too large");
     }
@@ -125,6 +145,51 @@ pub async fn prepare_instance_skin(
     tokio::fs::create_dir_all(&custom_skin_loader).await?;
     tokio::fs::write(custom_skin_loader.join(format!("{name}.png")), &bytes).await?;
 
+    // CustomSkinLoader queries online sources first by default. When the
+    // existing config is valid, move its LocalSkin entry to the front so the
+    // player's explicit PNG wins. Keep a backup of the original configuration.
+    let config_path = instance_path.join("CustomSkinLoader").join("CustomSkinLoader.json");
+    if tokio::fs::try_exists(&config_path).await? {
+        let original = tokio::fs::read(&config_path).await?;
+        match serde_json::from_slice::<serde_json::Value>(&original) {
+            Ok(mut config) => {
+                let mut changed = false;
+                if let Some(list) = config.get_mut("loadlist").and_then(|v| v.as_array_mut()) {
+                    match list.iter().position(|entry| {
+                        entry.get("name").and_then(|v| v.as_str()) == Some("LocalSkin")
+                            && entry.get("type").and_then(|v| v.as_str()) == Some("Legacy")
+                    }) {
+                        Some(index) if index > 0 => {
+                            let local = list.remove(index);
+                            list.insert(0, local);
+                            changed = true;
+                        }
+                        None => {
+                            list.insert(0, serde_json::json!({
+                                "name": "LocalSkin", "type": "Legacy",
+                                "checkPNG": false,
+                                "skin": "LocalSkin/skins/{USERNAME}.png",
+                                "model": "auto"
+                            }));
+                            changed = true;
+                        }
+                        _ => {}
+                    }
+                }
+                if changed {
+                    let backup = config_path.with_file_name("CustomSkinLoader.fre-launch-backup.json");
+                    if !tokio::fs::try_exists(&backup).await? {
+                        tokio::fs::write(&backup, &original).await?;
+                    }
+                    tokio::fs::write(&config_path, serde_json::to_vec_pretty(&config)?).await?;
+                }
+            }
+            Err(error) => {
+                tracing::warn!("Skipping unreadable CustomSkinLoader config: {error}");
+            }
+        }
+    }
+
     Ok(())
 }
 
@@ -146,7 +211,7 @@ mod tests {
     auth=root/"apps/app/src/api/auth.rs"
     exactly(auth,
             "            create_offline_user,\n",
-            "            create_offline_user,\n            save_local_skin,\n            has_local_skin,\n")
+            "            create_offline_user,\n            save_local_skin,\n            has_local_skin,\n            save_guest_skin,\n            has_guest_skin,\n")
     with auth.open("a",encoding="utf-8") as out:
         out.write("""
 
@@ -160,10 +225,20 @@ pub async fn save_local_skin(profile_id: uuid::Uuid, png_base64: String) -> Resu
 pub async fn has_local_skin(profile_id: uuid::Uuid) -> Result<bool> {
     Ok(theseus::offline_skins::has_local_skin(profile_id).await?)
 }
+
+#[tauri::command]
+pub async fn save_guest_skin(nickname: String, png_base64: String) -> Result<()> {
+    Ok(theseus::offline_skins::save_guest_skin(&nickname, &png_base64).await?)
+}
+
+#[tauri::command]
+pub async fn has_guest_skin(nickname: String) -> Result<bool> {
+    Ok(theseus::offline_skins::has_guest_skin(&nickname).await?)
+}
 """)
     exactly(root/"apps/app/build.rs",
             '                        "create_offline_user",\n',
-            '                        "create_offline_user",\n                        "save_local_skin",\n                        "has_local_skin",\n')
+            '                        "create_offline_user",\n                        "save_local_skin",\n                        "has_local_skin",\n                        "save_guest_skin",\n                        "has_guest_skin",\n')
 
     launcher=root/"packages/app-lib/src/launcher/mod.rs"
     exactly(launcher,
