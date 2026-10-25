@@ -94,6 +94,10 @@ if ($BuildWindows -or $RunDev) {
     try {
         pnpm install --frozen-lockfile
         if ($LASTEXITCODE -ne 0) { throw 'pnpm install failed' }
+        # Upstream Modrinth does not commit this generated TypeScript file.
+        # It must exist BEFORE checking the Vue frontend or compilation fails.
+        pnpm -w i18n:coverage
+        if ($LASTEXITCODE -ne 0) { throw 'Modrinth locale coverage generation failed' }
         pnpm --filter '@modrinth/app-frontend' run tsc:check
         if ($LASTEXITCODE -ne 0) { throw 'Vue typecheck failed' }
         if ($RunDev) {
