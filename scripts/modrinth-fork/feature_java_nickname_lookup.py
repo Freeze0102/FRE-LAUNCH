@@ -125,7 +125,7 @@ onUnmounted(() => {
     javaChecking: { id: 'fre-launch.guest.java-checking', defaultMessage: 'Checking Minecraft Java name...' },
     javaUsed: { id: 'fre-launch.guest.java-used', defaultMessage: 'This name belongs to an active Minecraft Java profile.' },
     javaNoProfile: { id: 'fre-launch.guest.java-no-profile', defaultMessage: 'No active Java profile found. Name availability is not guaranteed.' },
-    javaUnavailable: { id: 'fre-launch.guest.java-unavailable', defaultMessage: 'Minecraft name lookup is temporarily unavailable.' }""")
+    javaUnavailable: { id: 'fre-launch.guest.java-unavailable', defaultMessage: 'Minecraft name lookup is temporarily unavailable.' },""")
     print("Installed debounced Java nickname lookup with honest 200/404/unknown statuses. Guest launch remains independent.")
 
 
