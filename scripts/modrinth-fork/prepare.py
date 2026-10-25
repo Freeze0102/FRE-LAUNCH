@@ -212,9 +212,13 @@ def customize(root,revision):
     from feature_ukrainian import apply as finish_ukrainian
     from feature_skin_notice import apply as guard_offline_skins
     from feature_offline_skins import apply as add_offline_skin_support
+    from feature_local_skin_preview import apply as preserve_offline_skin_preview
+    from feature_ui_polish import apply as polish_account_and_skin_ui
     add_local_accounts(root)
     guard_offline_skins(root)
     add_offline_skin_support(root)
+    preserve_offline_skin_preview(root)
+    polish_account_and_skin_ui(root)
     finish_ukrainian(root)
     print("Prepared distinct FRE LAUNCH source fork from",revision)
 
