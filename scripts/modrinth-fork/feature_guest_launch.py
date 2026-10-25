@@ -96,6 +96,14 @@ async fn run_internal(
 
     run_credentials(instance_id, &credentials, quick_play_type).await""")
     exactly(runner,
+        """    if let Some(project_id) = server_play_project_id(&context.link)
+        && !project_id.trim().is_empty()
+    {""",
+        """    if let Some(project_id) = server_play_project_id(&context.link)
+        && !project_id.trim().is_empty()
+        && !credentials.is_offline_profile()
+    {""")
+    exactly(runner,
         """    crate::minecraft_skins::flush_pending_skin_change().await?;""",
         """    // Never send an unrelated saved Microsoft user's pending skin change
     // as part of an anonymous nickname-only game launch.
