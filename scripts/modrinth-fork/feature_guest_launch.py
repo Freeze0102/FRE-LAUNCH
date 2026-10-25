@@ -273,7 +273,7 @@ async function onGuestSkinFilePicked(event: Event) {
     input.value = ''
     if (!file || !guestNicknameValid.value || guestSkinBusy.value) return
     if (!file.name.toLowerCase().endsWith('.png') || file.size > 512 * 1024) {
-        handleError(new Error('Choose a PNG skin under 512 KiB (64x64 or 64x32)'))
+        handleError(new Error(formatMessage(messages.guestSkinInvalid)))
         return
     }
     guestSkinBusy.value = true
@@ -310,6 +310,7 @@ watch(guestNickname, (name) => {
     guestNickname: { id: 'fre-launch.guest.nickname', defaultMessage: 'Nickname (without account)' },
     uploadGuestSkin: { id: 'fre-launch.guest.upload-skin', defaultMessage: 'Upload PNG skin for this nickname' },
     guestSkinSaved: { id: 'fre-launch.guest.skin-saved', defaultMessage: 'Saved. Install CustomSkinLoader in this instance, then restart Minecraft.' },
+    guestSkinInvalid: { id: 'fre-launch.guest.skin-invalid', defaultMessage: 'Choose a PNG Minecraft skin (64x64 or 64x32) under 512 KiB.' },
     guestPlaceholder: { id: 'fre-launch.guest.placeholder', defaultMessage: 'Enter nickname' },
     guestNotice: { id: 'fre-launch.guest.notice', defaultMessage: 'No Microsoft login needed. For servers allowing non-premium players, use the same nickname you registered there and enter your server password when prompted.' },
     guestInvalid: { id: 'fre-launch.guest.invalid', defaultMessage: 'Use 1-16 English letters, numbers, or underscores.' },
