@@ -61,7 +61,7 @@ if (Test-Path $destination) {
     if ($previousSignature -ne $signature -or $missingSourceFiles.Count -gt 0) {
         $archive = Join-Path $projectRoot ('FRE-Modrinth-Source-archive-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
         if (Test-Path $archive) { throw "Archive destination exists: $archive" }
-        Write-Host 'Source converter changed. Preserving previous generated code in:' $archive -ForegroundColor Yellow
+        Write-Host 'Archiving existing generated source before regeneration:' $archive -ForegroundColor Yellow
         Move-Item -LiteralPath $destination -Destination $archive
     } else {
         Write-Host 'Using existing generated Modrinth source. Verifying before launch...' -ForegroundColor Cyan
@@ -173,13 +173,10 @@ Write-Host 'Separate old FRE LAUNCH profiles and worlds have not been changed.'
 if ($BuildWindows -or $RunDev) {
     Push-Location $destination
     try {
-        # The pinned upstream pnpm 12 lockfile may describe workspace importers
-        # that are absent from the generated desktop source. Refresh the local
-        # lockfile metadata before enforcing a frozen dependency installation.
-        # This never edits the upstream checkout, existing worlds or profiles.
-        Write-Host 'Reconciling pnpm lockfile with local workspace packages...' -ForegroundColor Cyan
-        pnpm.cmd install --lockfile-only --no-frozen-lockfile
-        if ($LASTEXITCODE -ne 0) { throw 'pnpm lockfile reconciliation failed' }
+        # The pinned upstream lockfile matches the full upstream workspace.
+        # If an importer is missing, regenerate the incomplete source checkout
+        # instead of silently rewriting the dependency graph.
+        Write-Host 'Installing pinned workspace dependencies...' -ForegroundColor Cyan
         pnpm.cmd install --frozen-lockfile
         if ($LASTEXITCODE -ne 0) { throw 'pnpm install failed' }
         $missingAfterPnpm = @($requiredSourceFiles | Where-Object {
