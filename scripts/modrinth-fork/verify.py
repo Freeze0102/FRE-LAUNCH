@@ -11,7 +11,7 @@ from pathlib import Path
 def verify(root):
     root=root.resolve()
     path=Path(__file__).resolve().parent
-    for item in ("prepare.py","feature_local_accounts.py","feature_skin_notice.py","feature_offline_skins.py","feature_local_skin_preview.py","feature_ui_polish.py","feature_guest_launch.py","feature_java_nickname_lookup.py","feature_remove_modrinth_login.py","feature_ukrainian.py","verify.py"):
+    for item in ("prepare.py","feature_local_accounts.py","feature_skin_notice.py","feature_offline_skins.py","feature_local_skin_preview.py","feature_ui_polish.py","feature_guest_launch.py","feature_java_nickname_lookup.py","feature_remove_modrinth_login.py","feature_brand_presence.py","feature_ukrainian.py","verify.py"):
         py_compile.compile(str(path/item),doraise=True)
     expected={"Notch":"b50ad385-829d-3141-a216-7e7d7539ba7f",
               "Steve":"5627dd98-e6be-3c21-b8a8-e92344183641"}
@@ -126,6 +126,17 @@ def verify(root):
     assert '<ModrinthAccountRequiredModal ref="modrinthLoginModal"' in app, "Keep internal Modrinth auth flow available for platform-only features"
     onboarding=(root/"apps/app-frontend/src/features/onboarding/checklist.vue").read_text(encoding="utf-8")
     assert "id: 'login-modrinth'," not in onboarding.split("const steps = computed(",1)[1].split("const accordionButtonClass",1)[0], "Onboarding must not require Modrinth login"
+
+    splash=(root/"apps/app-frontend/src/components/ui/SplashScreen.vue").read_text(encoding="utf-8")
+    assert 'aria-label="FRE LAUNCH"' in splash, "FRE LAUNCH startup branding is missing"
+    assert '<svg' not in splash and 'modrinth-app-logo' not in splash, "Upstream Modrinth splash logo remains"
+    assert "url('@/assets/loading/cube.png')" not in splash and "url('@/assets/loading/cube-light.webp')" not in splash, "Upstream splash background remains"
+    discord_src=(root/"packages/app-lib/src/state/discord.rs").read_text(encoding="utf-8")
+    assert 'FRE_LAUNCH_DISCORD_APP_ID' in discord_src, "Standalone Discord application configuration is missing"
+    assert 'FRE_DISCORD_APPLICATION_ID.is_none()' in discord_src, "Modrinth Discord RPC must be disabled by default"
+    for forbidden in ('1123683254248148992', 'modrinth_simple', 'Modrinth Logo'):
+        assert forbidden not in discord_src, f"Upstream Discord identity remains: {forbidden}"
+    assert 'description = "FRE LAUNCH is a desktop Minecraft launcher and mod manager"' in (root/"apps/app/Cargo.toml").read_text(encoding="utf-8")
 
     sidebar_vue=(root/"apps/app-frontend/src/app/shell/sidebar/index.vue").read_text(encoding="utf-8")
     for tag in ("<PrideFundraiserBanner", "<NewsSidebar", '<Promotion v-if="showAd"'):
