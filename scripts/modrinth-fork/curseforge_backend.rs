@@ -279,6 +279,7 @@ mod tests {
     #[test]
     fn rejects_mismatched_loader_and_version() {
         let file = CurseForgeFile {
+            id: 1,
             file_name: "example.jar".into(),
             file_date: "2026-01-01".into(),
             file_length: 2,
