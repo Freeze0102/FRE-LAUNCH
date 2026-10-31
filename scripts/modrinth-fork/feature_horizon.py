@@ -32,7 +32,7 @@ def apply(root: Path):
             '''            .plugin(
                 "fre-horizon",
                 InlinedPlugin::new()
-                    .commands(&["horizon_instances", "horizon_create", "horizon_play", "horizon_logs"])
+                    .commands(&["horizon_instances", "horizon_create", "horizon_play", "horizon_logs", "horizon_versions", "horizon_install_version", "horizon_set_version", "horizon_prepare"])
                     .default_permission(DefaultPermissionRule::AllowAllCommands),
             )
             .plugin(
