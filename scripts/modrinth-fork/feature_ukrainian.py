@@ -185,6 +185,8 @@ NEW = {
 "fre-launch.horizon.play":("Грати через Horizon","Play Horizon"),
 "fre-launch.horizon.playing":("Запускаємо...","Launching..."),
 "fre-launch.horizon.list":("Показати збірки Horizon","Show Horizon instances"),
+"fre-launch.horizon.logs":("Показати логи Horizon","Show Horizon logs"),
+"fre-launch.horizon.log-privacy":("Логи читаються тільки локально; нічого не завантажується в інтернет.","Logs are read locally only; nothing is uploaded."),
 "fre-launch.horizon.close":("Закрити","Close"),
 "fre-launch.horizon.not-configured":("Спочатку вибери виконуваний файл Horizon.","Choose the Horizon launcher executable first."),
 "fre-launch.horizon.error":("Помилка Horizon: {reason}","Horizon error: {reason}"),
