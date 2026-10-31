@@ -14,6 +14,10 @@ pub fn init<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
             horizon_create,
             horizon_play,
             horizon_logs,
+            horizon_versions,
+            horizon_install_version,
+            horizon_set_version,
+            horizon_prepare,
         ])
         .build()
 }
@@ -145,6 +149,81 @@ async fn horizon_logs(exe_path: String) -> Result<String, String> {
     .map_err(|e| format!("Horizon task error: {e}"))?
 }
 
+fn validate_version(version: &str) -> Result<&str, String> {
+    let version = version.trim();
+    if version.is_empty()
+        || version.len() > 80
+        || version.starts_with('-')
+        || !version
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '.' | '_' | '-'))
+    {
+        return Err("Enter a Horizon version tag or 'latest'.".into());
+    }
+    Ok(version)
+}
+
+#[tauri::command]
+async fn horizon_versions(exe_path: String, installed_only: bool) -> Result<String, String> {
+    let exe = validate_launcher(&exe_path)?;
+    tokio::task::spawn_blocking(move || {
+        let mut cmd = command(&exe);
+        cmd.arg("versions");
+        if installed_only {
+            cmd.arg("--installed");
+        }
+        let output = cmd.output()
+            .map_err(|e| format!("Could not list Horizon versions: {e}"))?;
+        output_string(output)
+    }).await.map_err(|e| format!("Horizon task error: {e}"))?
+}
+
+#[tauri::command]
+async fn horizon_install_version(exe_path: String, version: String) -> Result<String, String> {
+    let exe = validate_launcher(&exe_path)?;
+    let version = validate_version(&version)?.to_string();
+    tokio::task::spawn_blocking(move || {
+        let output = command(&exe)
+            .args(["install", &version])
+            .output()
+            .map_err(|e| format!("Could not install Horizon version: {e}"))?;
+        let details = output_string(output)?;
+        Ok(format!("Horizon version '{version}' installation finished.\n{details}"))
+    }).await.map_err(|e| format!("Horizon task error: {e}"))?
+}
+
+#[tauri::command]
+async fn horizon_set_version(
+    exe_path: String,
+    name: String,
+    version: String,
+) -> Result<String, String> {
+    let exe = validate_launcher(&exe_path)?;
+    let name = validate_name(&name)?.to_string();
+    let version = validate_version(&version)?.to_string();
+    tokio::task::spawn_blocking(move || {
+        let output = command(&exe)
+            .args(["instance", "version", &name, &version])
+            .output()
+            .map_err(|e| format!("Could not select Horizon version: {e}"))?;
+        output_string(output)?;
+        Ok(format!("Set '{name}' to Horizon version '{version}'."))
+    }).await.map_err(|e| format!("Horizon task error: {e}"))?
+}
+
+#[tauri::command]
+async fn horizon_prepare(exe_path: String) -> Result<String, String> {
+    let exe = validate_launcher(&exe_path)?;
+    tokio::task::spawn_blocking(move || {
+        let output = command(&exe)
+            .arg("prepare")
+            .output()
+            .map_err(|e| format!("Could not prepare Horizon: {e}"))?;
+        let details = output_string(output)?;
+        Ok(format!("Horizon preparation finished.\n{details}"))
+    }).await.map_err(|e| format!("Horizon task error: {e}"))?
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -154,5 +233,9 @@ mod tests {
         assert!(validate_name("../world").is_err());
         assert!(validate_name("--config").is_err());
         assert!(validate_name("").is_err());
+        assert_eq!(validate_version("latest").unwrap(), "latest");
+        assert_eq!(validate_version("0.2.31").unwrap(), "0.2.31");
+        assert!(validate_version("--config").is_err());
+        assert!(validate_version("../../bad").is_err());
     }
 }
