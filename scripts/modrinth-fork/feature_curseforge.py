@@ -42,6 +42,13 @@ def apply(root: Path):
             .plugin(
                 "instance",''')
 
+    # A new Tauri plugin needs an explicit capability on the main window.
+    # Its default permission allows only cf_search and cf_install.
+    capability = root / "apps/app/capabilities/plugins.json"
+    exactly(capability,
+            '"instance:default",',
+            '"instance:default",\n\t\t"fre-curseforge:default",')
+
     cargo = root / "apps/app/Cargo.toml"
     exactly(cargo, "sha2 = { workspace = true }",
                   "sha1 = { workspace = true }\nsha2 = { workspace = true }")
