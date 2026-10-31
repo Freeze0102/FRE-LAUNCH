@@ -136,6 +136,8 @@ def verify(root):
     cf_main=(root/"apps/app/src/main.rs").read_text(encoding="utf-8")
     cf_build=(root/"apps/app/build.rs").read_text(encoding="utf-8")
     cf_cargo=(root/"apps/app/Cargo.toml").read_text(encoding="utf-8")
+    cf_capabilities=json.loads((root/"apps/app/capabilities/plugins.json").read_text(encoding="utf-8"))
+    assert "fre-curseforge:default" in cf_capabilities["permissions"], "CurseForge Tauri commands must be explicitly permitted"
     for label, source, snippets in (
         ("CurseForge backend", cf_backend, ["FRE_CURSEFORGE_API_KEY", "x-api-key", "allow_mod_distribution",
             "gameVersion", "modLoaderType", "file_length", "verify_hash", "write_instance_file",
