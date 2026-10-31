@@ -9,7 +9,7 @@ const { formatMessage: t } = useVIntl()
 const messages = defineMessages({
   title: { id: 'fre-launch.horizon.title', defaultMessage: 'Horizon (Rust)' },
   subtitle: { id: 'fre-launch.horizon.subtitle', defaultMessage: 'A separate Rust-based Minecraft client. Horizon versions, mods, worlds and updates are managed independently of Java instances.' },
-  requirement: { id: 'fre-launch.horizon.requirement', defaultMessage: 'Requires the official Horizon Windows launcher and a Microsoft account that owns Minecraft: Java Edition. Horizon is experimental; Java Fabric/Forge mods are not supported.' },
+  requirement: { id: 'fre-launch.horizon.requirement', defaultMessage: 'Requires the official Horizon Windows launcher and Minecraft: Java Edition 26.3 installed and opened once. Microsoft sign-in may not work in Horizon yet; offline single player is available. Java Fabric/Forge mods are not supported.' },
   launcherLabel: { id: 'fre-launch.horizon.launcher-label', defaultMessage: 'Horizon executable' },
   chooseExe: { id: 'fre-launch.horizon.choose-exe', defaultMessage: 'Choose horizon-launcher.exe' },
   release: { id: 'fre-launch.horizon.release', defaultMessage: 'Official download and installation instructions' },
@@ -22,7 +22,14 @@ const messages = defineMessages({
   playing: { id: 'fre-launch.horizon.playing', defaultMessage: 'Launching...' },
   list: { id: 'fre-launch.horizon.list', defaultMessage: 'Show Horizon instances' },
   logs: { id: 'fre-launch.horizon.logs', defaultMessage: 'Show Horizon logs' },
-  logPrivacy: { id: 'fre-launch.horizon.log-privacy', defaultMessage: 'Logs are read locally only; nothing is uploaded.' }
+  logPrivacy: { id: 'fre-launch.horizon.log-privacy', defaultMessage: 'Logs are read locally only; nothing is uploaded.' },
+  versions: { id: 'fre-launch.horizon.versions', defaultMessage: 'Horizon releases' },
+  showVersions: { id: 'fre-launch.horizon.show-versions', defaultMessage: 'Show installed versions' },
+  releaseTag: { id: 'fre-launch.horizon.release-tag', defaultMessage: 'Horizon version or release tag' },
+  installVersion: { id: 'fre-launch.horizon.install-version', defaultMessage: 'Install this Horizon version' },
+  useVersion: { id: 'fre-launch.horizon.use-version', defaultMessage: 'Use version for selected instance' },
+  prepare: { id: 'fre-launch.horizon.prepare', defaultMessage: 'Prepare Minecraft 26.3 assets' },
+  firstRun: { id: 'fre-launch.horizon.first-run', defaultMessage: 'First install a Horizon version, then prepare game assets from a Minecraft 26.3 installation before Play.' },
   closing: { id: 'fre-launch.horizon.close', defaultMessage: 'Close' },
   notConfigured: { id: 'fre-launch.horizon.not-configured', defaultMessage: 'Choose the Horizon launcher executable first.' },
   error: { id: 'fre-launch.horizon.error', defaultMessage: 'Horizon error: {reason}' },
@@ -36,9 +43,11 @@ const instanceName = ref('')
 const launchName = ref('')
 const listing = ref('')
 const logs = ref('')
+const versions = ref('')
+const releaseTag = ref('latest')
 const feedback = ref('')
 const error = ref('')
-const pending = ref<'create' | 'play' | 'list' | 'logs' | null>(null)
+const pending = ref<'create' | 'play' | 'list' | 'logs' | 'versions' | 'install-version' | 'set-version' | 'prepare' | null>(null)
 
 try {
   const saved = localStorage.getItem('fre-launch-horizon-executable')
@@ -146,6 +155,45 @@ async function showLogs() {
     pending.value = null
   }
 }
+async function manageHorizon(action: 'versions' | 'install-version' | 'set-version' | 'prepare') {
+  if (!executable.value) { error.value = t(messages.notConfigured); return }
+  if (pending.value) return
+  pending.value = action
+  error.value = ''
+  feedback.value = ''
+  try {
+    if (action === 'versions') {
+      versions.value = await invoke<string>('plugin:fre-horizon|horizon_versions', {
+        exePath: executable.value,
+        installedOnly: true,
+      })
+    } else if (action === 'install-version') {
+      feedback.value = await invoke<string>('plugin:fre-horizon|horizon_install_version', {
+        exePath: executable.value,
+        version: releaseTag.value,
+      })
+      versions.value = await invoke<string>('plugin:fre-horizon|horizon_versions', {
+        exePath: executable.value,
+        installedOnly: true,
+      })
+    } else if (action === 'set-version') {
+      if (!launchName.value.trim()) throw new Error('Select a Horizon instance first.')
+      feedback.value = await invoke<string>('plugin:fre-horizon|horizon_set_version', {
+        exePath: executable.value,
+        name: launchName.value,
+        version: releaseTag.value,
+      })
+    } else {
+      feedback.value = await invoke<string>('plugin:fre-horizon|horizon_prepare', {
+        exePath: executable.value,
+      })
+    }
+  } catch (err) {
+    error.value = t(messages.error, { reason: failure(err) })
+  } finally {
+    pending.value = null
+  }
+}
 defineExpose({ show, hide })
 </script>
 
@@ -184,6 +232,25 @@ defineExpose({ show, hide })
         </button>
       </div>
 
+      <div class="mt-5 rounded-xl border border-solid border-surface-4 p-4">
+        <h3 class="m-0 text-base font-semibold text-contrast">{{ t(messages.versions) }}</h3>
+        <p class="my-2 text-xs text-secondary">{{ t(messages.firstRun) }}</p>
+        <label class="mt-3 block text-sm text-secondary">{{ t(messages.releaseTag) }}</label>
+        <input v-model="releaseTag" class="mt-1 w-full rounded-lg bg-button-bg p-3 text-contrast" maxlength="80" />
+        <div class="mt-3 flex flex-wrap gap-2">
+          <button type="button" class="cursor-pointer rounded-lg border border-solid border-surface-5 bg-button-bg px-3 py-2 text-sm text-contrast disabled:opacity-40" :disabled="!!pending" @click="manageHorizon('versions')">
+            {{ t(messages.showVersions) }}
+          </button>
+          <button type="button" class="cursor-pointer rounded-lg border-0 bg-brand px-3 py-2 text-sm font-semibold text-white disabled:opacity-40" :disabled="!!pending || !releaseTag.trim()" @click="manageHorizon('install-version')">
+            {{ t(messages.installVersion) }}
+          </button>
+          <button type="button" class="cursor-pointer rounded-lg border border-solid border-surface-5 bg-button-bg px-3 py-2 text-sm text-contrast disabled:opacity-40" :disabled="!!pending" @click="manageHorizon('prepare')">
+            {{ t(messages.prepare) }}
+          </button>
+        </div>
+        <pre v-if="versions" class="mt-3 max-h-40 overflow-auto whitespace-pre-wrap rounded-lg bg-button-bg p-3 text-xs text-secondary">{{ versions }}</pre>
+      </div>
+
       <div class="mt-5 flex flex-col gap-2">
         <label class="text-sm font-semibold text-contrast">{{ t(messages.name) }}</label>
         <input v-model="instanceName" class="w-full rounded-lg bg-button-bg p-3 text-contrast" maxlength="64" :placeholder="t(messages.namePlaceholder)" />
@@ -195,6 +262,9 @@ defineExpose({ show, hide })
         <label class="text-sm font-semibold text-contrast">{{ t(messages.launchName) }}</label>
         <input v-model="launchName" class="w-full rounded-lg bg-button-bg p-3 text-contrast" maxlength="64" :placeholder="t(messages.namePlaceholder)" />
         <div class="flex flex-wrap gap-2">
+          <button type="button" class="cursor-pointer rounded-lg border border-solid border-surface-5 bg-button-bg px-4 py-2 text-contrast disabled:opacity-40" :disabled="!!pending || !launchName.trim() || !releaseTag.trim()" @click="manageHorizon('set-version')">
+            {{ t(messages.useVersion) }}
+          </button>
           <button type="button" class="cursor-pointer rounded-lg border-0 bg-brand px-4 py-2 font-semibold text-white disabled:opacity-40" :disabled="!!pending || !launchName.trim()" @click="playInstance">
             {{ pending === 'play' ? t(messages.playing) : t(messages.play) }}
           </button>
