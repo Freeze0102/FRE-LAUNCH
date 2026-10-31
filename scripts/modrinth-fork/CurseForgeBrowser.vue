@@ -13,6 +13,7 @@ type CurseForgeMod = {
   slug: string
   logo: { thumbnailUrl?: string } | null
   allowModDistribution?: boolean
+  isAvailable?: boolean
 }
 
 const props = defineProps<{ instanceId?: string }>()
@@ -225,7 +226,7 @@ function openKeyHelp() {
           </button>
           <button
             class="rounded-lg border-0 bg-brand px-3 py-2 text-sm font-semibold text-white cursor-pointer disabled:opacity-40"
-            :disabled="!isModded || mod.allowModDistribution !== true || installing !== null"
+            :disabled="!isModded || mod.isAvailable === false || mod.allowModDistribution !== true || installing !== null"
             @click="install(mod)"
           >
             {{ installing === mod.id ? t(m.installing) : t(m.install) }}
