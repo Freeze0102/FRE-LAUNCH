@@ -84,6 +84,9 @@ def apply(root: Path):
 \t\t/>
 \t\t<BrowsePageLayout v-else>''')
     exactly(browse,
+            '<Teleport v-if="browseRouteActive" to="#sidebar-teleport-target">',
+            '<Teleport v-if="browseRouteActive && (projectType !== \'mod\' || freContentSource === \'modrinth\')" to="#sidebar-teleport-target">')
+    exactly(browse,
             "const freContentSource = ref<'modrinth' | 'curseforge'>('modrinth')",
             '''const freContentSource = ref<'modrinth' | 'curseforge'>('modrinth')
 const sourceMessages = defineMessages({
