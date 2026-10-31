@@ -32,7 +32,7 @@ def apply(root: Path):
             '''            .plugin(
                 "fre-horizon",
                 InlinedPlugin::new()
-                    .commands(&["horizon_instances", "horizon_create", "horizon_play"])
+                    .commands(&["horizon_instances", "horizon_create", "horizon_play", "horizon_logs"])
                     .default_permission(DefaultPermissionRule::AllowAllCommands),
             )
             .plugin(
@@ -93,7 +93,7 @@ def apply(root: Path):
 \t\t\t\t\t:icon="BoxesIcon"
 \t\t\t\t\t:title="formatMessage(messages.horizonTitle)"
 \t\t\t\t\t:description="formatMessage(messages.horizonDescription)"
-\t\t\t\t\t@click="ctx.onHorizon()"
+\t\t\t\t\t@click="ctx.onHorizon?.()"
 \t\t\t\t/>
 \t\t\t\t<BigOptionButton
 \t\t\t\t\t:icon="CompassIcon"
