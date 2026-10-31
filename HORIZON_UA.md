@@ -10,6 +10,10 @@
 - Перегляд збірок: `horizon-launcher instance list`.
 - Запуск: `horizon-launcher play --instance "<назва>"`.
 - Локальна діагностика: `horizon-launcher logs --lines 120`.
+- Перегляд інстальованих версій: `horizon-launcher versions --installed`.
+- Установлення версії: `horizon-launcher install latest` або за тегом випуску.
+- Призначення версії збірці: `horizon-launcher instance version "<назва>" "<версія>"`.
+- Підготовка ресурсів гри: `horizon-launcher prepare`.
 - Список установлених версій, оновлення та інші налаштування
   залишаються за офіційним Horizon launcher.
 - Java-профілі Modrinth/Fabric/Forge і файли Horizon зберігаються окремо.
@@ -23,8 +27,8 @@
 2. У FRE LAUNCH натиснути **Створити збірку → Horizon (Rust)**.
 3. Вибрати `horizon-launcher.exe` (не завантажений лаунчером автоматично).
 4. Назвати збірку й натиснути **Створити Horizon-збірку**.
-5. За необхідності відкрити офіційний Horizon, увійти в Microsoft-акаунт із придбаною Minecraft: Java Edition та налаштувати/підготувати Horizon 26.3.
-6. У FRE LAUNCH вказати назву створеної збірки й натиснути **Грати через Horizon**.
+5. Встановити потрібну версію Horizon через кнопку **Установити версію**, потім підготувати Minecraft 26.3 через **Підготувати ресурси**. Перед цим установити та хоча б раз запустити Minecraft: Java Edition 26.3 у звичайному лаунчері. У Horizon вхід Microsoft може бути недоступним; одиночна гра може працювати офлайн.
+6. За потреби вибрати версію для створеної Horizon-збірки кнопкою **Вибрати версію**, тоді натиснути **Грати через Horizon**.
 
 Офіційні команди: https://playhorizon.dev/docs/api/launcher .
 Світові й профільні файли Horizon за замовчуванням належать Horizon, а не
