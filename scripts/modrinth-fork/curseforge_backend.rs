@@ -58,7 +58,7 @@ struct CurseForgeHash {
     value: String,
 }
 
-fn api_key(session_key: Option<String>) -> Result<String, String> {
+fn validated_api_key(session_key: Option<String>) -> Result<String, String> {
     let raw = session_key
         .filter(|v| !v.trim().is_empty())
         .or_else(|| std::env::var("FRE_CURSEFORGE_API_KEY").ok())
@@ -123,7 +123,7 @@ async fn cf_search(
     mod_loader: Option<String>,
     api_key: Option<String>,
 ) -> Result<Vec<CurseForgeMod>, String> {
-    let key = api_key(api_key)?;
+    let key = validated_api_key(api_key)?;
     let query = query.trim();
     if query.chars().count() > 100 {
         return Err("Search text is too long.".into());
@@ -180,7 +180,7 @@ async fn cf_install(
     instance_id: String,
     api_key: Option<String>,
 ) -> Result<String, String> {
-    let key = api_key(api_key)?;
+    let key = validated_api_key(api_key)?;
     let metadata = theseus::instance::get(&instance_id)
         .await
         .map_err(|e| e.to_string())?
