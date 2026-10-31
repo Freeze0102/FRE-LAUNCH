@@ -170,13 +170,13 @@ def verify(root):
     horizon_capabilities=json.loads((root/"apps/app/capabilities/plugins.json").read_text(encoding="utf-8"))
     assert "fre-horizon:default" in horizon_capabilities["permissions"]
     for source, snippets in (
-        (horizon_backend, ["horizon_instances", "horizon_create", "horizon_play",
+        (horizon_backend, ["horizon_instances", "horizon_create", "horizon_play", "horizon_logs",
             '"instance", "create"', '"play", "--instance"', "validate_launcher",
             "validate_name", "spawn_blocking"]),
         (horizon_ui, ["plugin:fre-horizon|horizon_create",
             "plugin:fre-horizon|horizon_play", "horizon-launcher.exe",
             "https://playhorizon.dev/docs/install"]),
-        (horizon_stage, ["fre-launch.horizon.option.title", "ctx.onHorizon()"]),
+        (horizon_stage, ["fre-launch.horizon.option.title", "ctx.onHorizon?.()"]),
         (horizon_context, ["onHorizon"]),
         (horizon_modal, ["onHorizon: props.onHorizon"]),
         (horizon_app, ["HorizonRustPanel", 'ref="horizonWizard"', ':on-horizon="showHorizonWizard"']),
