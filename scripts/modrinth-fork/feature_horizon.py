@@ -69,10 +69,26 @@ def apply(root: Path):
 
     stage = root / "packages/ui/src/components/flows/creation-flow-modal/components/SetupTypeStage.vue"
     exactly(stage,
-            '''\t\t\t\t<BigOptionButton
+            '''\t\t<template v-if="ctx.flowType === 'instance'">
+\t\t\t<div class="flex flex-col gap-3">
+\t\t\t\t<BigOptionButton
+\t\t\t\t\t:icon="BoxesIcon"
+\t\t\t\t\t:title="formatMessage(messages.customSetupTitle)"
+\t\t\t\t\t:description="formatMessage(messages.customSetupDescription)"
+\t\t\t\t\t@click="setSetupType('custom')"
+\t\t\t\t/>
+\t\t\t\t<BigOptionButton
 \t\t\t\t\t:icon="CompassIcon"
 \t\t\t\t\t:title="formatMessage(messages.modpackBaseTitle)"''',
-            '''\t\t\t\t<BigOptionButton
+            '''\t\t<template v-if="ctx.flowType === 'instance'">
+\t\t\t<div class="flex flex-col gap-3">
+\t\t\t\t<BigOptionButton
+\t\t\t\t\t:icon="BoxesIcon"
+\t\t\t\t\t:title="formatMessage(messages.customSetupTitle)"
+\t\t\t\t\t:description="formatMessage(messages.customSetupDescription)"
+\t\t\t\t\t@click="setSetupType('custom')"
+\t\t\t\t/>
+\t\t\t\t<BigOptionButton
 \t\t\t\t\tv-if="ctx.onHorizon"
 \t\t\t\t\t:icon="BoxesIcon"
 \t\t\t\t\t:title="formatMessage(messages.horizonTitle)"
