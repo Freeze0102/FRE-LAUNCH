@@ -11,7 +11,7 @@ from pathlib import Path
 def verify(root):
     root=root.resolve()
     path=Path(__file__).resolve().parent
-    for item in ("prepare.py","feature_local_accounts.py","feature_skin_notice.py","feature_offline_skins.py","feature_local_skin_preview.py","feature_ui_polish.py","feature_guest_launch.py","feature_java_nickname_lookup.py","feature_remove_modrinth_login.py","feature_brand_presence.py","feature_curseforge.py","feature_ukrainian.py","verify.py"):
+    for item in ("prepare.py","feature_local_accounts.py","feature_skin_notice.py","feature_offline_skins.py","feature_local_skin_preview.py","feature_ui_polish.py","feature_guest_launch.py","feature_java_nickname_lookup.py","feature_remove_modrinth_login.py","feature_brand_presence.py","feature_curseforge.py","feature_horizon.py","feature_ukrainian.py","verify.py"):
         py_compile.compile(str(path/item),doraise=True)
     expected={"Notch":"b50ad385-829d-3141-a216-7e7d7539ba7f",
               "Steve":"5627dd98-e6be-3c21-b8a8-e92344183641"}
@@ -159,6 +159,35 @@ def verify(root):
     assert "npm install" not in cf_backend
     for key in ("fre-launch.cf.source", "fre-launch.cf.api-key", "fre-launch.cf.install-error"):
         assert key in app_uk and key in app_en, f"CurseForge translation missing: {key}"
+
+    # Horizon is a separate client: check actual local CLI wiring, no mock Play.
+    horizon_backend=(root/"apps/app/src/api/horizon.rs").read_text(encoding="utf-8")
+    horizon_ui=(root/"apps/app-frontend/src/components/ui/HorizonRustPanel.vue").read_text(encoding="utf-8")
+    horizon_stage=(root/"packages/ui/src/components/flows/creation-flow-modal/components/SetupTypeStage.vue").read_text(encoding="utf-8")
+    horizon_modal=(root/"packages/ui/src/components/flows/creation-flow-modal/index.vue").read_text(encoding="utf-8")
+    horizon_context=(root/"packages/ui/src/components/flows/creation-flow-modal/creation-flow-context.ts").read_text(encoding="utf-8")
+    horizon_app=(root/"apps/app-frontend/src/App.vue").read_text(encoding="utf-8")
+    horizon_capabilities=json.loads((root/"apps/app/capabilities/plugins.json").read_text(encoding="utf-8"))
+    assert "fre-horizon:default" in horizon_capabilities["permissions"]
+    for source, snippets in (
+        (horizon_backend, ["horizon_instances", "horizon_create", "horizon_play",
+            '"instance", "create"', '"play", "--instance"', "validate_launcher",
+            "validate_name", "spawn_blocking"]),
+        (horizon_ui, ["plugin:fre-horizon|horizon_create",
+            "plugin:fre-horizon|horizon_play", "horizon-launcher.exe",
+            "https://playhorizon.dev/docs/install"]),
+        (horizon_stage, ["fre-launch.horizon.option.title", "ctx.onHorizon()"]),
+        (horizon_context, ["onHorizon"]),
+        (horizon_modal, ["onHorizon: props.onHorizon"]),
+        (horizon_app, ["HorizonRustPanel", 'ref="horizonWizard"', ':on-horizon="showHorizonWizard"']),
+    ):
+        for snippet in snippets:
+            assert snippet in source, f"Horizon integration missing: {snippet}"
+    for key in ("fre-launch.horizon.title", "fre-launch.horizon.play", "fre-launch.horizon.error"):
+        assert key in app_uk and key in app_en, f"Horizon app translation missing: {key}"
+    for key in ("fre-launch.horizon.option.title", "fre-launch.horizon.option.description"):
+        assert key in ui_uk and key in ui_en, f"Horizon wizard translation missing: {key}"
+    assert "horizon" not in (root/"apps/app-frontend/src/pages/Browse.vue").read_text(encoding="utf-8").split("const freContentSource =",1)[1].split("\n",1)[0], "Horizon must not share Java mod catalog"
 
     splash=(root/"apps/app-frontend/src/components/ui/SplashScreen.vue").read_text(encoding="utf-8")
     assert 'aria-label="FRE LAUNCH"' in splash, "FRE LAUNCH startup branding is missing"
