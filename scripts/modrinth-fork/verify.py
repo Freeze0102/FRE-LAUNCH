@@ -139,7 +139,7 @@ def verify(root):
     cf_capabilities=json.loads((root/"apps/app/capabilities/plugins.json").read_text(encoding="utf-8"))
     assert "fre-curseforge:default" in cf_capabilities["permissions"], "CurseForge Tauri commands must be explicitly permitted"
     for label, source, snippets in (
-        ("CurseForge backend", cf_backend, ["FRE_CURSEFORGE_API_KEY", "x-api-key", "allow_mod_distribution",
+        ("CurseForge backend", cf_backend, ["FRE_CURSEFORGE_API_KEY", "x-api-key", "allow_mod_distribution", "is_available", "validated_api_key",
             "gameVersion", "modLoaderType", "file_length", "verify_hash", "write_instance_file",
             "sync_content_files", "cf_search", "cf_install", "loader_type"]),
         ("CurseForge browser", cf_frontend, ["plugin:fre-curseforge|cf_search",
@@ -171,10 +171,13 @@ def verify(root):
     assert "fre-horizon:default" in horizon_capabilities["permissions"]
     for source, snippets in (
         (horizon_backend, ["horizon_instances", "horizon_create", "horizon_play", "horizon_logs",
+            "horizon_versions", "horizon_install_version", "horizon_set_version", "horizon_prepare",
             '"instance", "create"', '"play", "--instance"', "validate_launcher",
-            "validate_name", "spawn_blocking"]),
+            "validate_name", "validate_version", "spawn_blocking"]),
         (horizon_ui, ["plugin:fre-horizon|horizon_create",
-            "plugin:fre-horizon|horizon_play", "horizon-launcher.exe",
+            "plugin:fre-horizon|horizon_play", "plugin:fre-horizon|horizon_versions",
+            "plugin:fre-horizon|horizon_install_version", "plugin:fre-horizon|horizon_set_version",
+            "plugin:fre-horizon|horizon_prepare", "horizon-launcher.exe",
             "https://playhorizon.dev/docs/install"]),
         (horizon_stage, ["fre-launch.horizon.option.title", "ctx.onHorizon?.()"]),
         (horizon_context, ["onHorizon"]),
@@ -183,10 +186,14 @@ def verify(root):
     ):
         for snippet in snippets:
             assert snippet in source, f"Horizon integration missing: {snippet}"
-    for key in ("fre-launch.horizon.title", "fre-launch.horizon.play", "fre-launch.horizon.error"):
+    for key in ("fre-launch.horizon.title", "fre-launch.horizon.play", "fre-launch.horizon.error",
+                "fre-launch.horizon.first-run", "fre-launch.horizon.install-version",
+                "fre-launch.horizon.use-version", "fre-launch.horizon.prepare"):
         assert key in app_uk and key in app_en, f"Horizon app translation missing: {key}"
-    for key in ("fre-launch.horizon.option.title", "fre-launch.horizon.option.description"):
-        assert key in ui_uk and key in ui_en, f"Horizon wizard translation missing: {key}"
+    from feature_ukrainian import HORIZON_UI_NEW
+    for key,(uk,en) in HORIZON_UI_NEW.items():
+        assert ui_uk[key]["defaultMessage"] == uk, f"Horizon wizard Ukrainian translation missing: {key}"
+        assert ui_en[key]["defaultMessage"] == en, f"Horizon wizard English translation missing: {key}"
     assert "horizon" not in (root/"apps/app-frontend/src/pages/Browse.vue").read_text(encoding="utf-8").split("const freContentSource =",1)[1].split("\n",1)[0], "Horizon must not share Java mod catalog"
 
     splash=(root/"apps/app-frontend/src/components/ui/SplashScreen.vue").read_text(encoding="utf-8")
