@@ -31,6 +31,7 @@ pub struct CurseForgeMod {
     slug: String,
     logo: Option<CurseForgeLogo>,
     allow_mod_distribution: Option<bool>,
+    is_available: Option<bool>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -198,6 +199,9 @@ async fn cf_install(
     let project = cf_get::<CurseForgeMod>(
         &client, &key, &format!("mods/{mod_id}"), &[],
     ).await?;
+    if project.is_available == Some(false) {
+        return Err("CurseForge reports this mod is unavailable.".into());
+    }
     if project.allow_mod_distribution != Some(true) {
         return Err("The author has not enabled third-party distribution for this mod.".into());
     }
