@@ -218,6 +218,7 @@ def customize(root,revision):
     from feature_java_nickname_lookup import apply as add_java_nickname_lookup
     from feature_remove_modrinth_login import apply as hide_modrinth_platform_login
     from feature_brand_presence import apply as brand_startup_and_discord
+    from feature_curseforge import apply as add_curseforge_source
     add_local_accounts(root)
     guard_offline_skins(root)
     add_offline_skin_support(root)
@@ -227,6 +228,7 @@ def customize(root,revision):
     add_java_nickname_lookup(root)
     hide_modrinth_platform_login(root)
     brand_startup_and_discord(root)
+    add_curseforge_source(root)
     finish_ukrainian(root)
     print("Prepared distinct FRE LAUNCH source fork from",revision)
 
