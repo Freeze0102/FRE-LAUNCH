@@ -42,6 +42,7 @@ pub struct CurseForgeLogo {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct CurseForgeFile {
+    id: u64,
     file_name: String,
     file_date: String,
     file_length: u64,
@@ -187,8 +188,8 @@ async fn cf_install(
     if metadata.quarantined || metadata.shared_instance.is_some() {
         return Err("Installing into a quarantined or shared instance is not supported.".into());
     }
-    let game_version = metadata.instance.game_version.clone();
-    let loader_json = serde_json::to_value(&metadata.instance.loader)
+    let game_version = metadata.applied_content_set.game_version.clone();
+    let loader_json = serde_json::to_value(&metadata.applied_content_set.loader)
         .map_err(|e| e.to_string())?;
     let loader = loader_json.as_str().ok_or("Unsupported instance loader.")?;
     let loader_id = loader_type(loader)
@@ -215,17 +216,23 @@ async fn cf_install(
         .filter(|f| compatible(f, &game_version, loader))
         .max_by(|a, b| a.file_date.cmp(&b.file_date))
         .ok_or("No compatible downloadable JAR for this Minecraft version and mod loader.")?;
-    if file.file_name.contains(['/', '\\', ':'])
-        || file.file_name.chars().any(char::is_control)
+    if file.file_name.chars().any(|ch| matches!(ch, '/' | '\\' | ':') || ch.is_control())
         || file.file_name == "." || file.file_name == ".."
         || file.file_name.len() > 180
     {
         return Err("Unsafe CurseForge file name.".into());
     }
-    let download = file.download_url.as_deref().ok_or(
-        "CurseForge has not enabled a direct download for this file. Open its project page instead."
-    )?;
-    let url = reqwest::Url::parse(download).map_err(|_| "Invalid file URL")?;
+    let download = if let Some(url) = &file.download_url {
+        url.clone()
+    } else {
+        cf_get::<String>(
+            &client,
+            &key,
+            &format!("mods/{mod_id}/files/{}/download-url", file.id),
+            &[],
+        ).await.map_err(|_| "CurseForge has not permitted a direct download for this file.")?
+    };
+    let url = reqwest::Url::parse(&download).map_err(|_| "Invalid file URL")?;
     let host = url.host_str().ok_or("File URL has no host")?;
     if url.scheme() != "https" || !(host == "forgecdn.net" || host.ends_with(".forgecdn.net")) {
         return Err("CurseForge returned an unapproved download domain.".into());
