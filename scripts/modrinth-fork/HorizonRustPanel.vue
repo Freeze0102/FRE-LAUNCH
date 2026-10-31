@@ -21,6 +21,8 @@ const messages = defineMessages({
   play: { id: 'fre-launch.horizon.play', defaultMessage: 'Play Horizon' },
   playing: { id: 'fre-launch.horizon.playing', defaultMessage: 'Launching...' },
   list: { id: 'fre-launch.horizon.list', defaultMessage: 'Show Horizon instances' },
+  logs: { id: 'fre-launch.horizon.logs', defaultMessage: 'Show Horizon logs' },
+  logPrivacy: { id: 'fre-launch.horizon.log-privacy', defaultMessage: 'Logs are read locally only; nothing is uploaded.' }
   closing: { id: 'fre-launch.horizon.close', defaultMessage: 'Close' },
   notConfigured: { id: 'fre-launch.horizon.not-configured', defaultMessage: 'Choose the Horizon launcher executable first.' },
   error: { id: 'fre-launch.horizon.error', defaultMessage: 'Horizon error: {reason}' },
@@ -33,9 +35,10 @@ const executable = ref('')
 const instanceName = ref('')
 const launchName = ref('')
 const listing = ref('')
+const logs = ref('')
 const feedback = ref('')
 const error = ref('')
-const pending = ref<'create' | 'play' | 'list' | null>(null)
+const pending = ref<'create' | 'play' | 'list' | 'logs' | null>(null)
 
 try {
   const saved = localStorage.getItem('fre-launch-horizon-executable')
@@ -129,6 +132,20 @@ async function refreshInstances() {
     if (!originalPending) pending.value = null
   }
 }
+async function showLogs() {
+  if (!executable.value) { error.value = t(messages.notConfigured); return }
+  pending.value = 'logs'
+  error.value = ''
+  try {
+    logs.value = await invoke<string>('plugin:fre-horizon|horizon_logs', {
+      exePath: executable.value,
+    })
+  } catch (err) {
+    error.value = t(messages.error, { reason: failure(err) })
+  } finally {
+    pending.value = null
+  }
+}
 defineExpose({ show, hide })
 </script>
 
@@ -184,12 +201,17 @@ defineExpose({ show, hide })
           <button type="button" class="cursor-pointer rounded-lg border border-solid border-surface-5 bg-button-bg px-4 py-2 text-contrast disabled:opacity-40" :disabled="!!pending" @click="refreshInstances">
             {{ t(messages.list) }}
           </button>
+          <button type="button" class="cursor-pointer rounded-lg border border-solid border-surface-5 bg-button-bg px-4 py-2 text-contrast disabled:opacity-40" :disabled="!!pending" @click="showLogs">
+            {{ t(messages.logs) }}
+          </button>
         </div>
       </div>
 
       <p v-if="error" role="alert" class="mt-4 rounded-lg border border-solid border-red-500/50 p-3 text-sm text-red-400">{{ error }}</p>
       <p v-if="feedback" role="status" class="mt-4 rounded-lg border border-solid border-surface-5 p-3 text-sm text-brand">{{ feedback }}</p>
       <pre v-if="listing" class="mt-4 max-h-48 overflow-auto whitespace-pre-wrap rounded-lg bg-button-bg p-3 text-xs text-secondary">{{ listing }}</pre>
+      <p v-if="logs" class="mt-3 text-xs text-secondary">{{ t(messages.logPrivacy) }}</p>
+      <pre v-if="logs" class="mt-2 max-h-52 overflow-auto whitespace-pre-wrap rounded-lg bg-button-bg p-3 text-xs text-secondary">{{ logs }}</pre>
       <p class="mt-4 text-xs text-secondary">{{ t(messages.about) }}</p>
     </div>
   </div>
