@@ -134,6 +134,6 @@ mod tests {
         assert!(validate_name("Horizon Survival").is_ok());
         assert!(validate_name("../world").is_err());
         assert!(validate_name("--config").is_err());
-        assert!(validate_name("")).is_err());
+        assert!(validate_name("").is_err());
     }
 }
