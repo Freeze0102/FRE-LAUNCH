@@ -11,7 +11,7 @@ from pathlib import Path
 def verify(root):
     root=root.resolve()
     path=Path(__file__).resolve().parent
-    for item in ("prepare.py","feature_local_accounts.py","feature_skin_notice.py","feature_offline_skins.py","feature_local_skin_preview.py","feature_ui_polish.py","feature_guest_launch.py","feature_java_nickname_lookup.py","feature_remove_modrinth_login.py","feature_brand_presence.py","feature_ukrainian.py","verify.py"):
+    for item in ("prepare.py","feature_local_accounts.py","feature_skin_notice.py","feature_offline_skins.py","feature_local_skin_preview.py","feature_ui_polish.py","feature_guest_launch.py","feature_java_nickname_lookup.py","feature_remove_modrinth_login.py","feature_brand_presence.py","feature_curseforge.py","feature_ukrainian.py","verify.py"):
         py_compile.compile(str(path/item),doraise=True)
     expected={"Notch":"b50ad385-829d-3141-a216-7e7d7539ba7f",
               "Steve":"5627dd98-e6be-3c21-b8a8-e92344183641"}
@@ -126,6 +126,37 @@ def verify(root):
     assert '<ModrinthAccountRequiredModal ref="modrinthLoginModal"' in app, "Keep internal Modrinth auth flow available for platform-only features"
     onboarding=(root/"apps/app-frontend/src/features/onboarding/checklist.vue").read_text(encoding="utf-8")
     assert "id: 'login-modrinth'," not in onboarding.split("const steps = computed(",1)[1].split("const accordionButtonClass",1)[0], "Onboarding must not require Modrinth login"
+
+    # CurseForge never borrows Modrinth's authentication and never silently
+    # installs content from incompatible Minecraft/modloader combinations.
+    cf_backend=(root/"apps/app/src/api/curseforge.rs").read_text(encoding="utf-8")
+    cf_frontend=(root/"apps/app-frontend/src/components/ui/CurseForgeBrowser.vue").read_text(encoding="utf-8")
+    cf_browse=(root/"apps/app-frontend/src/pages/Browse.vue").read_text(encoding="utf-8")
+    cf_mod=(root/"apps/app/src/api/mod.rs").read_text(encoding="utf-8")
+    cf_main=(root/"apps/app/src/main.rs").read_text(encoding="utf-8")
+    cf_build=(root/"apps/app/build.rs").read_text(encoding="utf-8")
+    cf_cargo=(root/"apps/app/Cargo.toml").read_text(encoding="utf-8")
+    for label, source, snippets in (
+        ("CurseForge backend", cf_backend, ["FRE_CURSEFORGE_API_KEY", "x-api-key", "allow_mod_distribution",
+            "gameVersion", "modLoaderType", "file_length", "verify_hash", "write_instance_file",
+            "sync_content_files", "cf_search", "cf_install", "loader_type"]),
+        ("CurseForge browser", cf_frontend, ["plugin:fre-curseforge|cf_search",
+            "plugin:fre-curseforge|cf_install", "instanceId", "apiKey"]),
+        ("Browse source selector", cf_browse, ["CurseForgeBrowser", "freContentSource",
+            "Modrinth</button>", "CurseForge</button>"]),
+        ("CurseForge Rust API module", cf_mod, ["pub mod curseforge;"]),
+        ("CurseForge Rust plugin", cf_main, [".plugin(api::curseforge::init())"]),
+        ("CurseForge Tauri permissions", cf_build, ['"fre-curseforge"', '"cf_search"', '"cf_install"']),
+        ("CurseForge hash library", cf_cargo, ["sha1 = { workspace = true }"]),
+    ):
+        for snippet in snippets:
+            assert snippet in source, f"{label}: missing {snippet}"
+    assert "CurseForge" in cf_frontend
+    assert "api.curseforge.com" in cf_backend
+    assert "https://api.curseforge.com" in cf_backend
+    assert "npm install" not in cf_backend
+    for key in ("fre-launch.cf.source", "fre-launch.cf.api-key", "fre-launch.cf.install-error"):
+        assert key in app_uk and key in app_en, f"CurseForge translation missing: {key}"
 
     splash=(root/"apps/app-frontend/src/components/ui/SplashScreen.vue").read_text(encoding="utf-8")
     assert 'aria-label="FRE LAUNCH"' in splash, "FRE LAUNCH startup branding is missing"
