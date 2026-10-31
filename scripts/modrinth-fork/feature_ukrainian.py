@@ -171,6 +171,25 @@ UI = {
 "user-restrictions.scope.version-write":"Редагувати версії та додавати файли"
 }
 NEW = {
+"fre-launch.horizon.title":("Horizon (Rust)","Horizon (Rust)"),
+"fre-launch.horizon.subtitle":("Окремий клієнт Minecraft на Rust. Версії, моди, світи й оновлення Horizon зберігаються окремо від Java-збірок.","A separate Rust-based Minecraft client. Horizon versions, mods, worlds and updates are managed independently of Java instances."),
+"fre-launch.horizon.requirement":("Потрібен офіційний Horizon для Windows і Microsoft-акаунт із придбаною Minecraft: Java Edition. Horizon експериментальний; Java-моди Fabric/Forge не підтримуються.","Requires the official Horizon Windows launcher and a Microsoft account that owns Minecraft: Java Edition. Horizon is experimental; Java Fabric/Forge mods are not supported."),
+"fre-launch.horizon.launcher-label":("Файл запуску Horizon","Horizon executable"),
+"fre-launch.horizon.choose-exe":("Вибрати horizon-launcher.exe","Choose horizon-launcher.exe"),
+"fre-launch.horizon.release":("Офіційне завантаження та інструкція","Official download and installation instructions"),
+"fre-launch.horizon.name":("Назва нової Horizon-збірки","New Horizon instance name"),
+"fre-launch.horizon.placeholder":("Мій Minecraft на Rust","My Rust Minecraft"),
+"fre-launch.horizon.create":("Створити Horizon-збірку","Create Horizon instance"),
+"fre-launch.horizon.creating":("Створюємо...","Creating..."),
+"fre-launch.horizon.launch-name":("Назва збірки для запуску","Instance to launch (name)"),
+"fre-launch.horizon.play":("Грати через Horizon","Play Horizon"),
+"fre-launch.horizon.playing":("Запускаємо...","Launching..."),
+"fre-launch.horizon.list":("Показати збірки Horizon","Show Horizon instances"),
+"fre-launch.horizon.close":("Закрити","Close"),
+"fre-launch.horizon.not-configured":("Спочатку вибери виконуваний файл Horizon.","Choose the Horizon launcher executable first."),
+"fre-launch.horizon.error":("Помилка Horizon: {reason}","Horizon error: {reason}"),
+"fre-launch.horizon.about":("Horizon розробляє інша команда. FRE LAUNCH запускає його офіційні команди, але не змінює й не виправляє код гри.","Horizon is maintained by its own developers. FRE LAUNCH starts its official CLI; it does not change or repair Horizon game code."),
+"fre-launch.horizon.separate":("Наявні Java-збірки Minecraft, моди та світи залишаються без змін.","Existing Minecraft Java instances, mods and worlds remain untouched."),
 "fre-launch.cf.source":("Джерело модів","Mod source"),
 "fre-launch.cf.intro":("Моди з CurseForge можна встановлювати в ту саму збірку, що й моди з Modrinth.","Mods from CurseForge can be installed into the same game instance as Modrinth mods."),
 "fre-launch.cf.api-key":("Схвалений ключ CurseForge API (не зберігається)","Approved CurseForge API key (not saved)"),
@@ -275,6 +294,11 @@ def _complete(english, ukrainian, curated, field):
             english_fallback+=1
     return added, english_fallback
 
+HORIZON_UI_NEW = {
+"fre-launch.horizon.option.title":("Horizon (Rust)","Horizon (Rust)"),
+"fre-launch.horizon.option.description":("Окремий Minecraft на Rust зі своїми версіями та модами. Працює через офіційний лаунчер Horizon.","Separate native Rust Minecraft client and versions; runs through the official Horizon launcher."),
+}
+
 def apply(root):
     app_uk=root/"apps/app-frontend/src/locales/uk-UA/index.json"
     app_en=root/"apps/app-frontend/src/locales/en-US/index.json"
@@ -293,6 +317,11 @@ def apply(root):
             raise RuntimeError(f"Locale name collision: {key}")
         ua[key]={"message":uk}
         ea[key]={"message":en}
+    for key,(uk,en) in HORIZON_UI_NEW.items():
+        if key in uu or key in eu:
+            raise RuntimeError(f"UI locale name collision: {key}")
+        uu[key]={"defaultMessage":uk}
+        eu[key]={"defaultMessage":en}
     # A nickname-only profile completes onboarding without a Microsoft login;
     # name this as choosing a profile, not signing into official services.
     ea["onboarding-checklist.login-minecraft"]={"message":"Set up Minecraft profile"}
