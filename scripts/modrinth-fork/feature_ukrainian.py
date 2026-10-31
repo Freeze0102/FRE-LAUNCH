@@ -330,7 +330,7 @@ def apply(root):
     for catalog in (ea, ua):
         if "app.settings.app-version" in catalog:
             catalog["app.settings.app-version"]["message"] = "FRE LAUNCH {version}"
-    for path, content in [(app_en,ea),(app_uk,ua),(ui_uk,uu)]:
+    for path, content in [(app_en,ea),(app_uk,ua),(ui_en,eu),(ui_uk,uu)]:
         path.write_text(json.dumps(content,ensure_ascii=False,indent=2,sort_keys=True)+"\n",encoding="utf-8")
     print(f"Ukrainian translations completed: app={app}, UI={ui}, new profiles={len(NEW)}. "
           f"English-only fallback strings app={_a}, UI={_u}. "
