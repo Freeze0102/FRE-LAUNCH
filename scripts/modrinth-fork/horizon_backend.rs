@@ -13,6 +13,7 @@ pub fn init<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
             horizon_instances,
             horizon_create,
             horizon_play,
+            horizon_logs,
         ])
         .build()
 }
@@ -121,6 +122,24 @@ async fn horizon_play(exe_path: String, name: String) -> Result<String, String> 
             "Passed instance '{name}' to Horizon launcher (process {}). Check the Horizon window or logs if it does not start.",
             child.id()
         ))
+    })
+    .await
+    .map_err(|e| format!("Horizon task error: {e}"))?
+}
+
+/// Read the local Horizon log for troubleshooting, without uploading it.
+#[tauri::command]
+async fn horizon_logs(exe_path: String) -> Result<String, String> {
+    let exe = validate_launcher(&exe_path)?;
+    tokio::task::spawn_blocking(move || {
+        let out = command(&exe)
+            .args(["logs", "--lines", "120"])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .output()
+            .map_err(|e| format!("Could not read Horizon logs: {e}"))?;
+        let log = output_string(out)?;
+        Ok(log.chars().take(24_000).collect::<String>())
     })
     .await
     .map_err(|e| format!("Horizon task error: {e}"))?
