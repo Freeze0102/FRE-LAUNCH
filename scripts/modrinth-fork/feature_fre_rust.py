@@ -5,6 +5,7 @@ not downloaded, launched or updated through any foreign launcher executable.
 Minecraft's private game assets come from the user's own installation.
 """
 import json
+import hashlib
 import shutil
 from pathlib import Path
 
@@ -102,8 +103,24 @@ def apply(root: Path):
     binaries = ("fre-rust-client.exe", "research-lock.json", "LICENSE.txt")
     valid = all((runtime / f).is_file() for f in binaries) and (
         runtime / "resources/horizon-resources.json"
-    ).is_file()
+    ).is_file() and (runtime / "BUILD-INFO.json").is_file()
     if valid:
+        # These may be private Minecraft resources. Prevent symlink escapes
+        # and detect incomplete, edited or mismatched native builds before
+        # copying anything into the Tauri installer.
+        for path in runtime.rglob("*"):
+            if path.is_symlink():
+                raise RuntimeError(f"Native Rust game runtime contains a link: {path}")
+        info = json.loads((runtime / "BUILD-INFO.json").read_text(encoding="utf-8-sig"))
+        if info.get("source_commit") != "975c07d9151847e6af13afc4b5ab37b6bbe78ef5":
+            raise RuntimeError("Native Rust engine source revision is not approved.")
+        checksum = hashlib.file_digest((runtime / "fre-rust-client.exe").open("rb"), "sha256").hexdigest()
+        if checksum.lower() != str(info.get("game_exe_sha256", "")).lower():
+            raise RuntimeError("Native Rust game SHA-256 is wrong: rebuild; do not bundle.")
+        if info.get("engine_license") != "MIT":
+            raise RuntimeError("Native Rust game license metadata changed.")
+        if not (runtime / "LICENSE.txt").read_text(encoding="utf-8").startswith("MIT License"):
+            raise RuntimeError("Native Rust game attribution is missing.")
         staged = app / "fre-rust-runtime"
         if staged.exists():
             raise RuntimeError("Native Rust staging folder already exists; use a clean upstream checkout.")
