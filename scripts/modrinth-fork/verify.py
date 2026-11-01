@@ -172,10 +172,11 @@ def verify(root):
     for source, snippets in (
         (horizon_backend, ["horizon_instances", "horizon_create", "horizon_play", "horizon_logs",
             "horizon_versions", "horizon_install_version", "horizon_set_version", "horizon_prepare",
+            "horizon_direct_play", "horizon-client.exe", "horizon-resources.json",
             '"instance", "create"', '"play", "--instance"', "validate_launcher",
             "validate_name", "validate_version", "run_cli", "kill_on_drop", "timeout"]),
         (horizon_ui, ["plugin:fre-horizon|horizon_create",
-            "plugin:fre-horizon|horizon_play", "plugin:fre-horizon|horizon_versions",
+            "plugin:fre-horizon|horizon_direct_play", "plugin:fre-horizon|horizon_versions",
             "plugin:fre-horizon|horizon_install_version", "plugin:fre-horizon|horizon_set_version",
             "plugin:fre-horizon|horizon_prepare", "horizon-launcher.exe",
             "https://playhorizon.dev/docs/install"]),
@@ -186,6 +187,27 @@ def verify(root):
     ):
         for snippet in snippets:
             assert snippet in source, f"Horizon integration missing: {snippet}"
+    rust_library=(root/"apps/app-frontend/src/components/ui/HorizonLibrary.vue").read_text(encoding="utf-8")
+    rust_index=(root/"apps/app-frontend/src/pages/Index.vue").read_text(encoding="utf-8")
+    rust_main=(root/"apps/app/src/main.rs").read_text(encoding="utf-8")
+    rust_build=(root/"apps/app/build.rs").read_text(encoding="utf-8")
+    for source, markers in (
+        (rust_library, ["fre-launch.rust.library.title", "plugin:fre-horizon|horizon_status",
+                        "plugin:fre-horizon|horizon_direct_play", "fre-horizon-library-refresh",
+                        "showHorizonWizard"]),
+        (rust_index, ['import HorizonLibrary', "<HorizonLibrary"]),
+        (horizon_app, ["provide('showHorizonWizard', showHorizonWizard)", "import { computed, nextTick, onMounted, onUnmounted, provide, ref, watch }"]),
+        (rust_main, [".plugin(api::horizon::init())"]),
+        (rust_build, ['"horizon_direct_play"', '"fre-horizon"']),
+    ):
+        for marker in markers:
+            assert marker in source, f"Rust library integration missing: {marker}"
+    for key in ("fre-launch.rust.library.title", "fre-launch.rust.library.play",
+                "fre-launch.rust.library.manage", "fre-launch.rust.library.error"):
+        assert key in app_uk and key in app_en, f"Rust library translation missing: {key}"
+    assert 'horizon_direct_play' in horizon_backend
+    assert 'horizon_client' not in rust_library, "UI must not pretend to launch native process directly"
+
     for key in ("fre-launch.horizon.title", "fre-launch.horizon.play", "fre-launch.horizon.error",
                 "fre-launch.horizon.minecraft-folder",
                 "fre-launch.horizon.first-run", "fre-launch.horizon.install-version",
