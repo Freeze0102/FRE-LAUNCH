@@ -1,0 +1,195 @@
+name: FRE LAUNCH Vue Rust Windows Update
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Publish approved signed v0.5.10 to in-launcher updates (requires FRE_LAUNCH_SECURITY_APPROVED=true)'
+        type: boolean
+        required: true
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: frelaunch-vue-rust-release
+  cancel-in-progress: false
+
+jobs:
+  windows-vue-rust:
+    if: github.ref == 'refs/heads/main'
+    runs-on: windows-latest
+    timeout-minutes: 180
+    env:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.FRE_TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.FRE_TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout the real Vue/Tauri FRE LAUNCH fork
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Verify version, source and signing key before spending build minutes
+        shell: pwsh
+        env:
+          WILL_PUBLISH: ${{ inputs.publish }}
+          SECURITY_APPROVED: ${{ vars.FRE_LAUNCH_SECURITY_APPROVED }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $channel = Get-Content 'update-channel.json' -Raw | ConvertFrom-Json
+          if ($channel.version -ne '0.5.10') { throw 'Review the versioned workflow before running it for any other release' }
+          if (!$env:TAURI_SIGNING_PRIVATE_KEY) {
+            throw 'Missing FRE_TAURI_SIGNING_PRIVATE_KEY secret. Use the EXISTING 0.5.9 Tauri updater key, not a newly generated key.'
+          }
+          if ($env:WILL_PUBLISH -eq 'true' -and $env:SECURITY_APPROVED -ne 'true') {
+            throw 'Publishing requires explicit FRE_LAUNCH_SECURITY_APPROVED=true after independent review'
+          }
+          gh release view "v$($channel.version)" --repo "$env:GITHUB_REPOSITORY" 2>$null
+          if ($LASTEXITCODE -eq 0) { throw 'Release tag already exists; existing signed releases are immutable' }
+          if (!(Test-Path 'scripts/modrinth-fork/feature_fre_rust.py')) {
+            throw 'This is not the new Vue/Rust source checkout.'
+          }
+
+      - name: Install Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Install Rust MSVC
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            vendor/fre-rust-source -> target
+            FRE-Modrinth-Source -> target
+
+      - name: Install pinned frontend/build tools
+        shell: pwsh
+        run: |
+          npm.cmd install -g pnpm@12.11.2
+          if ($LASTEXITCODE -ne 0) { throw 'Could not install required pnpm' }
+          python -m pip install 'Pillow>=11,<13'
+          if ($LASTEXITCODE -ne 0) { throw 'Could not install Python image dependency' }
+
+      - name: Compile real Rust Minecraft engine (MIT only)
+        shell: pwsh
+        run: |
+          ./scripts/modrinth-fork/ci-build-native-engine.ps1
+          if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { throw 'Native Rust client build failed' }
+          if (Test-Path 'scripts/modrinth-fork/fre-rust-runtime/resources') {
+            throw 'Proprietary Minecraft resources must never enter public GitHub update packages'
+          }
+
+      - name: Compile full Vue/Tauri launcher with strict checks and existing update signature
+        shell: pwsh
+        run: |
+          ./FRE-MODRINTH-LOCAL.ps1 -BuildWindows
+          if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { throw 'Vue/Tauri FRE LAUNCH build failed' }
+
+      - name: Verify compiled Windows installers and Defender status
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $dir = 'FRE-Modrinth-Source/target/release/bundle/nsis'
+          $installer = Get-ChildItem $dir -File -Filter '*.exe' | Select-Object -First 1
+          if (!$installer) { throw 'No real Vue/Tauri installer was produced' }
+          if (!(Test-Path "$($installer.FullName).sig")) { throw 'Signed updater artifact missing' }
+          if (!(Get-Command Get-MpComputerStatus -ErrorAction SilentlyContinue)) {
+            throw 'Microsoft Defender unavailable; fail closed'
+          }
+          $defender = Get-MpComputerStatus
+          if (!$defender.AMServiceEnabled -or !$defender.AntivirusEnabled) { throw 'Microsoft Defender is not active' }
+          Update-MpSignature -ErrorAction Stop
+          Start-MpScan -ScanType CustomScan -ScanPath $installer.FullName -ErrorAction Stop
+          if (!(Test-Path $installer.FullName)) { throw 'Installer quarantined' }
+          $exe = Get-ChildItem 'FRE-Modrinth-Source/target/release' -File -Filter '*.exe' | Select-Object -First 1
+          if (!$exe) { throw 'Vue/Tauri desktop executable missing' }
+          Start-MpScan -ScanType CustomScan -ScanPath $exe.FullName -ErrorAction Stop
+          if (@(Get-MpThreatDetection).Count) { throw 'Defender reported a malware detection: release blocked' }
+          Write-Host "Scanned executable: $($exe.Name)"
+          Write-Host "Scanned installer: $($installer.Name)"
+          "FRE_REVIEW_INSTALLER=$($installer.FullName)" >> $env:GITHUB_ENV
+
+      - name: Install into a fresh directory and smoke-test launch
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $folder = Join-Path $env:RUNNER_TEMP 'FRELaunchVueRustSmoke'
+          $process = Start-Process -FilePath $env:FRE_REVIEW_INSTALLER -ArgumentList @('/S',"/D=$folder") -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "NSIS installation failed: $($process.ExitCode)" }
+          $executables = @(Get-ChildItem -LiteralPath $folder -Recurse -File -Filter '*.exe' |
+            Where-Object { $_.Name -notmatch 'unins|uninstall' })
+          if (!$executables.Count) { throw 'Installed FRE LAUNCH EXE not found' }
+          $binary = $executables | Sort-Object Length -Descending | Select-Object -First 1
+          $app = Start-Process -FilePath $binary.FullName -PassThru
+          Start-Sleep -Seconds 12
+          $app.Refresh()
+          if ($app.HasExited) { throw "New Vue/Tauri launcher exited during startup: $($app.ExitCode)" }
+          Stop-Process -Id $app.Id -Force
+          Write-Host 'Installed Vue/Tauri launcher survived 12-second Windows startup smoke'
+
+      - name: Package signed update and create reproducible provenance
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = (Get-Content 'update-channel.json' -Raw | ConvertFrom-Json).version
+          $notes = "FRE LAUNCH $version — Vue/Tauri Modrinth fork with native Rust Minecraft engine, separate Rust profiles, signed updater, Ukrainian localization, and optional local import of legitimately owned Minecraft resources. Source: $env:GITHUB_SHA. This release does not contain proprietary Minecraft assets."
+          Set-Content -LiteralPath 'release-notes-ci.md' -Value $notes -Encoding UTF8
+          node scripts/modrinth-fork/package-update.mjs $env:FRE_REVIEW_INSTALLER release-notes-ci.md
+          if ($LASTEXITCODE -ne 0) { throw 'Minisign updater verification failed: do not publish' }
+          $stage = Join-Path 'release-staging' "v$version"
+          $hash = (Get-FileHash -LiteralPath (Join-Path $stage 'FRE-LAUNCH-Windows-x64-Setup.exe') -Algorithm SHA256).Hash.ToLowerInvariant()
+          $provenance = [ordered]@{
+            sourceCommit = "$env:GITHUB_SHA"
+            engineSourceRevision = '975c07d9151847e6af13afc4b5ab37b6bbe78ef5'
+            proprietaryMinecraftAssetsIncluded = $false
+            installer = @{ sha256 = $hash; signatureVerified = $true }
+            defender = @{ active = $true; threatsFound = 0; launcherExitCode = 0; installerExitCode = 0 }
+          }
+          $provenance | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $stage 'PROVENANCE.json') -Encoding utf8
+          "FRE_REVIEW_STAGE=$stage" >> $env:GITHUB_ENV
+          Write-Host "Signed Vue/Rust updater verified: SHA-256 $hash"
+
+      - name: Upload reviewable EXE, signature and update manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: FRE-LAUNCH-v0.5.10-Vue-Rust-Windows-REVIEW
+          path: |
+            ${{ env.FRE_REVIEW_STAGE }}/FRE-LAUNCH-Windows-x64-Setup.exe
+            ${{ env.FRE_REVIEW_STAGE }}/FRE-LAUNCH-Windows-x64-Setup.exe.sig
+            ${{ env.FRE_REVIEW_STAGE }}/latest.json
+            ${{ env.FRE_REVIEW_STAGE }}/SHA256SUMS.txt
+            ${{ env.FRE_REVIEW_STAGE }}/PROVENANCE.json
+            ${{ env.FRE_REVIEW_STAGE }}/NOTES.md
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Publish signed v0.5.10 to the installed launcher
+        if: inputs.publish && vars.FRE_LAUNCH_SECURITY_APPROVED == 'true'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = '0.5.10'
+          $stage = $env:FRE_REVIEW_STAGE
+          $tag = "v$version"
+          $files = @('FRE-LAUNCH-Windows-x64-Setup.exe','FRE-LAUNCH-Windows-x64-Setup.exe.sig',
+                     'latest.json','SHA256SUMS.txt','PROVENANCE.json')
+          gh release view $tag --repo $env:GITHUB_REPOSITORY 2>$null
+          if ($LASTEXITCODE -eq 0) { throw 'Version already released; nothing will be replaced' }
+          gh release create $tag --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "FRE LAUNCH $version" --notes-file (Join-Path $stage 'NOTES.md') --draft
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to create release draft' }
+          foreach ($name in $files) {
+            gh release upload $tag (Join-Path $stage $name) --repo $env:GITHUB_REPOSITORY
+            if ($LASTEXITCODE -ne 0) { throw "Failed to upload $name; draft remains unpublished" }
+          }
+          gh release edit $tag --repo $env:GITHUB_REPOSITORY --draft=false --latest
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to publish verified release' }
+          Write-Host "Published $tag; the signed updater can now discover this release."
