@@ -52,7 +52,8 @@ const freAppUpdater = createAppUpdater({
 	warn: (error) => console.warn('FRE LAUNCH update:', error),
 })
 
-watch(stateInitialized, (ready) => { if (ready) void freAppUpdater.start() })
+// Start checking even if the app was already initialized before this watcher mounted.
+watch(stateInitialized, (ready) => { if (ready) void freAppUpdater.start() }, { immediate: true })
 setAppUpdateActions({
 	download: freAppUpdater.download,
 	install: freAppUpdater.install,
