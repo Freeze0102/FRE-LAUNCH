@@ -19,6 +19,7 @@ def apply(root: Path):
     shutil.copyfile(here / "horizon_backend.rs", root / "apps/app/src/api/horizon.rs")
     shutil.copyfile(here / "horizon_bootstrap.rs", root / "apps/app/src/api/horizon_bootstrap.rs")
     shutil.copyfile(here / "HorizonRustPanel.vue", root / "apps/app-frontend/src/components/ui/HorizonRustPanel.vue")
+    shutil.copyfile(here / "HorizonLibrary.vue", root / "apps/app-frontend/src/components/ui/HorizonLibrary.vue")
 
     api = root / "apps/app/src/api/mod.rs"
     exactly(api, "pub mod files;\npub mod friends;", "pub mod files;\npub mod horizon;\npub mod friends;")
@@ -33,7 +34,7 @@ def apply(root: Path):
             '''            .plugin(
                 "fre-horizon",
                 InlinedPlugin::new()
-                    .commands(&["horizon_instances", "horizon_create", "horizon_play", "horizon_logs", "horizon_versions", "horizon_install_version", "horizon_set_version", "horizon_prepare", "horizon_install_launcher", "horizon_detect_launcher", "horizon_status", "horizon_open_launcher"])
+                    .commands(&["horizon_instances", "horizon_create", "horizon_play", "horizon_logs", "horizon_versions", "horizon_install_version", "horizon_set_version", "horizon_prepare", "horizon_install_launcher", "horizon_detect_launcher", "horizon_status", "horizon_open_launcher", "horizon_direct_play"])
                     .default_permission(DefaultPermissionRule::AllowAllCommands),
             )
             .plugin(
@@ -137,4 +138,27 @@ function showHorizonWizard() {
     exactly(app,
         "\t\t<IconEditorModal\n\t\t\tref=\"creationIconEditorModal\"",
         "\t\t<HorizonRustPanel ref=\"horizonWizard\" />\n\t\t<IconEditorModal\n\t\t\tref=\"creationIconEditorModal\"")
+    # List actual native Rust instances beside Java instances in the Library.
+    library = root / "apps/app-frontend/src/pages/Index.vue"
+    exactly(library,
+        "import LibrarySection from '@/components/ui/library/index.vue'",
+        "import HorizonLibrary from '@/components/ui/HorizonLibrary.vue'\n"
+        "import LibrarySection from '@/components/ui/library/index.vue'")
+    exactly(library,
+        '\t\t<LibrarySection :instances="instances" />',
+        '\t\t<LibrarySection :instances="instances" />\n\t\t<HorizonLibrary />')
+    exactly(library,
+        '\t\t<ContextMenu ref="pageOptions" :label="formatMessage(messages.libraryActionsLabel)" />\n\t</div>',
+        '\t\t<ContextMenu ref="pageOptions" :label="formatMessage(messages.libraryActionsLabel)" />\n\t</div>\n'
+        '\t<HorizonLibrary v-if="isReady && !hasCreatedInstance" class="px-6 pb-6" />')
+
+    # App provides an action so Library cards can reopen the existing wizard.
+    exactly(app,
+        "import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'",
+        "import { computed, nextTick, onMounted, onUnmounted, provide, ref, watch } from 'vue'")
+    exactly(app,
+        "function showHorizonWizard() {\n    installationModal.value?.hide()\n    horizonWizard.value?.show()\n}",
+        "function showHorizonWizard() {\n    installationModal.value?.hide()\n    horizonWizard.value?.show()\n}\n"
+        "provide('showHorizonWizard', showHorizonWizard)")
+
     print("FRE LAUNCH Horizon Rust instance integration added to the Create Instance wizard.")
