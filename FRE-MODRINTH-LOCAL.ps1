@@ -59,7 +59,7 @@ $requiredSourceFiles = @(
     'apps\frontend\package.json',
     'apps\app\package.json',
     'apps\app\src\fre_update_policy.rs',
-    'apps\app\src\api\horizon_bootstrap.rs',
+    'apps\app\src\api\fre_rust.rs',
     'apps\app\src\fre_update_channel.rs',
     'apps\app-frontend\src\helpers\fre-app-updater.ts',
     'apps\app-frontend\src\fre-compat.d.ts',
