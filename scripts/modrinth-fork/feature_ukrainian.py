@@ -306,7 +306,7 @@ def _complete(english, ukrainian, curated, field):
 
 HORIZON_UI_NEW = {
 "fre-launch.horizon.option.title":("Horizon (Rust)","Horizon (Rust)"),
-"fre-launch.horizon.option.description":("Окремий Minecraft на Rust зі своїми версіями та модами. Працює через офіційний лаунчер Horizon.","Separate native Rust Minecraft client and versions; runs through the official Horizon launcher."),
+"fre-launch.horizon.option.description":("Окремий Minecraft на Rust з власними версіями й світами. FRE LAUNCH запускає гру напряму.","Separate native Rust Minecraft client and versions; FRE LAUNCH launches the game directly."),
 }
 
 NEW.update({
@@ -314,6 +314,21 @@ NEW.update({
     for name, translations in json.loads(
         (Path(__file__).parent / 'horizon-setup-messages.json').read_text(encoding='utf-8')
     ).items()
+})
+
+# Distinct from Java game instance rows: Rust profiles appear as independent
+# cards sourced from the installed Horizon profile manifest.
+NEW.update({
+"fre-launch.rust.library.title":("Minecraft на Rust","Minecraft on Rust"),
+"fre-launch.rust.library.subtitle":("Окремі збірки Horizon з власними світами, налаштуваннями й файлами гри.","Horizon profiles are separate game installations with their own worlds, options and game files."),
+"fre-launch.rust.library.version":("Версія {version}","Version {version}"),
+"fre-launch.rust.library.play":("Грати","Play"),
+"fre-launch.rust.library.playing":("Запускаємо…","Starting..."),
+"fre-launch.rust.library.manage":("Налаштувати","Manage"),
+"fre-launch.rust.library.add":("Нова Rust-збірка","New Rust profile"),
+"fre-launch.rust.library.needs-prepare":("Потрібно встановити гру або підготувати ресурси","Installation or resources required"),
+"fre-launch.rust.library.ready":("Готово до запуску","Ready to play"),
+"fre-launch.rust.library.error":("Horizon: {reason}","Horizon: {reason}"),
 })
 
 def apply(root):
