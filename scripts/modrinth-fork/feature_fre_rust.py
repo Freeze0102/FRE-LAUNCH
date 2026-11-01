@@ -114,7 +114,11 @@ def apply(root: Path):
         info = json.loads((runtime / "BUILD-INFO.json").read_text(encoding="utf-8-sig"))
         if info.get("source_commit") != "975c07d9151847e6af13afc4b5ab37b6bbe78ef5":
             raise RuntimeError("Native Rust engine source revision is not approved.")
-        checksum = hashlib.file_digest((runtime / "fre-rust-client.exe").open("rb"), "sha256").hexdigest()
+        hasher = hashlib.sha256()
+        with (runtime / "fre-rust-client.exe").open("rb") as executable:
+            for block in iter(lambda: executable.read(1024 * 1024), b""):
+                hasher.update(block)
+        checksum = hasher.hexdigest()
         if checksum.lower() != str(info.get("game_exe_sha256", "")).lower():
             raise RuntimeError("Native Rust game SHA-256 is wrong: rebuild; do not bundle.")
         if info.get("engine_license") != "MIT":
