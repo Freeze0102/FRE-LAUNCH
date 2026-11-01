@@ -222,7 +222,8 @@ fn verify_native_client(root: &Path) -> Result<(), String> {
 
 fn ready(root: &Path) -> RustRuntime {
     let (client, resources) = runtime_files(root);
-    let installed = client.is_file();
+    let installed = client.is_file() && root.join("BUILD-INFO.json").is_file()
+        && root.join("research-lock.json").is_file();
     let prepared = resources.join("horizon-resources.json").is_file();
     let reason = if !installed {
         Some("The FRE LAUNCH Rust game was not included in this installer. Build and bundle the native client first.".into())
