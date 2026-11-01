@@ -179,7 +179,10 @@ def verify(root):
             'Builder::new("fre-rust")', "async fn rust_create_profile",
             "async fn rust_launch", "async fn rust_profiles", "async fn rust_runtime",
             "async fn rust_logs", '"fre-rust-client.exe"', 'Command::new(client)',
-            '"--resources"', '"--home"', "profile_id_valid", "read_profile",
+            '"--resources"', '"--home"', '"--game-dir"', '"--session-stdin"',
+            "Credentials::get_default_credential", "online_profile_fresh",
+            "verify_native_client", "Sha256::new", "RUNNING_PROFILES",
+            "profile_id_valid", "read_profile",
         ]),
         (rust_panel, [
             "plugin:fre-rust|rust_create_profile", "plugin:fre-rust|rust_launch",
@@ -206,6 +209,18 @@ def verify(root):
         "fre-rust.library.title", "fre-rust.library.play", "fre-rust.library.error",
     ):
         assert key in app_uk and key in app_en, f"FRE Rust localization missing: {key}"
+    # Runtime is either entirely absent (Play remains disabled) or a
+    # complete private local installation. Never silently ship half a game.
+    rust_bundle=json.loads((root/"apps/app/tauri.conf.json").read_text(encoding="utf-8"))["bundle"]
+    rust_mapping=rust_bundle.get("resources", {})
+    runtime_source=Path(__file__).resolve().parent/"fre-rust-runtime"
+    if runtime_source.is_dir():
+        assert rust_mapping["fre-rust-runtime/BUILD-INFO.json"] == "fre-rust/BUILD-INFO.json"
+        assert rust_mapping["fre-rust-runtime/fre-rust-client.exe"] == "fre-rust/fre-rust-client.exe"
+        assert rust_mapping["fre-rust-runtime/resources/"] == "fre-rust/resources/"
+    else:
+        assert "fre-rust-runtime/fre-rust-client.exe" not in rust_mapping
+
     # Old plugin and its binary must not be compiled or included in the output.
     assert not (root/"apps/app/src/api/horizon.rs").exists()
     assert not (root/"apps/app-frontend/src/components/ui/HorizonRustPanel.vue").exists()
