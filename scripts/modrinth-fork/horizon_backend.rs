@@ -76,8 +76,10 @@ fn parse_status(instances: &str, versions: &str, detail: &str) -> Result<Horizon
         .map_err(|_| "Horizon did not return an instance list. Use launcher 0.2.33 or newer.")?;
     let mut parsed = Vec::new();
     for row in rows {
-        // Java instances managed by Horizon are a separate path, never mistaken for Rust ones.
-        if row.get("kind").and_then(|v| v.as_str()) == Some("java") || !row["java"].is_null() { continue; }
+        // Only the standard and independent Rust profiles have standalone
+        // directories. Java and pack/port profiles need different launch paths.
+        if !matches!(row.get("kind").and_then(|v| v.as_str()), Some("default" | "own"))
+            || !row["java"].is_null() { continue; }
         let instance: HorizonInstance = serde_json::from_value(row).map_err(|e| e.to_string())?;
         validate_name(&instance.id)?;
         parsed.push(instance);
