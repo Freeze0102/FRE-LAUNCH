@@ -19,6 +19,7 @@ const MAX_METADATA: u64 = 8192;
 // Creation must be serialized: two simultaneous requests cannot create
 // duplicate visible profile names or compete for the same metadata.
 static PROFILE_CREATION: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+static RUNNING_PROFILES: tokio::sync::Mutex<Vec<String>> = tokio::sync::Mutex::const_new(Vec::new());
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -306,15 +307,43 @@ async fn rust_launch<R: tauri::Runtime>(
         .kill_on_drop(false);
     #[cfg(windows)]
     cmd.creation_flags(0x08000000);
-    let mut child = cmd.spawn().map_err(|e| format!("Could not start Rust Minecraft: {e}"))?;
-    let mut stdin = child.stdin.take().ok_or("Could not open the Minecraft session pipe.")?;
-    if let Err(err) = stdin.write_all(&session_bytes).await {
+    // Two simultaneous launches of one game directory can corrupt a saved
+    // world. Reject duplicate launches from this FRE LAUNCH process.
+    {
+        let mut running = RUNNING_PROFILES.lock().await;
+        if running.contains(&profile_id) {
+            return Err("This Rust Minecraft profile is already running.".into());
+        }
+        running.push(profile_id.clone());
+    }
+    let mut child = match cmd.spawn() {
+        Ok(child) => child,
+        Err(error) => {
+            RUNNING_PROFILES.lock().await.retain(|id| id != &profile_id);
+            return Err(format!("Could not start Rust Minecraft: {error}"));
+        }
+    };
+    let mut stdin = match child.stdin.take() {
+        Some(stdin) => stdin,
+        None => {
+            let _ = child.kill().await;
+            RUNNING_PROFILES.lock().await.retain(|id| id != &profile_id);
+            return Err("Could not open the private Minecraft session pipe.".into());
+        }
+    };
+    if let Err(error) = stdin.write_all(&session_bytes).await {
         let _ = child.kill().await;
-        return Err(format!("Could not securely hand the Minecraft account to the Rust game: {err}"));
+        RUNNING_PROFILES.lock().await.retain(|id| id != &profile_id);
+        return Err(format!("Could not securely hand the Minecraft account to the Rust game: {error}"));
     }
     drop(stdin);
     let pid = child.id().unwrap_or_default();
-    let mut task = tokio::spawn(async move { child.wait().await });
+    let active_id = profile_id.clone();
+    let mut task = tokio::spawn(async move {
+        let result = child.wait().await;
+        RUNNING_PROFILES.lock().await.retain(|id| id != &active_id);
+        result
+    });
     match tokio::time::timeout(Duration::from_millis(1200), &mut task).await {
         Ok(result) => {
             let status = result.map_err(|e| e.to_string())?.map_err(|e| e.to_string())?;
