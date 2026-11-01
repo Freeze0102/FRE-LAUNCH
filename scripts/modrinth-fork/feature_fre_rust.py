@@ -42,7 +42,7 @@ def apply(root: Path):
     new = '''            .plugin(
                 "fre-rust",
                 InlinedPlugin::new()
-                    .commands(&["rust_profiles", "rust_create_profile", "rust_runtime", "rust_launch", "rust_logs"])
+                    .commands(&["rust_profiles", "rust_create_profile", "rust_runtime", "rust_import_resources", "rust_launch", "rust_logs"])
                     .default_permission(DefaultPermissionRule::AllowAllCommands),
             )'''
     exactly(build, old, new)
@@ -101,9 +101,7 @@ def apply(root: Path):
     # in the UI, NEVER a fake Play button.
     runtime = here / "fre-rust-runtime"
     binaries = ("fre-rust-client.exe", "research-lock.json", "LICENSE.txt")
-    valid = all((runtime / f).is_file() for f in binaries) and (
-        runtime / "resources/horizon-resources.json"
-    ).is_file() and (runtime / "BUILD-INFO.json").is_file()
+    valid = all((runtime / f).is_file() for f in binaries) and (runtime / "BUILD-INFO.json").is_file()
     if valid:
         # These may be private Minecraft resources. Prevent symlink escapes
         # and detect incomplete, edited or mismatched native builds before
@@ -136,9 +134,14 @@ def apply(root: Path):
             raise RuntimeError("Unexpected Tauri bundle.resources configuration.")
         for file in binaries + ("BUILD-INFO.json",):
             resources[f"fre-rust-runtime/{file}"] = f"fre-rust/{file}"
-        resources["fre-rust-runtime/resources/"] = "fre-rust/resources/"
+        # PUBLIC releases carry the MIT engine only. Mojang resources are
+        # imported locally by the authenticated owner after installation.
+        if (runtime / "resources/horizon-resources.json").is_file():
+            resources["fre-rust-runtime/resources/"] = "fre-rust/resources/"
+        elif (runtime / "resources").exists():
+            raise RuntimeError("Incomplete private Minecraft resource set.")
         conf.write_text(json.dumps(settings, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-        print("Bundled native FRE LAUNCH Rust engine and local Minecraft resources.")
+        print("Bundled native FRE LAUNCH Rust engine; private resources stay on the user's PC.")
     else:
         if runtime.exists():
             raise RuntimeError("Incomplete fre-rust-runtime staging; run BUILD-FRE-RUST.ps1 again.")
