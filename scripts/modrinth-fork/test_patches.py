@@ -18,6 +18,28 @@ TEMP_ROOT.mkdir(exist_ok=True)
 
 
 class PatchTests(unittest.TestCase):
+    def test_frontend_fixes_are_transactional(self):
+        import feature_frontend_types
+        with tempfile.TemporaryDirectory(dir=TEMP_ROOT, prefix='test-frontend-drift-') as directory:
+            root = Path(directory)
+            (root / 'source.ts').write_text('original', encoding='utf-8')
+            fixes = [
+                {'path': 'source.ts', 'old': 'original', 'new': 'changed', 'count': 1},
+                {'path': 'source.ts', 'old': 'missing', 'new': 'wrong', 'count': 1},
+            ]
+            with patch.object(feature_frontend_types.json, 'loads', return_value=fixes):
+                with self.assertRaisesRegex(RuntimeError, 'anchor drift'):
+                    feature_frontend_types.apply(root)
+            self.assertEqual((root / 'source.ts').read_text(), 'original')
+
+    def test_frontend_fixes_cannot_escape_source(self):
+        import feature_frontend_types
+        with tempfile.TemporaryDirectory(dir=TEMP_ROOT, prefix='test-frontend-path-') as directory:
+            fixes = [{'path': '../outside.ts', 'old': 'x', 'new': 'y', 'count': 1}]
+            with patch.object(feature_frontend_types.json, 'loads', return_value=fixes):
+                with self.assertRaisesRegex(RuntimeError, 'escaped'):
+                    feature_frontend_types.apply(Path(directory))
+
     def test_wrong_revision_rejected_without_mutation(self):
         with tempfile.TemporaryDirectory(dir=TEMP_ROOT, prefix='test-pin-') as directory:
             root = Path(directory)

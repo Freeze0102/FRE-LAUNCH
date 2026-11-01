@@ -266,6 +266,7 @@ def customize(root,revision):
     from feature_curseforge import apply as add_curseforge_source
     from feature_horizon import apply as add_horizon_client
     from feature_updates import apply as add_signed_updates
+    from feature_frontend_types import apply as fix_frontend_types
     add_local_accounts(root)
     guard_offline_skins(root)
     add_offline_skin_support(root)
@@ -279,6 +280,7 @@ def customize(root,revision):
     add_horizon_client(root)
     finish_ukrainian(root)
     add_signed_updates(root)
+    fix_frontend_types(root)
     patch_cargo_lock(root)
     # Publish the completion marker only after every patch succeeds.
     marker.write_text(fork_notice, encoding="utf-8")

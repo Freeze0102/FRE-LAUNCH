@@ -2,7 +2,8 @@
 # No GitHub Actions, no new branches. This script never changes the legacy game files.
 param(
     [switch]$BuildWindows,
-    [switch]$RunDev
+    [switch]$RunDev,
+    [string]$PythonExe = $env:FRE_LAUNCH_PYTHON
 )
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -11,7 +12,26 @@ $upstream = Join-Path $projectRoot 'vendor\modrinth'
 $destination = Join-Path $projectRoot 'FRE-Modrinth-Source'
 $converter = Join-Path $projectRoot 'scripts\modrinth-fork\prepare.py'
 if (-not (Test-Path $converter)) { throw 'Full FRE LAUNCH repository not found.' }
-Get-Command py -ErrorAction Stop | Out-Null
+$pythonCommand = $null
+$pythonArguments = @()
+$pythonCandidates = if ($PythonExe) {
+    @(@{ Command = $PythonExe; Arguments = @() })
+} else {
+    @(@{ Command = 'py'; Arguments = @('-3') }, @{ Command = 'python'; Arguments = @() })
+}
+foreach ($candidate in $pythonCandidates) {
+    try {
+        $candidateCommand = (Get-Command $candidate.Command -ErrorAction Stop).Source
+        $candidateArguments = $candidate.Arguments
+        $pythonMajor = & $candidateCommand @candidateArguments -c 'import sys; print(sys.version_info.major)' 2>$null
+        if ($LASTEXITCODE -eq 0 -and "$pythonMajor".Trim() -eq '3') {
+            $pythonCommand = $candidateCommand
+            $pythonArguments = $candidateArguments
+            break
+        }
+    } catch { }
+}
+if (-not $pythonCommand) { throw 'Working Python 3 not found. Install Python 3 or pass -PythonExe PATH_TO_PYTHON.exe.' }
 if ($BuildWindows -and $RunDev) { throw 'Choose either -BuildWindows or -RunDev.' }
 if ($BuildWindows -or $RunDev) {
     Get-Command node -ErrorAction Stop | Out-Null
@@ -41,11 +61,15 @@ $requiredSourceFiles = @(
     'apps\app\src\fre_update_policy.rs',
     'apps\app\src\fre_update_channel.rs',
     'apps\app-frontend\src\helpers\fre-app-updater.ts',
+    'apps\app-frontend\src\fre-compat.d.ts',
+    'packages\ui\src\utils\fre-query-options.ts',
     'pnpm-workspace.yaml',
     'pnpm-lock.yaml'
 )
 $patchNames = @('prepare.py','feature_local_accounts.py','feature_ukrainian.py','feature_skin_notice.py','feature_offline_skins.py','feature_local_skin_preview.py','feature_ui_polish.py','feature_guest_launch.py','feature_java_nickname_lookup.py','feature_remove_modrinth_login.py','feature_brand_presence.py','feature_curseforge.py','curseforge_backend.rs','CurseForgeBrowser.vue','feature_horizon.py','horizon_backend.rs','HorizonRustPanel.vue','verify.py')
 $patchNames += @('feature_updates.py','fre-app-updater.ts','fre-update-ui.js','fre_update_policy.rs','fre_updater_impl.rs','fre-update-test.json')
+$patchNames += @('feature_frontend_types.py','frontend-type-fixes.json','fre-query-options.ts')
+$patchNames += @('fre-compat.d.ts')
 $signature = ($revision + ':' + (($patchNames | ForEach-Object {
     $sourceFile = Join-Path $projectRoot ('scripts\modrinth-fork\' + $_)
     if (-not (Test-Path $sourceFile)) { throw "Missing source patcher: $sourceFile" }
@@ -79,7 +103,6 @@ if (Test-Path $destination) {
 }
 if (-not (Test-Path $destination)) {
 Get-Command git -ErrorAction Stop | Out-Null
-Get-Command py -ErrorAction Stop | Out-Null
 Write-Host 'Fetching pinned original Modrinth source...' -ForegroundColor Cyan
 $gitDirectory = Join-Path $projectRoot '.git'
 if (Test-Path $gitDirectory) {
@@ -110,9 +133,9 @@ Write-Host 'Copying upstream desktop source without modifying your old launcher.
 Copy-Item -Path $upstream -Destination $destination -Recurse -Force
 $copiedGit = Join-Path $destination '.git'
 if (Test-Path $copiedGit) { Remove-Item $copiedGit -Force -Recurse }
-py -3 -m pip install 'Pillow>=11,<13'
+& $pythonCommand @pythonArguments -m pip install 'Pillow>=11,<13'
 if ($LASTEXITCODE -ne 0) { throw 'Pillow dependency installation failed.' }
-py -3 "$converter" "$destination" --upstream-sha $revision
+& $pythonCommand @pythonArguments "$converter" "$destination" --upstream-sha $revision
 if ($LASTEXITCODE -ne 0) { throw 'Customization failed, source remains in FRE-Modrinth-Source for inspection.' }
 }
 $missingPreparedFiles = @($requiredSourceFiles | Where-Object {
@@ -122,7 +145,7 @@ if ($missingPreparedFiles.Count -gt 0) {
     throw ("Pinned source copy is incomplete after preparation: " + ($missingPreparedFiles -join ', '))
 }
 Write-Host 'Verifying nickname auth, locale coverage and app identity...' -ForegroundColor Cyan
-py -3 "$projectRoot\scripts\modrinth-fork\verify.py" "$destination"
+& $pythonCommand @pythonArguments "$projectRoot\scripts\modrinth-fork\verify.py" "$destination"
 if ($LASTEXITCODE -ne 0) { throw 'FRE LAUNCH verification failed; refusing Windows compilation.' }
 Set-Content -LiteralPath $signaturePath -Value $signature -Encoding UTF8
 
@@ -137,7 +160,7 @@ if ($BuildWindows -or $RunDev) {
         # If an importer is missing, regenerate the incomplete source checkout
         # instead of silently rewriting the dependency graph.
         Write-Host 'Installing pinned workspace dependencies...' -ForegroundColor Cyan
-        pnpm.cmd install --frozen-lockfile
+        pnpm.cmd --filter '@modrinth/app...' install --frozen-lockfile
         if ($LASTEXITCODE -ne 0) { throw 'pnpm install failed' }
         $missingAfterPnpm = @($requiredSourceFiles | Where-Object {
             -not (Test-Path -LiteralPath (Join-Path $destination $_) -PathType Leaf)

@@ -1,0 +1,1340 @@
+[
+  {
+    "path": "packages/ui/src/providers/web-notifications.ts",
+    "old": "handleError = (error: Error): void => {",
+    "new": "handleError = (error: unknown): void => {",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/providers/web-notifications.ts",
+    "old": "text: error.message ?? error,",
+    "new": "text: error instanceof Error ? error.message\n\t\t\t\t: error && typeof error === 'object' && 'message' in error && typeof error.message === 'string'\n\t\t\t\t\t? error.message : String(error),",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/base/Toggle.vue",
+    "old": "defineModel<boolean>()",
+    "new": "defineModel<boolean>({ default: false })",
+    "count": 1
+  },
+  {
+    "path": "packages/api-client/src/features/auth.ts",
+    "old": "declare protected config: AuthConfig",
+    "new": "declare protected config: AuthConfig\n\n\tconstructor(config: AuthConfig) {\n\t\tsuper(config)\n\t}",
+    "count": 1
+  },
+  {
+    "path": "packages/api-client/src/features/node-auth.ts",
+    "old": "declare protected config: NodeAuthConfig",
+    "new": "declare protected config: NodeAuthConfig\n\n\tconstructor(config: NodeAuthConfig) {\n\t\tsuper(config)\n\t}",
+    "count": 1
+  },
+  {
+    "path": "packages/utils/users.ts",
+    "old": "// noinspection JSUnusedGlobalSymbols",
+    "new": "import type { Labrinth } from '@modrinth/api-client'\n\n// noinspection JSUnusedGlobalSymbols",
+    "count": 1
+  },
+  {
+    "path": "packages/utils/users.ts",
+    "old": "getUserLink = (user)",
+    "new": "getUserLink = (user: Pick<Labrinth.Users.v2.User, 'username'>)",
+    "count": 1
+  },
+  {
+    "path": "packages/utils/users.ts",
+    "old": "isStaff = (user)",
+    "new": "isStaff = (user: Pick<Labrinth.Users.v2.User, 'role'> | null | undefined)",
+    "count": 1
+  },
+  {
+    "path": "packages/utils/users.ts",
+    "old": "isAdmin = (user)",
+    "new": "isAdmin = (user: Pick<Labrinth.Users.v2.User, 'role'> | null | undefined)",
+    "count": 1
+  },
+  {
+    "path": "packages/utils/users.ts",
+    "old": "(userId) =>",
+    "new": "(userId: string) =>",
+    "count": 2
+  },
+  {
+    "path": "packages/utils/projects.ts",
+    "old": "const isApproved = (project)",
+    "new": "const isApproved = (project: { status: string } | null | undefined)",
+    "count": 1
+  },
+  {
+    "path": "packages/utils/projects.ts",
+    "old": "const isListed = (project)",
+    "new": "const isListed = (project: { status: string } | null | undefined)",
+    "count": 1
+  },
+  {
+    "path": "packages/utils/projects.ts",
+    "old": "const isUnlisted = (project)",
+    "new": "const isUnlisted = (project: { status: string } | null | undefined)",
+    "count": 1
+  },
+  {
+    "path": "packages/utils/projects.ts",
+    "old": "const isPrivate = (project)",
+    "new": "const isPrivate = (project: { status: string } | null | undefined)",
+    "count": 1
+  },
+  {
+    "path": "packages/utils/projects.ts",
+    "old": "const isRejected = (project)",
+    "new": "const isRejected = (project: { status: string } | null | undefined)",
+    "count": 1
+  },
+  {
+    "path": "packages/utils/projects.ts",
+    "old": "const isUnderReview = (project)",
+    "new": "const isUnderReview = (project: { status: string } | null | undefined)",
+    "count": 1
+  },
+  {
+    "path": "packages/utils/projects.ts",
+    "old": "const isDraft = (project)",
+    "new": "const isDraft = (project: { status: string } | null | undefined)",
+    "count": 1
+  },
+  {
+    "path": "packages/utils/projects.ts",
+    "old": "const showDownloadCount = (project)",
+    "new": "const showDownloadCount = (project: { status: string } | null | undefined)",
+    "count": 1
+  },
+  {
+    "path": "packages/utils/projects.ts",
+    "old": "getVersionsToDisplay(project,",
+    "new": "getVersionsToDisplay(project: { game_versions: string[] },",
+    "count": 1
+  },
+  {
+    "path": "packages/utils/projects.ts",
+    "old": "allVersions.reduce((map, gameVersion, index)",
+    "new": "allVersions.reduce<Record<string, number>>((map, gameVersion, index)",
+    "count": 1
+  },
+  {
+    "path": "packages/utils/types.ts",
+    "old": "export type ProjectType =\n\t| 'mod'",
+    "new": "export type ProjectType =\n\t| 'server'\n\t| 'mod'",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/providers/content-manager.ts",
+    "old": "\n\ttype UploadState,",
+    "new": "",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/index.ts",
+    "old": "export * from './src/utils'",
+    "new": "export * from './src/utils'\nexport { ServerModpackContent } from './src/components/project/server'\nexport type { TooltipDirective } from './src/providers/tooltip'\nexport type { UploadState } from '@modrinth/api-client'\nexport { getCompatibleLoaderAliases, normalizeLoaderAlias } from './src/utils/version-compatibility'",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/providers/index.ts",
+    "old": "export * from './web-notifications'",
+    "new": "export * from './web-notifications'\nexport type { AuthUser } from './auth'",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/helpers/analytics.ts",
+    "old": "\tInstanceRemoveIcon: Record<string, never>",
+    "new": "\tInstanceRemoveIcon: Record<string, never>\n\tInstanceCreateIcon: Record<string, never>\n\tInstanceEditCreatedIcon: Record<string, never>\n\tInstanceSaveCreatedIcon: Record<string, never>\n\tInstanceRemove: InstanceProperties",
+    "count": 1
+  },
+  {
+    "path": "packages/utils/parse.ts",
+    "old": "onIgnoreTagAttr: (tag, name, value)",
+    "new": "onIgnoreTagAttr: (tag: string, name: string, value: string)",
+    "count": 1
+  },
+  {
+    "path": "packages/utils/parse.ts",
+    "old": "safeAttrValue(tag, name, value, cssFilter) {",
+    "new": "safeAttrValue(tag: string, name: string, value: string, cssFilter: Parameters<typeof safeAttrValue>[3]) {",
+    "count": 1
+  },
+  {
+    "path": "packages/utils/highlightjs/index.ts",
+    "old": "renderHighlightedString = (string)",
+    "new": "renderHighlightedString = (string: string)",
+    "count": 1
+  },
+  {
+    "path": "packages/utils/highlightjs/index.ts",
+    "old": "highlight(str, lang)",
+    "new": "highlight(str: string, lang: string)",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/base/ScrollablePanel.vue",
+    "old": "const scrollablePane = ref(null)",
+    "new": "const scrollablePane = ref<HTMLDivElement | null>(null)",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/base/ScrollablePanel.vue",
+    "old": "let resizeObserver",
+    "new": "let resizeObserver: ResizeObserver | undefined",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/base/ScrollablePanel.vue",
+    "old": "resizeObserver.observe(scrollablePane.value)",
+    "new": "if (scrollablePane.value) resizeObserver.observe(scrollablePane.value)",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/base/ScrollablePanel.vue",
+    "old": "function updateFade(scrollTop, offsetHeight, scrollHeight)",
+    "new": "function updateFade(scrollTop: number, offsetHeight: number, scrollHeight: number)",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/base/ScrollablePanel.vue",
+    "old": "function onScroll({ target: { scrollTop, offsetHeight, scrollHeight } }) {\n\tupdateFade(scrollTop, offsetHeight, scrollHeight)\n}",
+    "new": "function onScroll(event: Event) {\n\tif (event.currentTarget instanceof HTMLElement) {\n\t\tconst { scrollTop, offsetHeight, scrollHeight } = event.currentTarget\n\t\tupdateFade(scrollTop, offsetHeight, scrollHeight)\n\t}\n}",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/composables/useJavaTest.ts",
+    "old": "success: javaTestResult.value",
+    "new": "success: javaTestResult.value === true",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/features/instances/settings-modal/hooks-settings.vue",
+    "old": "const globalSettings = (await get().catch(handleError)) as AppSettings",
+    "new": "const globalSettings = await get()",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/features/instances/settings-modal/window-settings.vue",
+    "old": "const globalSettings = (await get().catch(handleError)) as AppSettings",
+    "new": "const globalSettings = await get()",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/layouts/wrapped/settings/language-settings/language-settings-selector.vue",
+    "old": "'fuse.js/dist/fuse.basic'",
+    "new": "'fuse.js'",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/pages/instance/share/index.vue",
+    "old": "auth.isReady.value",
+    "new": "auth.isReady?.value",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/helpers/game-options.ts",
+    "old": "import { queryOptions } from '@tanstack/vue-query'",
+    "new": "import { queryOptions } from '@modrinth/ui/src/utils/fre-query-options'",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/helpers/settings.ts",
+    "old": "import { queryOptions } from '@tanstack/vue-query'",
+    "new": "import { queryOptions } from '@modrinth/ui/src/utils/fre-query-options'",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/helpers/synced-options.ts",
+    "old": "import { queryOptions } from '@tanstack/vue-query'",
+    "new": "import { queryOptions } from '@modrinth/ui/src/utils/fre-query-options'",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/helpers/synced-packs.ts",
+    "old": "import { queryOptions } from '@tanstack/vue-query'",
+    "new": "import { queryOptions } from '@modrinth/ui/src/utils/fre-query-options'",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/components/ui/world/queries.ts",
+    "old": "import { queryOptions } from '@tanstack/vue-query'",
+    "new": "import { queryOptions } from '@modrinth/ui/src/utils/fre-query-options'",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/features/news/queries.ts",
+    "old": "import { queryOptions } from '@tanstack/vue-query'",
+    "new": "import { queryOptions } from '@modrinth/ui/src/utils/fre-query-options'",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/pages/instance/query-options.ts",
+    "old": "import { queryOptions } from '@tanstack/vue-query'",
+    "new": "import { queryOptions } from '@modrinth/ui/src/utils/fre-query-options'",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/base/Avatar.vue",
+    "old": "function onError(e)",
+    "new": "function onError(e: Event)",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/base/Admonition.vue",
+    "old": "? buttonColors[type] === 'medal-promo'\n\t\t\t\t\t\t\t? 'medal_promotion'\n\t\t\t\t\t\t\t: buttonColors[type]",
+    "new": "? buttonColors[type]",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/nav/NotificationPanel.vue",
+    "old": "? button.color === 'medal-promo'\n\t\t\t\t\t\t\t\t\t\t\t\t? 'medal_promotion'\n\t\t\t\t\t\t\t\t\t\t\t\t: button.color",
+    "new": "? button.color",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/skin/skin-preview-shader.ts",
+    "old": "THREE.Shader",
+    "new": "Parameters<THREE.MeshStandardMaterial['onBeforeCompile']>[0]",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/utils/auto-icons.ts",
+    "old": "minecraft_java_server: ServerIcon",
+    "new": "server: ServerIcon",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/utils/tag-messages.ts",
+    "old": "export function getTagMessage(",
+    "new": "function lookupMessage(messages: Record<string, MessageDescriptor>, key: string): MessageDescriptor | undefined {\n\treturn Object.hasOwn(messages, key) ? messages[key] : undefined\n}\n\nexport function getTagMessage(",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/utils/tag-messages.ts",
+    "old": "loaderMessages[tag]",
+    "new": "lookupMessage(loaderMessages, tag)",
+    "count": 2
+  },
+  {
+    "path": "packages/ui/src/utils/tag-messages.ts",
+    "old": "categoryMessages[tag]",
+    "new": "lookupMessage(categoryMessages, tag)",
+    "count": 2
+  },
+  {
+    "path": "packages/ui/src/utils/tag-messages.ts",
+    "old": "categoryHeaderMessages[header]",
+    "new": "lookupMessage(categoryHeaderMessages, header)",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/helpers/instance.ts",
+    "old": "editInstance: Partial<GameInstance>",
+    "new": "editInstance: Partial<{ [Key in keyof GameInstance]: GameInstance[Key] | null }>",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/base/Table.vue",
+    "old": "T extends Record<string, unknown> = Record<K, unknown>",
+    "new": "T extends Partial<Record<K, unknown>> = Record<K, unknown>",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/features/instances/settings-modal/java-settings.vue",
+    "old": "const globalSettings = (await get().catch(handleError)) as unknown as AppSettings",
+    "new": "const globalSettings = await get()",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/features/instances/settings-modal/java-settings.vue",
+    "old": "const optimalJava = readonly(await get_optimal_jre_key(instance.value.id).catch(handleError))",
+    "new": "const optimalJava = await get_optimal_jre_key(instance.value.id).catch((error) => { handleError(error); return null })",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/features/instances/settings-modal/java-settings.vue",
+    "old": "'--legacy-button-color':\n\t\t\t\t\t\t\t\t\t\t\t(overrideJavaInstall && !hoveringTest && !testingJava\n\t\t\t\t\t\t\t\t\t\t\t\t? javaTestResult === true\n\t\t\t\t\t\t\t\t\t\t\t\t\t? 'green'\n\t\t\t\t\t\t\t\t\t\t\t\t\t: 'red'\n\t\t\t\t\t\t\t\t\t\t\t\t: 'standard') &&\n\t\t\t\t\t\t\t\t\t\t\t(overrideJavaInstall && !hoveringTest && !testingJava\n\t\t\t\t\t\t\t\t\t\t\t\t? javaTestResult === true\n\t\t\t\t\t\t\t\t\t\t\t\t\t? 'green'\n\t\t\t\t\t\t\t\t\t\t\t\t\t: 'red'\n\t\t\t\t\t\t\t\t\t\t\t\t: 'standard') !== 'standard'\n\t\t\t\t\t\t\t\t\t\t\t\t? `var(--color-${\n\t\t\t\t\t\t\t\t\t\t\t\t\t\toverrideJavaInstall && !hoveringTest && !testingJava\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t? javaTestResult === true\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t? 'green'\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t: 'red'\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t: 'standard'\n\t\t\t\t\t\t\t\t\t\t\t\t\t})`\n\t\t\t\t\t\t\t\t\t\t\t\t: undefined,",
+    "new": "'--legacy-button-color': overrideJavaInstall && !hoveringTest && !testingJava\n\t\t\t\t\t\t\t\t\t\t\t? (javaTestResult === true ? 'green' : 'red') : 'standard',",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/features/settings/display/behavior-settings.vue",
+    "old": "} = useSavable(",
+    "new": "} = useSavable<ReturnType<typeof getBehaviorSettingsState>>(",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/features/settings/display/features-settings.vue",
+    "old": "} = useSavable(",
+    "new": "} = useSavable<ReturnType<typeof getFeaturesSettingsState>>(",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/features/updates/new-update-modal/use-notification.ts",
+    "old": "const notification = popupNotificationManager.addPopupNotification(",
+    "new": "const notification: PopupNotification = popupNotificationManager.addPopupNotification(",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/components/ui/modal/InstallToPlayModal.vue",
+    "old": "const version = await get_version(versionId, 'bypass')",
+    "new": "const version: Labrinth.Versions.v2.Version | null = await get_version(versionId, 'bypass')",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/components/ui/modal/InstallToPlayModal.vue",
+    "old": "const serverProjectId = project.value?.id\n\tstartInstallingServer",
+    "new": "const serverProjectId = project.value?.id\n\tif (!serverProjectId) return\n\tstartInstallingServer",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/components/ui/modal/InstallToPlayModal.vue",
+    "old": "\t\t\t\treturn {\n\t\t\t\t\tfile_name:",
+    "new": "\t\t\t\treturn {\n\t\t\t\t\tid: dep.version_id ?? dep.project_id ?? dep.file_name ?? 'unknown',\n\t\t\t\t\tfile_name:",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/components/ui/modal/ShareModalWrapper.vue",
+    "old": "const modal = ref(null)",
+    "new": "const modal = ref<InstanceType<typeof ShareModal> | null>(null)",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/components/ui/modal/ShareModalWrapper.vue",
+    "old": "show: (passedContent)",
+    "new": "show: (passedContent: Parameters<InstanceType<typeof ShareModal>['show']>[0])",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/components/ui/modal/ShareModalWrapper.vue",
+    "old": "modal.value.show",
+    "new": "modal.value?.show",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/components/ui/modal/ShareModalWrapper.vue",
+    "old": "modal.value.hide()",
+    "new": "modal.value?.hide()",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/base/Chips.vue",
+    "old": "// Intentional any type, as this default should only be used for primitives (string or number)\n\t\tformatLabel: (item) => item.toString(),",
+    "new": "formatLabel: (item: T) => String(item),",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/modal/NewModal.vue",
+    "old": "if (event.metaKey || event.altKey || event.ctrlKey)",
+    "new": "if ('metaKey' in event && (event.metaKey || event.altKey || event.ctrlKey))",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/modal/NewModal.vue",
+    "old": "focusVisible: inputModality.keyboard",
+    "new": "",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/modal/NewModal.vue",
+    "old": "active?.compareDocumentPosition(first)",
+    "new": "(active?.compareDocumentPosition(first) ?? 0)",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/modal/NewModal.vue",
+    "old": "active?.compareDocumentPosition(last)",
+    "new": "(active?.compareDocumentPosition(last) ?? 0)",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/composables/hosting/kyros-session-upload.ts",
+    "old": "let uploadHandle: { cancel: () => void } | null = null",
+    "new": "let uploadHandle: ReturnType<typeof options.client.kyros.upload_sessions_v1.uploadFiles> | null = null",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/composables/server-manage-core-runtime.ts",
+    "old": "{ event: 'log', ...data }",
+    "new": "{ ...data }",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/composables/server-manage-core-runtime.ts",
+    "old": "{ event: 'log4j', ...data }",
+    "new": "{ ...data }",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/layouts/shared/installation-settings/components/ContentDiffModal.vue",
+    "old": "commonMessages.confirmButton",
+    "new": "commonMessages.confirm",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/base/Table.vue",
+    "old": "T extends Partial<Record<K, unknown>> = Record<K, unknown>",
+    "new": "T extends object = Record<K, unknown>",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/base/Table.vue",
+    "old": "row[column.key]",
+    "new": "row[column.key as keyof T]",
+    "count": 4
+  },
+  {
+    "path": "packages/ui/src/components/search/SearchSidebarFilter.vue",
+    "old": "default: [],",
+    "new": "default: () => [],",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/utils/search.ts",
+    "old": "display: 'all' | 'scrollable' | 'none' | 'depends-on-project'",
+    "new": "display: 'all' | 'scrollable' | 'none' | 'depends-on-project' | 'toggle'",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/external_files/AddToExistingExternalProjectModal.vue",
+    "old": "from './types.ts'",
+    "new": "from './external-project-utils'",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/external_files/AddToGlobalPermissionsDatabaseModal.vue",
+    "old": "from './types.ts'",
+    "new": "from './external-project-utils'",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/external_files/ExternalProjectLicenseStateTag.vue",
+    "old": "from './types.ts'",
+    "new": "from './external-project-utils'",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/external_files/ExternalProjectLookupCard.vue",
+    "old": "from './types.ts'",
+    "new": "from './external-project-utils'",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/external_files/index.ts",
+    "old": "from './types.ts'",
+    "new": "from './external-project-utils'",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/project/settings/environment/EnvironmentSelector.vue",
+    "old": "type SubOptionKey = ValidKeys<",
+    "new": "type ValidKeys<T> = T extends unknown ? keyof T : never\ntype SubOptionKey = ValidKeys<",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/servers/access/AccessTable.vue",
+    "old": "import { computed, onMounted, onUnmounted, ref } from 'vue'",
+    "new": "import { type Component, computed, onMounted, onUnmounted, ref } from 'vue'",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/composables/use-loading-bar-token.ts",
+    "old": "loadingState.end(token)",
+    "new": "loadingState?.end(token)",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/providers/tooltip.ts",
+    "old": "modifiers: Record<string, boolean>",
+    "new": "modifiers: Partial<Record<string, boolean>>",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/layouts/shared/browse-tab/types.ts",
+    "old": "export interface BrowseInstallContext {\n\tname: string\n\tloader: string",
+    "new": "export interface BrowseInstallContext {\n\tname: string\n\tloader: string\n\tloaderVersion?: string",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/layouts/shared/files-tab/components/FileNavbar.vue",
+    "old": "$emit('update:searchQuery', $event)",
+    "new": "$emit('update:searchQuery', String($event))",
+    "count": 2
+  },
+  {
+    "path": "packages/ui/src/components/modal/ShareModal.vue",
+    "old": "defineExpose({\n\tshow,\n})",
+    "new": "defineExpose({\n\tshow,\n\thide: () => shareModal.value?.hide(),\n})",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/modal/NewModal.vue",
+    "old": "{ preventScroll: true,  }",
+    "new": "{ preventScroll: true }",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/components/ui/world/modal/AddServerModal.vue",
+    "old": "name: serverName,\n\t\t\ttype: 'server'",
+    "new": "name: serverName,\n\t\t\tdisplay_status: 'normal',\n\t\t\ttype: 'server'",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/helpers/friends.ts",
+    "old": "status?.profile_name",
+    "new": "status?.instance_name",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/pages/instance/layout.vue",
+    "old": "\n\t\tinstanceId.value = targetInstanceId",
+    "new": "",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/base/page-header/page-header-badge-item.vue",
+    "old": "\n\taction: undefined,",
+    "new": "",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/base/page-header/metadata/page-header-metadata-item.vue",
+    "old": "\n\taction: undefined,",
+    "new": "",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/project/ProjectPageVersions.vue",
+    "old": "\n\t\tversionLink: undefined,",
+    "new": "",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/billing/AddPaymentMethod.vue",
+    "old": "import { ref } from 'vue'",
+    "new": "import { ref } from 'vue'\nimport type Stripe from 'stripe'",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/billing/AddPaymentMethod.vue",
+    "old": "function handleError(error: Error) {\n\tprops.onError(error)",
+    "new": "function handleError(cause: unknown) {\n\tprops.onError(cause instanceof Error ? cause : new Error(String(cause)))",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/billing/AddPaymentMethod.vue",
+    "old": "const stripe = ref<StripsJs>()",
+    "new": "const stripe = ref<StripsJs | null>(null)",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/billing/AddPaymentMethod.vue",
+    "old": "stripe.value = await loadStripe(props.publishableKey)",
+    "new": "stripe.value = await loadStripe(props.publishableKey)\n\t\tif (!stripe.value) throw new Error('Stripe failed to load')",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/billing/AddPaymentMethod.vue",
+    "old": "emit('startLoading')\n\n\tconst result",
+    "new": "if (!stripe.value || !elements.value) return false\n\temit('startLoading')\n\n\tconst result",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/billing/AddPaymentMethod.vue",
+    "old": "} else if (!error) {\n\t\treturn true\n\t}\n}",
+    "new": "} else if (!error) {\n\t\treturn true\n\t}\n\treturn false\n}",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/features/friends/friends-list/section.vue",
+    "old": "(friend: FriendWithUserData) => Promise<void>",
+    "new": "(friend: FriendWithUserData) => void | Promise<void>",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/features/instances/settings-modal/general-settings.vue",
+    "old": "id: 'create',\n\t\t\t\t\t\t\t\taction:",
+    "new": "id: 'create',\n\t\t\t\t\t\t\t\tlabel: formatMessage(messages.createIcon),\n\t\t\t\t\t\t\t\taction:",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/components/ui/instance_settings/icon-editor-modal/index.vue",
+    "old": "content: formatMessage(option.name),",
+    "new": "text: formatMessage(option.name),",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/components/ui/instance_settings/icon-editor-modal/index.vue",
+    "old": "delay: { show: 500, hide: 0 },",
+    "new": "delay: 500,",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/components/ui/world/WorldItem.vue",
+    "old": "const incompatibleVersionTooltip = computed(() => ({\n\tcontent: `<span class=\"font-minecraft font-normal leading-5\">${autoToHTML(\n\t\tformatMessage(messages.incompatibleVersion, {\n\t\t\tversion: props.serverStatus?.version?.name ?? '',\n\t\t}),\n\t)}</span>`,\n\thtml: true,\n}))",
+    "new": "const incompatibleVersionTooltip = computed(() => formatMessage(messages.incompatibleVersion, {\n\tversion: props.serverStatus?.version?.name ?? '',\n}))",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/image-viewer-editor/controls.vue",
+    "old": "OverflowMenuOption",
+    "new": "ButtonMenuOption",
+    "count": 2
+  },
+  {
+    "path": "packages/ui/src/components/image-viewer-editor/use-image-editor.ts",
+    "old": "type FabricPointerEvent = {\n\te: MouseEvent | TouchEvent | PointerEvent\n\ttarget?: FabricObject\n\ttransform?: { corner?: string }\n}",
+    "new": "type FabricPointerEvent = import('fabric').TPointerEventInfo<import('fabric').TPointerEvent>",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/image-viewer-editor/use-image-editor.ts",
+    "old": "editorCanvas.on('path:created', ({ path }) => {",
+    "new": "editorCanvas.on('path:created', ({ path }) => {\n\t\t\tif (!fabric || !(path instanceof fabric.Path)) return",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/image-viewer-editor/use-image-editor.ts",
+    "old": "mergeClipPaths(object.clipPath, clipPath)",
+    "new": "mergeClipPaths(object.clipPath as FabricObject, clipPath)",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/composables/skin-rendering/use-ears-mod-features.ts",
+    "old": "return [image.width, image.height] as const",
+    "new": "if ('displayWidth' in image) return [image.displayWidth, image.displayHeight] as const\n\tif (image instanceof SVGImageElement) return [image.width.baseVal.value, image.height.baseVal.value] as const\n\treturn [image.width, image.height] as const",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/composables/skin-rendering/use-ears-mod-features.ts",
+    "old": "new ImageData(data, width, height)",
+    "new": "new ImageData(new Uint8ClampedArray(data), width, height)",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/layouts/shared/console/layout.vue",
+    "old": "!!(window as Record<string, unknown>).__TAURI_INTERNALS__",
+    "new": "'__TAURI_INTERNALS__' in window",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/layouts/shared/console/layout.vue",
+    "old": "function unwrapMaybeRef<T>(value: T | { value: T } | undefined): T | undefined {\n\tif (value === undefined) return undefined\n\treturn isRef(value) ? value.value : value\n}",
+    "new": "function unwrapMaybeRef<T>(value: T | { value: T } | undefined): T | undefined {\n\tif (value === undefined) return undefined\n\tif (typeof value === 'object' && value !== null && 'value' in value) return value.value\n\treturn value\n}",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/composables/use-server-image.ts",
+    "old": "computed, type ComputedRef, ref",
+    "new": "computed, type ComputedRef, type MaybeRefOrGetter, ref, toValue",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/composables/use-server-image.ts",
+    "old": "serverId: string,",
+    "new": "serverId: MaybeRefOrGetter<string>,",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/composables/use-server-image.ts",
+    "old": "['servers', 'detail', serverId, 'icon'",
+    "new": "['servers', 'detail', toValue(serverId), 'icon'",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/composables/use-server-image.ts",
+    "old": "return !!serverId &&",
+    "new": "return !!toValue(serverId) &&",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/composables/use-server-image.ts",
+    "old": "if (!serverId) return null",
+    "new": "if (!toValue(serverId)) return null",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/composables/use-server-image.ts",
+    "old": "getFilesystemAuth(serverId)",
+    "new": "getFilesystemAuth(toValue(serverId))",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/composables/stripe.ts",
+    "old": "const createElements = (options)",
+    "new": "const createElements = (options: import('@stripe/stripe-js').StripeElementsOptionsClientSecret)",
+    "count": 1
+  },
+  {
+    "path": "packages/utils/users.ts",
+    "old": "Pick<Labrinth.Users.v2.User, 'username'>",
+    "new": "{ username?: string | null; id?: string }",
+    "count": 1
+  },
+  {
+    "path": "packages/utils/users.ts",
+    "old": "${user.username}",
+    "new": "${user.username ?? user.id ?? ''}",
+    "count": 1
+  },
+  {
+    "path": "packages/utils/users.ts",
+    "old": "(userId: string) =>",
+    "new": "(userId: string | undefined) =>",
+    "count": 2
+  },
+  {
+    "path": "packages/utils/users.ts",
+    "old": "return OFFICIAL_ACCOUNT_IDS.includes(userId)",
+    "new": "return !!userId && OFFICIAL_ACCOUNT_IDS.includes(userId)",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/base/inputs/Input.vue",
+    "old": "mergeProps(controlAttrs(), inputAttrs ?? {})",
+    "new": "mergeProps(controlAttrs(), { ...inputAttrs })",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/base/inputs/DateInput.vue",
+    "old": "mergeProps(controlAttrs(), inputAttrs ?? {})",
+    "new": "mergeProps(controlAttrs(), { ...inputAttrs })",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/base/inputs/Textarea.vue",
+    "old": "mergeProps(controlAttrs(), inputAttrs ?? {})",
+    "new": "mergeProps(controlAttrs(), { ...inputAttrs })",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/base/Table.vue",
+    "old": "row[column.key as keyof T]",
+    "new": "getCellValue(row, column.key)",
+    "count": 4
+  },
+  {
+    "path": "packages/ui/src/components/base/Table.vue",
+    "old": "function getRowId(row: T)",
+    "new": "function getCellValue(row: T, key: string): unknown {\n\treturn Reflect.get(row, key)\n}\n\nfunction getRowId(row: T)",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/base/DropdownFilterBar.vue",
+    "old": "(values) =>",
+    "new": "(values: string[]) =>",
+    "count": 3
+  },
+  {
+    "path": "packages/ui/src/components/base/DropdownFilterBar.vue",
+    "old": "(event) => closePreviewFilterMenu",
+    "new": "(event?: MouseEvent) => closePreviewFilterMenu",
+    "count": 3
+  },
+  {
+    "path": "packages/ui/src/components/base/FullImage.vue",
+    "old": ":src=\"src\"",
+    "new": ":src=\"src ?? undefined\"",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/base/UnsavedChangesPopup.vue",
+    "old": "{ content: reasons.join('\\n'), popperClass: 'unsaved-changes-save-tooltip' }",
+    "new": "{ text: reasons.join('\\n') }",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/modal/NewModal.vue",
+    "old": "'metaKey' in event && (event.metaKey || event.altKey || event.ctrlKey)",
+    "new": "('metaKey' in event && event.metaKey) || ('altKey' in event && event.altKey) || ('ctrlKey' in event && event.ctrlKey)",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/layouts/shared/installation-settings/components/ContentDiffModal.vue",
+    "old": "commonMessages.confirm",
+    "new": "commonMessages.acceptButton",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/base/Admonition.vue",
+    "old": "buttonColors[type] && buttonColors[type] !== 'standard'\n\t\t\t\t\t\t? buttonColors[type]",
+    "new": "buttonColors[type] !== 'standard'\n\t\t\t\t\t\t? buttonColors[type]",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/features/settings/display/behavior-settings.vue",
+    "old": "() => settingsMutation.mutateAsync({ ...current.value }),",
+    "new": "async (): Promise<void> => { await settingsMutation.mutateAsync({ ...current.value }) },",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/features/settings/display/features-settings.vue",
+    "old": "(changedValues) =>\n\t\tsettingsMutation.mutateAsync({",
+    "new": "async (changedValues): Promise<void> => {\n\t\tawait settingsMutation.mutateAsync({",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/features/settings/display/features-settings.vue",
+    "old": "updateQuickInstanceCount: changedValues.quickInstanceCount !== undefined,\n\t\t}),",
+    "new": "updateQuickInstanceCount: changedValues.quickInstanceCount !== undefined,\n\t\t})\n\t},",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/helpers/skins.ts",
+    "old": "const data = await invoke('plugin:minecraft-skins|get_dragged_skin_data'",
+    "new": "const data = await invoke<number[]>('plugin:minecraft-skins|get_dragged_skin_data'",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/pages/Browse.vue",
+    "old": "projectType.value === 'modpack' ||\n\t\t\t(isServerContext.value && projectType.value !== 'modpack')",
+    "new": "projectType.value === 'modpack' ||\n\t\t\tisServerContext.value",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/providers/content-install.ts",
+    "old": "function resolveContentType(projectType?: Labrinth.Projects.v2.ProjectType) {\n\treturn projectType && RESOLVABLE_PROJECT_TYPES.has(projectType) ? projectType : 'mod'\n}",
+    "new": "function resolveContentType(projectType?: string): Labrinth.Content.v3.ContentType {\n\tfor (const type of RESOLVABLE_PROJECT_TYPES) {\n\t\tif (type === projectType) return type\n\t}\n\treturn 'mod'\n}",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/providers/content-install.ts",
+    "old": "instance: GameInstance,",
+    "new": "instance: Pick<GameInstance, 'game_version' | 'loader'>,",
+    "count": 2
+  },
+  {
+    "path": "apps/app-frontend/src/providers/content-install.ts",
+    "old": "'id' | 'name' | 'icon_path' | 'game_version' | 'loader'\n>",
+    "new": "'id' | 'name' | 'game_version' | 'loader'\n> & { icon_path?: string | null }",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/pages/instance/layout.vue",
+    "old": "action: openSettings,",
+    "new": "action: () => openSettings(),",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/billing/AddPaymentMethodModal.vue",
+    "old": "addPaymentMethod.submit",
+    "new": "addPaymentMethod?.submit",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/billing/AddPaymentMethodModal.vue",
+    "old": "modal.hide()",
+    "new": "modal?.hide()",
+    "count": 1
+  },
+  {
+    "path": "packages/api-client/src/modules/labrinth/types.ts",
+    "old": "\t\t\texport type Dependency = {\n\t\t\t\tfile_name?: string\n\t\t\t\tdependency_type: DependencyType\n\t\t\t} & (\n\t\t\t\t| {\n\t\t\t\t\t\tproject_id: string\n\t\t\t\t  }\n\t\t\t\t| {\n\t\t\t\t\t\tversion_id: string\n\t\t\t\t\t\tproject_id?: string\n\t\t\t\t  }\n\t\t\t)",
+    "new": "\t\t\texport type Dependency = {\n\t\t\t\tfile_name: string | null\n\t\t\t\tdependency_type: DependencyType\n\t\t\t\tproject_id: string | null\n\t\t\t\tversion_id: string | null\n\t\t\t}",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/components/ui/modal/InstallToPlayModal.vue",
+    "old": "\t\t\t\t// @ts-expect-error - version_id is missing from the type for some reason\n",
+    "new": "",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/components/ui/modal/InstallToPlayModal.vue",
+    "old": "? // @ts-expect-error - version_id is missing from the type for some reason\n\t\t\t\t\t\t",
+    "new": "? ",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/project/ProjectSidebarServerInfo.vue",
+    "old": "SERVER_LANGUAGES[language]",
+    "new": "SERVER_LANGUAGES[language as keyof typeof SERVER_LANGUAGES]",
+    "count": 2
+  },
+  {
+    "path": "packages/ui/src/components/project/server/ServerRegion.vue",
+    "old": "SERVER_REGIONS[region]",
+    "new": "SERVER_REGIONS[region as keyof typeof SERVER_REGIONS]",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/utils/regions.ts",
+    "old": "export const regionOverrides = {",
+    "new": "export const regionOverrides: Record<string, { name: MessageDescriptor; flag: string }> = {",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/billing/FormattedPaymentMethod.vue",
+    "old": "paymentMethodMessages[method.card.brand]",
+    "new": "paymentMethodMessages[method.card.brand as keyof typeof paymentMethodMessages]",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/billing/FormattedPaymentMethod.vue",
+    "old": "paymentMethodMessages[method.type]",
+    "new": "paymentMethodMessages[method.type as keyof typeof paymentMethodMessages]",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/content/ContentListItem.vue",
+    "old": "const model = defineModel<boolean>()",
+    "new": "const model = defineModel<boolean>({ default: false })",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/external_files/AttributionEditor.vue",
+    "old": ".filter((short) => short !== '')",
+    "new": ".filter(Boolean)",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/external_files/AttributionModerationDbBadge.vue",
+    "old": "moderationStatuses.others?.length > 0",
+    "new": "(moderationStatuses.others?.length ?? 0) > 0",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/layouts/wrapped/settings/AccountSocialSettings.vue",
+    "old": "value: FriendPrivacy | null",
+    "new": "value: FriendPrivacy | null | undefined",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/layouts/wrapped/settings/AccountSocialSettings.vue",
+    "old": "value: InvitePrivacy | null",
+    "new": "value: InvitePrivacy | null | undefined",
+    "count": 2
+  },
+  {
+    "path": "packages/ui/src/components/base/MarkdownEditorImpl.vue",
+    "old": "files: FileList",
+    "new": "files: FileList | File[]",
+    "count": 2
+  },
+  {
+    "path": "packages/ui/src/components/search/SearchFilterOption.vue",
+    "old": "emit(primaryAction === 'exclude' ? 'toggleExclude' : 'toggle', option)",
+    "new": "primaryAction === 'exclude' ? emit('toggleExclude', option) : emit('toggle', option)",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/composables/stripe.ts",
+    "old": "StripeElementsOptionsClientSecret",
+    "new": "StripeElementsOptionsMode",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/base/StackedAdmonitions.vue",
+    "old": "ref, useAttrs, useId, watch",
+    "new": "ref, normalizeStyle, useAttrs, useId, watch",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/base/StackedAdmonitions.vue",
+    "old": "const attrs = useAttrs()",
+    "new": "const attrs = useAttrs()\nconst motionAttrs = computed(() => {\n\tconst { style, ...rest } = attrs\n\tconst normalized = normalizeStyle([style])\n\treturn { ...rest, style: typeof normalized === 'object' ? normalized : undefined }\n})",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/base/StackedAdmonitions.vue",
+    "old": "v-bind=\"attrs\"",
+    "new": "v-bind=\"motionAttrs\"",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/components/ui/modal/UpdateToPlayModal.vue",
+    "old": "type Dependency = Labrinth.Versions.v3.Dependency",
+    "new": "type Dependency = Labrinth.Versions.v2.Dependency",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/components/ui/shared-instances/shared-instance-install-modal/use-shared-instance-preview-content.ts",
+    "old": "\n\t\tfile.fileType,",
+    "new": "\n\t\t(['mod', 'modpack', 'resourcepack', 'shader', 'plugin', 'datapack', 'server'] as const).find((type) => type === file.fileType),",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/components/ui/skin/BakedSkinButton.vue",
+    "old": "\tbutton,\n\t([entry])",
+    "new": "\tcomputed(() => {\n\t\tconst element = button.value?.$el\n\t\treturn element instanceof Element ? element : null\n\t}),\n\t([entry])",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/features/settings/syncing/game-settings-modal/boolean-control.vue",
+    "old": "value !== undefined && emit('update:model-value', value)",
+    "new": "typeof value === 'boolean' && emit('update:model-value', value)",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/features/settings/syncing/game-settings-modal/use-editor.ts",
+    "old": "queryClient.getQueryData(options.queryKey)",
+    "new": "queryClient.getQueryData<GameSettingsEditorState>(options.queryKey)",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/helpers/worlds.ts",
+    "old": "getWorldDisplayName(world: World)",
+    "new": "getWorldDisplayName(world: World | { name: string; address: string })",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/helpers/worlds.ts",
+    "old": "if (world.type === 'server') {\n\t\treturn world.address",
+    "new": "if ('address' in world) {\n\t\treturn world.address",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/pages/instance/content/index.vue",
+    "old": "if (!canUpdateProject(mod) || mod.locked) return",
+    "new": "if (!canUpdateProject(mod) || mod.locked || !mod.file_path) return",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/pages/instance/content/index.vue",
+    "old": "async function handleModpackUpdate() {\n\tif (!instance.value?.link?.project_id) return\n\n\tconst requestId = beginUpdateRequest()\n\n\tupdatingModpack.value = true\n\tupdatingProject.value = null\n\tupdatingProjectVersions.value = []\n\tloadingVersions.value = true\n\tloadingChangelog.value = false\n\n\tawait nextTick()\n\n\tconst initialVersionId =\n\t\tlinkedModpackUpdateVersionId.value ?? instance.value?.link?.version_id ?? undefined\n\tdebug('handleModpackUpdate: opening modpack updater modal', {\n\t\ttype: 'modpack',\n\t\tinitialVersionId,\n\t\tlinkedModpackUpdateVersionId: linkedModpackUpdateVersionId.value,\n\t\tlinkedModpackProject: linkedModpackProject.value,\n\t\tlinkedModpackVersion: linkedModpackVersion.value,\n\t\tinstance: {\n\t\t\tpath: instance.value.id,\n\t\t\tname: instance.value.name,\n\t\t\tgameVersion: instance.value.game_version,\n\t\t\tloader: instance.value.loader,\n\t\t\tlink: instance.value.link,\n\t\t},\n\t\tmodalStateBeforeFetch: {\n\t\t\tupdatingModpack: updatingModpack.value,\n\t\t\tupdatingProjectId: updatingProject.value?.id,",
+    "new": "async function handleModpackUpdate() {\n\tif (!instance.value?.link?.project_id) return\n\n\tconst requestId = beginUpdateRequest()\n\n\tupdatingModpack.value = true\n\tupdatingProject.value = null\n\tupdatingProjectVersions.value = []\n\tloadingVersions.value = true\n\tloadingChangelog.value = false\n\n\tawait nextTick()\n\n\tconst initialVersionId =\n\t\tlinkedModpackUpdateVersionId.value ?? instance.value?.link?.version_id ?? undefined\n\tdebug('handleModpackUpdate: opening modpack updater modal', {\n\t\ttype: 'modpack',\n\t\tinitialVersionId,\n\t\tlinkedModpackUpdateVersionId: linkedModpackUpdateVersionId.value,\n\t\tlinkedModpackProject: linkedModpackProject.value,\n\t\tlinkedModpackVersion: linkedModpackVersion.value,\n\t\tinstance: {\n\t\t\tpath: instance.value.id,\n\t\t\tname: instance.value.name,\n\t\t\tgameVersion: instance.value.game_version,\n\t\t\tloader: instance.value.loader,\n\t\t\tlink: instance.value.link,\n\t\t},\n\t\tmodalStateBeforeFetch: {\n\t\t\tupdatingModpack: updatingModpack.value,\n\t\t\tupdatingProjectId: null,",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/pages/instance/share/shared-instance-members-table.vue",
+    "old": "function setUsernameRef(id: string, element: Element | null)",
+    "new": "function setUsernameRef(id: string, element: unknown)",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/pages/instance/files/index.vue",
+    "old": "return await invoke('plugin:files|file_extract_zip'",
+    "new": "return await invoke<import('@modrinth/ui/src/layouts/shared/files-tab/types').ExtractDryRunResult | void>('plugin:files|file_extract_zip'",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/providers/server-install.ts",
+    "old": "action: () => opts.router.push(`/instance/${encodeURIComponent(project.id)}`)",
+    "new": "action: async () => { await opts.router.push(`/instance/${encodeURIComponent(project.id)}`) }",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/providers/server-install.ts",
+    "old": "action: () => opts.router.push(`/instance/${encodeURIComponent(instance.id)}`)",
+    "new": "action: async () => { await opts.router.push(`/instance/${encodeURIComponent(instance.id)}`) }",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/providers/setup/server-install-content.ts",
+    "old": "await flushStoredServerAddonInstallQueue({",
+    "new": "await flushStoredServerAddonInstallQueue<InstallableSearchResult>({",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/layouts/shared/browse-tab/composables/install-logic.ts",
+    "old": "parsed.filter(isStoredServerInstallQueueEntry),",
+    "new": "parsed.filter(isStoredServerInstallQueueEntry) as [string, BrowseInstallPlan<TProject>][],",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/base/Admonition.vue",
+    "old": ":color=\"\n\t\t\t\t\tbuttonColors[type] !== 'standard'\n\t\t\t\t\t\t? buttonColors[type]\n\t\t\t\t\t\t: undefined\n\t\t\t\t\"",
+    "new": ":color=\"type === 'neutral' ? undefined : buttonColors[type]\"",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/base/UnsavedChangesPopup.vue",
+    "old": "generic=\"T\"",
+    "new": "generic=\"T extends object\"",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/base/UnsavedChangesPopup.vue",
+    "old": "Object.keys(props.modified).some((key) => !isEqual(props.original[key], props.modified[key]))",
+    "new": "(Object.keys(props.modified) as (keyof T)[]).some((key) => !isEqual(props.original[key], props.modified[key]))",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/project/ProjectPageHeader.vue",
+    "old": ":status=\"projectV3.status\"",
+    "new": ":status=\"projectV3?.status ?? project.status\"",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/project/ProjectSidebarCompatibility.vue",
+    "old": "getVersionsToDisplay(project, tags.gameVersions)",
+    "new": "getVersionsToDisplay({ game_versions: project.versions ?? [] }, tags.gameVersions)",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/composables/use-server-image.ts",
+    "old": "type UpstreamRef = ComputedRef<Archon.Servers.v0.Server['upstream'] | null | undefined>",
+    "new": "type UpstreamRef = ComputedRef<{ project_id?: string | null } | null | undefined>",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/layouts/shared/installation-settings/components/ContentDiffList.vue",
+    "old": "return formatMessage(diffTypeMessages[diff.type])",
+    "new": "if (isDependencyDiff(diff)) return formatMessage(diffTypeMessages[diff.type])\n\treturn ''",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/layouts/shared/server-settings/pages/installation.vue",
+    "old": "isLocal ? modpack.value.spec.name : modpack.value.spec.project_id",
+    "new": "modpack.value.spec.platform === 'local_file' ? modpack.value.spec.name : modpack.value.spec.project_id",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/layouts/shared/server-settings/pages/installation.vue",
+    "old": "isLocal ? modpack.value.spec.filename : undefined",
+    "new": "modpack.value.spec.platform === 'local_file' ? modpack.value.spec.filename : undefined",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/layouts/shared/server-settings/pages/installation.vue",
+    "old": "iconUrl: modpack.value.icon_url,",
+    "new": "iconUrl: modpack.value.icon_url ?? undefined,",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/layouts/shared/server-settings/pages/installation.vue",
+    "old": "versionNumber: modpack.value.version_number,",
+    "new": "versionNumber: modpack.value.version_number ?? undefined,",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/layouts/shared/server-settings/pages/installation.vue",
+    "old": "iconUrl: modpack.value.owner.icon_url,",
+    "new": "iconUrl: modpack.value.owner.icon_url ?? undefined,",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/layouts/wrapped/hosting/manage/content.vue",
+    "old": "const projectId = isLocal ? null : mp.spec.project_id",
+    "new": "const projectId = mp.spec.platform === 'local_file' ? null : mp.spec.project_id",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/layouts/wrapped/hosting/manage/content.vue",
+    "old": "const title = isLocal\n",
+    "new": "const title = mp.spec.platform === 'local_file'\n",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/layouts/wrapped/hosting/manage/content.vue",
+    "old": "const options: { id: string; icon?: typeof ClipboardCopyIcon; action: () => void }[] = []",
+    "new": "const options: { id: string; label: string; icon?: typeof ClipboardCopyIcon; action: () => void }[] = []",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/layouts/wrapped/hosting/manage/content.vue",
+    "old": "id: formatMessage(commonMessages.copyLinkButton),",
+    "new": "id: 'copy-link',\n\t\t\tlabel: formatMessage(commonMessages.copyLinkButton),",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/layouts/shared/browse-tab/layout.vue",
+    "old": "action.color && action.color !== 'standard'",
+    "new": "action.color",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/layouts/shared/browse-tab/layout.vue",
+    "old": " || action.color === 'standard'",
+    "new": "",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/base/SegmentedControl.vue",
+    "old": "items: T[]",
+    "new": "items: readonly T[]",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/base/SegmentedControl.vue",
+    "old": "neutralItems?: T[]",
+    "new": "neutralItems?: readonly T[]",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/layouts/shared/appearance-settings/layout.vue",
+    "old": "\t\t\t<AppearanceSettingsThemeSelector",
+    "new": "\t\t\t<!-- @vue-generic {import('./types').AppearanceThemeSelection} -->\n\t\t\t<AppearanceSettingsThemeSelector",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/billing/ServersPurchase3Review.vue",
+    "old": "formatPrice(monthlyPrice, currency",
+    "new": "formatPrice(monthlyPrice ?? 0, currency",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/billing/ServersPurchase3Review.vue",
+    "old": "formatPrice(selectedPlanPriceForInterval, currency",
+    "new": "formatPrice(selectedPlanPriceForInterval ?? 0, currency",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/billing/ServersPurchase3Review.vue",
+    "old": "formatPrice(total, currency",
+    "new": "formatPrice(total ?? 0, currency",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/layouts/shared/server-settings/pages/network.vue",
+    "old": ":label=\"advancedActionTooltip\"",
+    "new": ":label=\"advancedActionTooltip ?? ''\"",
+    "count": 2
+  },
+  {
+    "path": "apps/app-frontend/src/components/ui/skin/BakedSkinButton.vue",
+    "old": "element instanceof Element",
+    "new": "element instanceof HTMLElement",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/components/ui/shared-instances/shared-instance-install-modal/use-shared-instance-preview-content.ts",
+    "old": "'plugin', 'datapack', 'server'] as const",
+    "new": "'plugin', 'datapack'] as const",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/layouts/shared/server-settings/pages/backups.vue",
+    "old": "\t\t\t\t\t<SegmentedControl",
+    "new": "\t\t\t\t\t<!-- @vue-generic {number} -->\n\t\t\t\t\t<SegmentedControl",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/billing/ServersPurchase3Review.vue",
+    "old": "formatPrice(monthlyPrice ?? 0, currency, true)",
+    "new": "monthlyPrice === undefined ? '—' : formatPrice(monthlyPrice, currency, true)",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/billing/ServersPurchase3Review.vue",
+    "old": "formatPrice(selectedPlanPriceForInterval ?? 0, currency)",
+    "new": "selectedPlanPriceForInterval === undefined ? '—' : formatPrice(selectedPlanPriceForInterval, currency)",
+    "count": 1
+  },
+  {
+    "path": "packages/ui/src/components/billing/ServersPurchase3Review.vue",
+    "old": "formatPrice(total ?? 0, currency)",
+    "new": "total === undefined ? '—' : formatPrice(total, currency)",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/components/ui/modal/InstallToPlayModal.vue",
+    "old": "async function handleAccept() {\n\thide()\n\tconst serverProjectId = project.value?.id\n\tif (!serverProjectId) return",
+    "new": "async function handleAccept() {\n\tconst serverProjectId = project.value?.id\n\tif (!serverProjectId) return\n\thide()",
+    "count": 1
+  },
+  {
+    "path": "apps/app-frontend/src/components/ui/modal/UpdateToPlayModal.vue",
+    "old": "currentVersionId: currentDep.version_id,",
+    "new": "currentVersionId: currentDep.version_id ?? undefined,",
+    "count": 2
+  },
+  {
+    "path": "apps/app-frontend/src/components/ui/modal/InstallToPlayModal.vue",
+    "old": "async function fetchData(versionId: string) {\n\t// cache is making version null for some reason so bypassing for now\n\tconst version: Labrinth.Versions.v2.Version | null = await get_version(versionId, 'bypass')\n\tmodpackVersion.value = version\n\n\tif (!version) {\n\t\tconsole.warn(`InstallToPlayModal: modpack version ${versionId} is unavailable`)\n\t\treturn\n\t}\n\n\tif (version.project_id) {\n\t\trequiredContentProject.value = await get_project(version.project_id, 'bypass')\n\t\texternalFiles.value = [\n\t\t\t...new Set(\n\t\t\t\t(version.dependencies ?? [])\n\t\t\t\t\t.filter(\n\t\t\t\t\t\t(dependency) =>\n\t\t\t\t\t\t\tdependency.dependency_type === 'embedded' &&\n\t\t\t\t\t\t\t!dependency.project_id &&\n\t\t\t\t\t\t\t!dependency.version_id &&\n\t\t\t\t\t\t\tdependency.file_name,\n\t\t\t\t\t)\n\t\t\t\t\t.flatMap((dependency) => (dependency.file_name ? [dependency.file_name] : [])),\n\t\t\t),\n\t\t].sort((left, right) => left.localeCompare(right))\n\t}\n}\n",
+    "new": "let fetchGeneration = 0\n\nasync function fetchData(versionId: string) {\n\tconst requestGeneration = ++fetchGeneration\n\tmodpackVersion.value = null\n\trequiredContentProject.value = null\n\texternalFiles.value = []\n\t// cache is making version null for some reason so bypassing for now\n\tconst version: Labrinth.Versions.v2.Version | null = await get_version(versionId, 'bypass')\n\tif (requestGeneration !== fetchGeneration) return\n\tmodpackVersion.value = version\n\n\tif (!version) {\n\t\tconsole.warn(`InstallToPlayModal: modpack version ${versionId} is unavailable`)\n\t\treturn\n\t}\n\n\tif (version.project_id) {\n\t\tconst resolvedProject = await get_project(version.project_id, 'bypass')\n\t\tif (requestGeneration !== fetchGeneration) return\n\t\trequiredContentProject.value = resolvedProject\n\t\texternalFiles.value = [\n\t\t\t...new Set(\n\t\t\t\t(version.dependencies ?? [])\n\t\t\t\t\t.filter(\n\t\t\t\t\t\t(dependency) =>\n\t\t\t\t\t\t\tdependency.dependency_type === 'embedded' &&\n\t\t\t\t\t\t\t!dependency.project_id &&\n\t\t\t\t\t\t\t!dependency.version_id &&\n\t\t\t\t\t\t\tdependency.file_name,\n\t\t\t\t\t)\n\t\t\t\t\t.flatMap((dependency) => (dependency.file_name ? [dependency.file_name] : [])),\n\t\t\t),\n\t\t].sort((left, right) => left.localeCompare(right))\n\t}\n}\n",
+    "count": 1
+  }
+]
