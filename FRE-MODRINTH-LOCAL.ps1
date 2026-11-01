@@ -11,6 +11,7 @@ $upstream = Join-Path $projectRoot 'vendor\modrinth'
 $destination = Join-Path $projectRoot 'FRE-Modrinth-Source'
 $converter = Join-Path $projectRoot 'scripts\modrinth-fork\prepare.py'
 if (-not (Test-Path $converter)) { throw 'Full FRE LAUNCH repository not found.' }
+Get-Command py -ErrorAction Stop | Out-Null
 if ($BuildWindows -and $RunDev) { throw 'Choose either -BuildWindows or -RunDev.' }
 if ($BuildWindows -or $RunDev) {
     Get-Command node -ErrorAction Stop | Out-Null
@@ -47,8 +48,9 @@ $signature = ($revision + ':' + (($patchNames | ForEach-Object {
     (Get-FileHash $sourceFile -Algorithm SHA256).Hash
 }) -join ':'))
 if (Test-Path $destination) {
-    if (-not (Test-Path $prepared)) {
-        throw "Found an incomplete generated source: $destination. Rename that folder and retry; no original game data is changed."
+    $incompletePreparation = -not (Test-Path $prepared)
+    if ($incompletePreparation) {
+        Write-Warning "Preserving incomplete generated source before rebuilding: $destination"
     }
     $previousSignature = if (Test-Path $signaturePath) { (Get-Content $signaturePath -Raw).Trim() } else { '' }
     $missingSourceFiles = @($requiredSourceFiles | Where-Object {
@@ -58,7 +60,7 @@ if (Test-Path $destination) {
         Write-Warning ("Generated source is incomplete: " + ($missingSourceFiles -join ', '))
         Write-Host 'Preserving the incomplete tree and regenerating from pinned upstream.' -ForegroundColor Yellow
     }
-    if ($previousSignature -ne $signature -or $missingSourceFiles.Count -gt 0) {
+    if ($incompletePreparation -or $previousSignature -ne $signature -or $missingSourceFiles.Count -gt 0) {
         $archive = Join-Path $projectRoot ('FRE-Modrinth-Source-archive-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
         if (Test-Path $archive) { throw "Archive destination exists: $archive" }
         Write-Host 'Archiving existing generated source before regeneration:' $archive -ForegroundColor Yellow
@@ -116,58 +118,8 @@ py -3 "$projectRoot\scripts\modrinth-fork\verify.py" "$destination"
 if ($LASTEXITCODE -ne 0) { throw 'FRE LAUNCH verification failed; refusing Windows compilation.' }
 Set-Content -LiteralPath $signaturePath -Value $signature -Encoding UTF8
 
-# After successful source verification, discard obsolete generated source
-# snapshots only. Never touch the active source tree or Minecraft game data.
-$sourceArchives = @(Get-ChildItem -LiteralPath $projectRoot -Directory -Filter 'FRE-Modrinth-Source-archive-*' -ErrorAction SilentlyContinue)
-foreach ($sourceArchive in $sourceArchives) {
-    if ($sourceArchive.Name -notmatch '^FRE-Modrinth-Source-archive-\d{8}-\d{6}$') { continue }
-    if (($sourceArchive.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) { continue }
-    $archiveReadme = Join-Path $sourceArchive.FullName 'FRE_LAUNCH_FORK.md'
-    $archiveSignature = Join-Path $sourceArchive.FullName '.fre-launch-source-signature'
-    if (-not (Test-Path -LiteralPath $archiveReadme -PathType Leaf) -or
-        -not (Test-Path -LiteralPath $archiveSignature -PathType Leaf)) {
-        Write-Warning "Keeping unverified archive: $($sourceArchive.Name)"
-        continue
-    }
-    $archiveMissingFiles = @($requiredSourceFiles | Where-Object {
-        -not (Test-Path -LiteralPath (Join-Path $sourceArchive.FullName $_) -PathType Leaf)
-    })
-    if ($archiveMissingFiles.Count -gt 0) {
-        Write-Warning "Keeping incomplete generated source for diagnosis: $($sourceArchive.Name)"
-        continue
-    }
-    $gameFolders = @('instances', 'saves', 'worlds', 'mods', 'resourcepacks', 'shaderpacks', 'screenshots', '.minecraft', 'minecraft')
-    $containsGameFiles = $false
-    foreach ($folder in $gameFolders) {
-        if (Test-Path -LiteralPath (Join-Path $sourceArchive.FullName $folder)) {
-            $containsGameFiles = $true
-            break
-        }
-    }
-    if ($containsGameFiles) {
-        Write-Warning "Keeping archive with possible game files: $($sourceArchive.Name)"
-        continue
-    }
-    # Remove long nested Rust/Java build paths with Robocopy. PowerShell 5.1
-    # Remove-Item -Recurse can fail on MAX_PATH while leaving a half-deleted tree.
-    $emptyArchiveDirectory = Join-Path $env:TEMP ('fre-empty-' + [guid]::NewGuid().ToString('N'))
-    try {
-        New-Item -Path $emptyArchiveDirectory -ItemType Directory -Force | Out-Null
-        & robocopy.exe $emptyArchiveDirectory $sourceArchive.FullName /MIR /XJ /R:1 /W:1 /NFL /NDL /NJH /NJS /NP | Out-Null
-        $mirrorExitCode = $LASTEXITCODE
-        if ($mirrorExitCode -ge 8) {
-            throw "Robocopy could not clean this archive (exit $mirrorExitCode)"
-        }
-        Remove-Item -LiteralPath $sourceArchive.FullName -Force -ErrorAction Stop
-        Write-Host "Removed outdated generated source archive: $($sourceArchive.Name)" -ForegroundColor DarkGray
-    } catch {
-        Write-Warning "Archive cleanup skipped ($($sourceArchive.Name)): $_"
-    } finally {
-        if (Test-Path -LiteralPath $emptyArchiveDirectory) {
-            Remove-Item -LiteralPath $emptyArchiveDirectory -Force -ErrorAction SilentlyContinue
-        }
-    }
-}
+# Preserve archived source and build caches. They may contain local changes or
+# diagnostics; normal startup must never recursively delete a previous tree.
 Write-Host "FRE LAUNCH modified Modrinth GPLv3 source: $destination" -ForegroundColor Green
 Write-Host 'Separate old FRE LAUNCH profiles and worlds have not been changed.'
 if ($BuildWindows -or $RunDev) {

@@ -9,7 +9,7 @@ const { formatMessage: t } = useVIntl()
 const messages = defineMessages({
   title: { id: 'fre-launch.horizon.title', defaultMessage: 'Horizon (Rust)' },
   subtitle: { id: 'fre-launch.horizon.subtitle', defaultMessage: 'A separate Rust-based Minecraft client. Horizon versions, mods, worlds and updates are managed independently of Java instances.' },
-  requirement: { id: 'fre-launch.horizon.requirement', defaultMessage: 'Requires the official Horizon Windows launcher and Minecraft: Java Edition 26.3 installed and opened once. Microsoft sign-in may not work in Horizon yet; offline single player is available. Java Fabric/Forge mods are not supported.' },
+  requirement: { id: 'fre-launch.horizon.requirement', defaultMessage: 'Requires the official Horizon Windows launcher and Minecraft: Java Edition 26.3 installed and opened once. Account requirements depend on the selected Horizon release; follow its official instructions. Java Fabric/Forge mods are not supported.' },
   launcherLabel: { id: 'fre-launch.horizon.launcher-label', defaultMessage: 'Horizon executable' },
   chooseExe: { id: 'fre-launch.horizon.choose-exe', defaultMessage: 'Choose horizon-launcher.exe' },
   release: { id: 'fre-launch.horizon.release', defaultMessage: 'Official download and installation instructions' },
@@ -30,6 +30,7 @@ const messages = defineMessages({
   useVersion: { id: 'fre-launch.horizon.use-version', defaultMessage: 'Use version for selected instance' },
   prepare: { id: 'fre-launch.horizon.prepare', defaultMessage: 'Prepare Minecraft 26.3 assets' },
   firstRun: { id: 'fre-launch.horizon.first-run', defaultMessage: 'First install a Horizon version, then prepare game assets from a Minecraft 26.3 installation before Play.' },
+  minecraftFolder: { id: 'fre-launch.horizon.minecraft-folder', defaultMessage: 'Choose Minecraft folder for preparation (optional)' },
   closing: { id: 'fre-launch.horizon.close', defaultMessage: 'Close' },
   notConfigured: { id: 'fre-launch.horizon.not-configured', defaultMessage: 'Choose the Horizon launcher executable first.' },
   error: { id: 'fre-launch.horizon.error', defaultMessage: 'Horizon error: {reason}' },
@@ -39,6 +40,7 @@ const messages = defineMessages({
 
 const visible = ref(false)
 const executable = ref('')
+const minecraftPath = ref('')
 const instanceName = ref('')
 const launchName = ref('')
 const listing = ref('')
@@ -87,11 +89,21 @@ async function selectExe() {
   }
 }
 
+async function selectMinecraftFolder() {
+  try {
+    const picked = await open({ multiple: false, directory: true })
+    if (typeof picked === 'string') minecraftPath.value = picked
+  } catch (err) {
+    error.value = t(messages.error, { reason: failure(err) })
+  }
+}
+
 function failure(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
 }
 
 async function createInstance() {
+  if (pending.value) return
   if (!executable.value) { error.value = t(messages.notConfigured); return }
   if (!instanceName.value.trim()) return
   pending.value = 'create'
@@ -111,6 +123,7 @@ async function createInstance() {
 }
 
 async function playInstance() {
+  if (pending.value) return
   if (!executable.value) { error.value = t(messages.notConfigured); return }
   if (!launchName.value.trim()) return
   pending.value = 'play'
@@ -142,6 +155,7 @@ async function refreshInstances() {
   }
 }
 async function showLogs() {
+  if (pending.value) return
   if (!executable.value) { error.value = t(messages.notConfigured); return }
   pending.value = 'logs'
   error.value = ''
@@ -186,6 +200,8 @@ async function manageHorizon(action: 'versions' | 'install-version' | 'set-versi
     } else {
       feedback.value = await invoke<string>('plugin:fre-horizon|horizon_prepare', {
         exePath: executable.value,
+        minecraftPath: minecraftPath.value || null,
+        version: releaseTag.value || null,
       })
     }
   } catch (err) {
@@ -237,6 +253,10 @@ defineExpose({ show, hide })
         <p class="my-2 text-xs text-secondary">{{ t(messages.firstRun) }}</p>
         <label class="mt-3 block text-sm text-secondary">{{ t(messages.releaseTag) }}</label>
         <input v-model="releaseTag" class="mt-1 w-full rounded-lg bg-button-bg p-3 text-contrast" maxlength="80" />
+        <button type="button" class="mt-3 cursor-pointer rounded-lg border border-solid border-surface-5 bg-button-bg px-3 py-2 text-sm text-contrast" :disabled="!!pending" @click="selectMinecraftFolder">
+          {{ t(messages.minecraftFolder) }}
+        </button>
+        <p v-if="minecraftPath" class="text-xs text-secondary">{{ minecraftPath }}</p>
         <div class="mt-3 flex flex-wrap gap-2">
           <button type="button" class="cursor-pointer rounded-lg border border-solid border-surface-5 bg-button-bg px-3 py-2 text-sm text-contrast disabled:opacity-40" :disabled="!!pending" @click="manageHorizon('versions')">
             {{ t(messages.showVersions) }}

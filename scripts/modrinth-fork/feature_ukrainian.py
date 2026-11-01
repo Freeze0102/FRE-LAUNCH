@@ -171,9 +171,10 @@ UI = {
 "user-restrictions.scope.version-write":"Редагувати версії та додавати файли"
 }
 NEW = {
+"fre-launch.horizon.minecraft-folder":("Вибрати папку Minecraft для підготовки (необов’язково)","Choose Minecraft folder for preparation (optional)"),
 "fre-launch.horizon.title":("Horizon (Rust)","Horizon (Rust)"),
 "fre-launch.horizon.subtitle":("Окремий клієнт Minecraft на Rust. Версії, моди, світи й оновлення Horizon зберігаються окремо від Java-збірок.","A separate Rust-based Minecraft client. Horizon versions, mods, worlds and updates are managed independently of Java instances."),
-"fre-launch.horizon.requirement":("Потрібен офіційний Horizon для Windows і Minecraft: Java Edition 26.3, установлену та запущену хоча б раз. Вхід через Microsoft у Horizon може ще не працювати; одиночна гра офлайн доступна. Java-моди Fabric/Forge не підтримуються.","Requires the official Horizon Windows launcher and Minecraft: Java Edition 26.3 installed and opened once. Microsoft sign-in may not work in Horizon yet; offline single player is available. Java Fabric/Forge mods are not supported."),
+"fre-launch.horizon.requirement":("Потрібен офіційний Horizon для Windows і Minecraft: Java Edition 26.3, установлена й запущена хоча б раз. Вимоги до акаунта залежать від обраного випуску Horizon; дотримуйся його офіційних інструкцій. Java-моди Fabric/Forge не підтримуються.","Requires the official Horizon Windows launcher and Minecraft: Java Edition 26.3 installed and opened once. Account requirements depend on the selected Horizon release; follow its official instructions. Java Fabric/Forge mods are not supported."),
 "fre-launch.horizon.launcher-label":("Файл запуску Horizon","Horizon executable"),
 "fre-launch.horizon.choose-exe":("Вибрати horizon-launcher.exe","Choose horizon-launcher.exe"),
 "fre-launch.horizon.release":("Офіційне завантаження та інструкція","Official download and installation instructions"),

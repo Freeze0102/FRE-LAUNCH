@@ -45,6 +45,28 @@ pub fn guest_credentials(name: &str) -> crate::Result<Credentials> {
         active: false,
     })
 }
+
+#[cfg(test)]
+mod fre_guest_tests {
+    use super::guest_credentials;
+    #[test]
+    fn guest_uuid_matches_minecraft_and_does_not_need_database() {
+        for (name, expected) in [
+            ("Notch", "b50ad385-829d-3141-a216-7e7d7539ba7f"),
+            ("Steve", "5627dd98-e6be-3c21-b8a8-e92344183641"),
+        ] {
+            let user = guest_credentials(name).unwrap();
+            assert_eq!(user.offline_profile.id.to_string(), expected);
+            assert_eq!(user.offline_profile.name, name);
+            assert!(user.is_offline_profile());
+            assert!(!user.active);
+        }
+        assert_eq!(guest_credentials(" Steve ").unwrap().offline_profile.name, "Steve");
+        for invalid in ["", "a b", "../world", "українець", "abcdefghijklmnopq"] {
+            assert!(guest_credentials(invalid).is_err(), "{invalid}");
+        }
+    }
+}
 """)
 
     runner = root/"packages/app-lib/src/api/instance/run.rs"
@@ -287,7 +309,7 @@ async function onGuestSkinFilePicked(event: Event) {
         await invoke('plugin:auth|save_guest_skin', { nickname, pngBase64: btoa(binary) })
         guestSkinStatus.value = formatMessage(messages.guestSkinSaved)
     } catch (error) {
-        handleError(error)
+        handleError(error instanceof Error ? error : new Error(String(error)))
     } finally {
         guestSkinBusy.value = false
     }

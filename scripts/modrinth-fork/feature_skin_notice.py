@@ -16,6 +16,8 @@ def exactly(path, old, new):
 
 def apply(root: Path):
     p=root/"apps/app-frontend/src/pages/Skins.vue"
+    exactly(p, "const currentUser = ref(undefined)",
+        "const currentUser = ref<Awaited<ReturnType<typeof users>>[number] | undefined>(undefined)")
     exactly(p,
         "const currentUserId = ref<string | undefined>(undefined)",
         "const currentUserId = ref<string | undefined>(undefined)\n"

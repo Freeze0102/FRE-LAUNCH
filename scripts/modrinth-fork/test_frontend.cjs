@@ -1,0 +1,149 @@
+// Uses the pinned workspace's Vue compiler, TypeScript and Vue reactivity.
+const { test } = require('node:test')
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const path = require('node:path')
+const { createRequire } = require('node:module')
+const source = path.resolve(process.argv[2] || 'FRE-Modrinth-Source')
+const workspace = createRequire(path.join(source, 'apps/app-frontend/package.json'))
+const rootRequire = createRequire(path.join(source, 'package.json'))
+const ts = workspace('typescript')
+const vue = workspace('vue')
+const compiler = rootRequire('@vue/compiler-sfc')
+
+function component(file, invoke, instances = []) {
+  const text = fs.readFileSync(path.join(__dirname, file), 'utf8')
+  const { descriptor, errors } = compiler.parse(text, { filename: file })
+  assert.deepEqual(errors, [])
+  compiler.compileScript(descriptor, { id: file })
+  const template = compiler.compileTemplate({ source: descriptor.template.content, filename: file, id: file })
+  assert.deepEqual(template.errors, [])
+  const output = ts.transpileModule(descriptor.scriptSetup.content, {
+    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
+  }).outputText
+  const mounted = []
+  const unmounted = []
+  const mocks = {
+    '@tauri-apps/api/core': { invoke },
+    '@tauri-apps/plugin-opener': { openUrl: async () => {} },
+    '@tauri-apps/plugin-dialog': { open: async () => null },
+    '@/helpers/instance': { list: async () => instances },
+    '@modrinth/ui': { defineMessages: x => x, useVIntl: () => ({ formatMessage: (m, args = {}) =>
+      m.defaultMessage.replace(/\{(\w+)\}/g, (_, k) => String(args[k])) }) },
+    vue: { ...vue, onMounted: f => mounted.push(f), onUnmounted: f => unmounted.push(f) },
+  }
+  const names = file === 'CurseForgeBrowser.vue'
+    ? 'instanceId,searchText,apiKey,results,loading,notice,error,installing,doSearch,install'
+    : 'minecraftPath,executable,instanceName,launchName,pending,error,feedback,manageHorizon,createInstance,playInstance'
+  const setup = new Function('require', 'defineProps', 'defineExpose', 'localStorage', 'exports',
+    `${output}\nreturn {${names}}`)
+  const state = setup(name => {
+    assert.ok(name in mocks, `Unexpected dependency: ${name}`)
+    return mocks[name]
+  }, () => ({}), () => {}, { getItem: () => null, setItem: () => {} }, {})
+  return { state, mount: async () => { for (const f of mounted) await f() },
+    unmount: () => { for (const f of unmounted) f() } }
+}
+
+const instances = [
+  { id: 'a', name: 'Fabric', loader: 'fabric', game_version: '1.21.1' },
+  { id: 'b', name: 'Forge', loader: 'forge', game_version: '1.20.1' },
+]
+const deferred = () => {
+  let resolve, reject
+  const promise = new Promise((a, b) => { resolve = a; reject = b })
+  return { promise, resolve, reject }
+}
+
+test('CurseForge discards an old search after switching instance', async () => {
+  const request = deferred()
+  const c = component('CurseForgeBrowser.vue', () => request.promise, instances)
+  await c.mount()
+  const searching = c.state.doSearch()
+  c.state.instanceId.value = 'b'
+  request.resolve([{ id: 1, name: 'Wrong version' }])
+  await searching
+  assert.deepEqual(c.state.results.value, [])
+  assert.equal(c.state.loading.value, false)
+})
+
+test('CurseForge latest query wins even when responses arrive out of order', async () => {
+  const old = deferred(), recent = deferred()
+  let calls = 0
+  const c = component('CurseForgeBrowser.vue', () => (++calls === 1 ? old : recent).promise, instances)
+  await c.mount()
+  const first = c.state.doSearch()
+  c.state.searchText.value = 'new'
+  const second = c.state.doSearch()
+  recent.resolve([{ id: 2 }])
+  await second
+  old.resolve([{ id: 1 }])
+  await first
+  assert.equal(c.state.results.value[0].id, 2)
+})
+
+test('CurseForge refuses unavailable distribution and keeps install destination stable', async () => {
+  const request = deferred(), calls = []
+  const c = component('CurseForgeBrowser.vue', (command, args) => {
+    calls.push({ command, args }); return request.promise
+  }, instances)
+  await c.mount()
+  await c.state.install({ id: 1, allowModDistribution: false })
+  await c.state.install({ id: 1, allowModDistribution: true, isAvailable: false })
+  assert.equal(calls.length, 0)
+  const install = c.state.install({ id: 1, name: 'Example', allowModDistribution: true })
+  c.state.instanceId.value = 'b'
+  request.resolve('done')
+  await install
+  assert.equal(calls[0].args.instanceId, 'a')
+  assert.match(c.state.notice.value, /^Fabric:/)
+})
+
+test('Horizon forwards the optional Minecraft folder using the official prepare flag input', async () => {
+  const calls = []
+  const c = component('HorizonRustPanel.vue', async (command, args) => { calls.push({ command, args }); return 'prepared' })
+  c.state.executable.value = 'C:\\Horizon\\horizon-launcher.exe'
+  c.state.minecraftPath.value = 'D:\\My Minecraft'
+  await c.state.manageHorizon('prepare')
+  assert.equal(calls[0].command, 'plugin:fre-horizon|horizon_prepare')
+  assert.equal(calls[0].args.minecraftPath, 'D:\\My Minecraft')
+  assert.equal(c.state.pending.value, null)
+})
+
+test('Horizon prevents duplicate launch requests and shows CLI failures', async () => {
+  const request = deferred()
+  let calls = 0
+  const c = component('HorizonRustPanel.vue', () => { calls++; return request.promise })
+  c.state.executable.value = 'C:\\Horizon\\horizon-launcher.exe'
+  c.state.launchName.value = 'Survival'
+  const play = c.state.playInstance()
+  await c.state.playInstance()
+  assert.equal(calls, 1)
+  request.reject(new Error('Missing installed version'))
+  await play
+  assert.match(c.state.error.value, /Missing installed version/)
+  assert.equal(c.state.pending.value, null)
+})
+
+test('Leaving an instance catalog resets context without stale breadcrumb handles', () => {
+  const file = path.join(source, 'apps/app-frontend/src/pages/Browse.vue')
+  const { descriptor } = compiler.parse(fs.readFileSync(file, 'utf8'))
+  const ast = ts.createSourceFile(file, descriptor.scriptSetup.content, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+  const reset = ast.statements.find(s => ts.isFunctionDeclaration(s) && s.name.text === 'resetInstanceContext')
+  assert.ok(reset)
+  const installedProjectIds = vue.ref(['old'])
+  const instanceHideInstalled = vue.ref(true)
+  const newlyInstalled = vue.ref(['old'])
+  const hiddenInstanceProjectIds = vue.ref(new Set(['old']))
+  const hiddenInstanceProjectIdsInitialized = vue.ref(true)
+  let refreshed = 0
+  const bindings = { debugLog: () => {}, installedProjectIds, instanceHideInstalled, newlyInstalled,
+    hiddenInstanceProjectIds, hiddenInstanceProjectIdsInitialized,
+    refreshInstalledProjectIds: () => { refreshed++ } }
+  const code = ts.transpileModule(reset.getText(ast), { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText
+  new Function(...Object.keys(bindings), `${code}\nresetInstanceContext()`)(...Object.values(bindings))
+  assert.equal(installedProjectIds.value, null)
+  assert.equal(instanceHideInstalled.value, false)
+  assert.deepEqual(newlyInstalled.value, [])
+  assert.equal(refreshed, 1)
+})

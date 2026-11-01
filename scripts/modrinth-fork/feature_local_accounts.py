@@ -176,7 +176,7 @@ async function createProfile() {
         window.dispatchEvent(new Event('fre-launch-offline-account-created'))
         emit('created')
     } catch (error) {
-        handleError(error)
+        handleError(error instanceof Error ? error : new Error(String(error)))
     } finally {
         busy.value = false
     }
@@ -193,6 +193,9 @@ const messages = defineMessages({
 </script>
 """,encoding="utf-8")
     p=root/"apps/app-frontend/src/features/minecraft-accounts/accounts-card.vue"
+    exactly(root/"apps/app-frontend/src/helpers/auth.js",
+        "@returns {Promise<Credential[]>}",
+        "@returns {Promise<Array<{profile: {id: string, name: string}, access_token?: string}>>}")
     exactly(p,'\t\t</Button>\n\t</div>\n\t<Accordion',
         '\t\t</Button>\n\t\t<OfflineProfileCreator />\n\t</div>\n\t<Accordion')
     exactly(p, '\t\t\t\t\t{{ formatMessage(messages.addAccount) }}\n\t\t\t\t</Button>\n',
@@ -228,11 +231,6 @@ const messages = defineMessages({
         '{{ account.profile.name }} <span v-if="account.access_token?.startsWith(\'fre-offline:\')" class="text-xs text-secondary">({{ formatMessage(messages.offline) }})</span>')
     exactly(p, "\tminecraftAccount: {\n",
         "\toffline: { id: 'fre-launch.offline.short', defaultMessage: 'Local' },\n\tminecraftAccount: {\n")
-
-    with (root/"FRE_LAUNCH_FORK.md").open("a",encoding="utf-8") as f:
-        f.write("\nFRE LAUNCH supports saved nickname-only profiles with Minecraft-compatible\n"
-                "offline UUIDs. Such profiles do not authenticate to Minecraft Services,\n"
-                "online-mode servers, or Microsoft. Official Microsoft login remains separate.\n")
 
 if __name__=="__main__":
     raise SystemExit("This module must be imported from prepare.py")

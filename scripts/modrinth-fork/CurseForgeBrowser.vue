@@ -2,7 +2,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { defineMessages, useVIntl } from '@modrinth/ui'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { list as listInstances } from '@/helpers/instance'
 
 type GameChoice = { id: string; name: string; game_version: string; loader: string }
@@ -54,6 +54,7 @@ const loading = ref(false)
 const installing = ref<number | null>(null)
 const notice = ref('')
 const error = ref('')
+let searchSequence = 0
 
 const selected = computed(() => instances.value.find((i) => i.id === instanceId.value))
 const gameVersion = computed(() => selected.value?.game_version ?? '')
@@ -63,18 +64,21 @@ const isModded = computed(() => ['fabric', 'forge', 'neoforge', 'quilt'].include
 watch(() => props.instanceId, (value) => {
   if (value) instanceId.value = value
 })
-watch(instanceId, () => {
+watch([instanceId, searchText, apiKey], () => {
+  searchSequence++
+  loading.value = false
   results.value = []
   searched.value = false
   error.value = ''
   notice.value = ''
-})
+}, { flush: 'sync' })
+onUnmounted(() => { searchSequence++ })
 
 onMounted(async () => {
   try {
     const all = await listInstances()
     instances.value = all
-      .filter((i) => ['fabric', 'forge', 'neoforge', 'quilt'].includes(String(i.loader).toLowerCase()))
+      .filter((i) => !i.quarantined && !i.shared_instance && ['fabric', 'forge', 'neoforge', 'quilt'].includes(String(i.loader).toLowerCase()))
       .map((i) => ({ id: i.id, name: i.name, game_version: i.game_version, loader: String(i.loader) }))
     if (!instances.value.some((i) => i.id === instanceId.value)) {
       instanceId.value = instances.value[0]?.id ?? ''
@@ -89,38 +93,44 @@ function reason(error: unknown): string {
 }
 
 async function doSearch() {
+  const sequence = ++searchSequence
   loading.value = true
   error.value = ''
   notice.value = ''
   searched.value = false
   try {
-    results.value = await invoke<CurseForgeMod[]>('plugin:fre-curseforge|cf_search', {
+    const found = await invoke<CurseForgeMod[]>('plugin:fre-curseforge|cf_search', {
       query: searchText.value.trim(),
       gameVersion: isModded.value ? gameVersion.value : null,
       modLoader: isModded.value ? loader.value : null,
       apiKey: apiKey.value.trim() || null,
     })
+    if (sequence !== searchSequence) return
+    results.value = found
     searched.value = true
   } catch (err) {
+    if (sequence !== searchSequence) return
     results.value = []
     error.value = t(m.searchError, { reason: reason(err) })
   } finally {
-    loading.value = false
+    if (sequence === searchSequence) loading.value = false
   }
 }
 
 async function install(mod: CurseForgeMod) {
-  if (!selected.value || !isModded.value || installing.value !== null) return
+  if (!selected.value || !isModded.value || installing.value !== null
+    || mod.isAvailable === false || mod.allowModDistribution !== true) return
+  const target = selected.value
   installing.value = mod.id
   error.value = ''
   notice.value = ''
   try {
     await invoke<string>('plugin:fre-curseforge|cf_install', {
       modId: mod.id,
-      instanceId: instanceId.value,
+      instanceId: target.id,
       apiKey: apiKey.value.trim() || null,
     })
-    notice.value = t(m.success, { name: mod.name })
+    notice.value = `${target.name}: ${t(m.success, { name: mod.name })}`
   } catch (err) {
     error.value = t(m.installError, { reason: reason(err) })
   } finally {
@@ -154,7 +164,7 @@ function openKeyHelp() {
       <div class="mt-4 grid gap-3 md:grid-cols-2">
         <label class="flex flex-col gap-2 text-sm text-secondary">
           {{ t(m.instance) }}
-          <select v-model="instanceId" class="min-h-10 w-full rounded-lg bg-button-bg p-2 text-contrast">
+          <select v-model="instanceId" :disabled="installing !== null" class="min-h-10 w-full rounded-lg bg-button-bg p-2 text-contrast">
             <option value="">{{ t(m.selectInstance) }}</option>
             <option v-for="i in instances" :key="i.id" :value="i.id">
               {{ i.name }} · {{ i.game_version }} · {{ i.loader }}

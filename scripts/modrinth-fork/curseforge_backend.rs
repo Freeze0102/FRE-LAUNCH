@@ -3,13 +3,13 @@
 //! a shared secret, bypasses author distribution controls, or scrapes the site.
 use serde::{Deserialize, Serialize};
 use sha1::{Digest as _, Sha1};
-use sha2::Sha256;
 use std::time::Duration;
 use tauri_plugin_http::reqwest::{self, Client};
 
 const MINECRAFT_GAME_ID: &str = "432";
 const MINECRAFT_MOD_CLASS_ID: &str = "6";
 const MAX_MOD_BYTES: usize = 128 * 1024 * 1024;
+static INSTALL: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 pub fn init<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
     tauri::plugin::Builder::new("fre-curseforge")
@@ -44,6 +44,8 @@ pub struct CurseForgeLogo {
 #[serde(rename_all = "camelCase")]
 struct CurseForgeFile {
     id: u64,
+    mod_id: u64,
+    game_id: u64,
     file_name: String,
     file_date: String,
     file_length: u64,
@@ -149,6 +151,7 @@ async fn cf_search(
 
 fn compatible(file: &CurseForgeFile, game_version: &str, loader: &str) -> bool {
     file.is_available
+        && file.game_id == 432
         && file.file_name.to_ascii_lowercase().ends_with(".jar")
         && file.game_versions.iter().any(|s| s == game_version)
         && file.game_versions.iter().any(|s| s.eq_ignore_ascii_case(loader))
@@ -157,14 +160,9 @@ fn compatible(file: &CurseForgeFile, game_version: &str, loader: &str) -> bool {
 }
 
 fn verify_hash(data: &[u8], hashes: &[CurseForgeHash]) -> Result<(), String> {
-    let sha256 = hashes.iter().find(|h| h.algo == 3 && h.value.len() == 64);
+    // CurseForge documents only 1 = SHA-1 and 2 = MD5; do not invent algo 3.
     let sha1 = hashes.iter().find(|h| h.algo == 1 && h.value.len() == 40);
-    if let Some(hash) = sha256 {
-        let value = format!("{:x}", Sha256::digest(data));
-        if !value.eq_ignore_ascii_case(&hash.value) {
-            return Err("CurseForge SHA-256 verification failed. File not installed.".into());
-        }
-    } else if let Some(hash) = sha1 {
+    if let Some(hash) = sha1 {
         let value = format!("{:x}", Sha1::digest(data));
         if !value.eq_ignore_ascii_case(&hash.value) {
             return Err("CurseForge SHA-1 verification failed. File not installed.".into());
@@ -181,6 +179,7 @@ async fn cf_install(
     instance_id: String,
     api_key: Option<String>,
 ) -> Result<String, String> {
+    let _install = INSTALL.try_lock().map_err(|_| "Another CurseForge installation is still running.")?;
     let key = validated_api_key(api_key)?;
     let metadata = theseus::instance::get(&instance_id)
         .await
@@ -190,9 +189,7 @@ async fn cf_install(
         return Err("Installing into a quarantined or shared instance is not supported.".into());
     }
     let game_version = metadata.applied_content_set.game_version.clone();
-    let loader_json = serde_json::to_value(&metadata.applied_content_set.loader)
-        .map_err(|e| e.to_string())?;
-    let loader = loader_json.as_str().ok_or("Unsupported instance loader.")?;
+    let loader = metadata.applied_content_set.loader.as_str();
     let loader_id = loader_type(loader)
         .ok_or("Choose a Fabric, Forge, NeoForge, or Quilt instance before installing mods.")?;
     let client = http()?;
@@ -217,15 +214,10 @@ async fn cf_install(
         ],
     ).await?;
     let file = files.iter()
-        .filter(|f| compatible(f, &game_version, loader))
+        .filter(|f| f.mod_id == mod_id && compatible(f, &game_version, loader))
         .max_by(|a, b| a.file_date.cmp(&b.file_date))
         .ok_or("No compatible downloadable JAR for this Minecraft version and mod loader.")?;
-    if file.file_name.chars().any(|ch| matches!(ch, '/' | '\\' | ':') || ch.is_control())
-        || file.file_name == "." || file.file_name == ".."
-        || file.file_name.len() > 180
-    {
-        return Err("Unsafe CurseForge file name.".into());
-    }
+    validate_file_name(&file.file_name)?;
     let download = if let Some(url) = &file.download_url {
         url.clone()
     } else {
@@ -236,12 +228,9 @@ async fn cf_install(
             &[],
         ).await.map_err(|_| "CurseForge has not permitted a direct download for this file.")?
     };
-    let url = reqwest::Url::parse(&download).map_err(|_| "Invalid file URL")?;
-    let host = url.host_str().ok_or("File URL has no host")?;
-    if url.scheme() != "https" || !(host == "forgecdn.net" || host.ends_with(".forgecdn.net")) {
-        return Err("CurseForge returned an unapproved download domain.".into());
-    }
-    let mut response = client.get(url).header("x-api-key", &key).send()
+    let url = download_url(&download)?;
+    // The API key belongs only on api.curseforge.com, never on the file CDN.
+    let mut response = client.get(url).send()
         .await.map_err(|e| format!("CurseForge download error: {e}"))?;
     if !response.status().is_success() {
         return Err(format!("CurseForge file download failed (HTTP {})", response.status()));
@@ -263,12 +252,84 @@ async fn cf_install(
         return Err("The downloaded file is not a valid JAR/ZIP header.".into());
     }
     verify_hash(&bytes, &file.hashes)?;
-    let destination = format!("mods/{}", file.file_name);
-    theseus::instance::write_instance_file(&instance_id, &destination, &bytes, true)
-        .await.map_err(|e| format!("Could not install mod: {e}"))?;
-    theseus::instance::sync_content_files(&instance_id)
-        .await.map_err(|e| format!("JAR saved, but refresh failed: {e}"))?;
+    let bytes = tokio::task::spawn_blocking(move || {
+        validate_jar(&bytes)?;
+        Ok::<_, String>(bytes)
+    }).await.map_err(|e| e.to_string())??;
+    let current = theseus::instance::get(&instance_id).await.map_err(|e| e.to_string())?
+        .ok_or("Minecraft instance was removed while downloading.")?;
+    if current.quarantined || current.shared_instance.is_some()
+        || current.applied_content_set.game_version != game_version
+        || current.applied_content_set.loader.as_str() != loader
+    {
+        return Err("Instance changed while downloading. Refresh and try again.".into());
+    }
+    if !theseus::process::get_by_instance_id(&instance_id).await.map_err(|e| e.to_string())?.is_empty() {
+        return Err("Close Minecraft before changing this instance's mods.".into());
+    }
+    let existing = theseus::instance::sync_content_files(&instance_id).await.map_err(|e| e.to_string())?;
+    let hash = format!("{:x}", Sha1::digest(&bytes));
+    if existing.iter().any(|f| f.sha1.eq_ignore_ascii_case(&hash)
+        || f.file_name.eq_ignore_ascii_case(&file.file_name)) {
+        return Err("This JAR or filename is already in the instance. Manage it in the Content tab; no file was replaced.".into());
+    }
+    // Files API deliberately makes mods/ read-only in this upstream revision.
+    // Import through the content store so the JAR is registered and manageable.
+    let staging = tempfile::tempdir().map_err(|e| e.to_string())?;
+    let staged_file = staging.path().join(&file.file_name);
+    tokio::fs::write(&staged_file, &bytes).await.map_err(|e| e.to_string())?;
+    theseus::instance::add_project_from_path(
+        &instance_id, &staged_file, Some(theseus::data::ProjectType::Mod),
+    ).await.map_err(|e| format!("Could not import mod: {e}"))?;
     Ok(format!("Installed {} from CurseForge into the selected Minecraft instance.", file.file_name))
+}
+
+fn validate_file_name(name: &str) -> Result<(), String> {
+    if !path_util::is_safe_file_name(name)
+        || name.len() > 180
+        || !name.to_ascii_lowercase().ends_with(".jar")
+        || name.chars().any(|ch| ch.is_control() || "<>:\"|?*".contains(ch))
+    {
+        return Err("Unsafe CurseForge file name.".into());
+    }
+    Ok(())
+}
+
+fn validate_jar(bytes: &[u8]) -> Result<(), String> {
+    let mut jar = zip::ZipArchive::new(std::io::Cursor::new(bytes))
+        .map_err(|_| "Downloaded JAR is not a complete ZIP archive.")?;
+    if jar.is_empty() || jar.len() > 100_000 {
+        return Err("JAR has an invalid number of entries.".into());
+    }
+    let mut total = 0u64;
+    for index in 0..jar.len() {
+        let entry = jar.by_index(index).map_err(|e| format!("Invalid JAR entry: {e}"))?;
+        if entry.enclosed_name().is_none() || entry.name().contains('\\') || entry.is_symlink() {
+            return Err("JAR contains an unsafe entry path.".into());
+        }
+        total = total.saturating_add(entry.size());
+        if total > 512 * 1024 * 1024 {
+            return Err("JAR exceeds the unpacked size limit.".into());
+        }
+        let expected = entry.size();
+        let actual = std::io::copy(&mut std::io::Read::take(entry, expected + 1), &mut std::io::sink())
+            .map_err(|e| format!("JAR integrity check failed: {e}"))?;
+        if actual != expected { return Err("JAR entry size mismatch.".into()); }
+    }
+    Ok(())
+}
+
+fn download_url(download: &str) -> Result<reqwest::Url, String> {
+    let url = reqwest::Url::parse(download).map_err(|_| "Invalid file URL")?;
+    let host = url.host_str().ok_or("File URL has no host")?;
+    if url.scheme() != "https"
+        || !(host == "forgecdn.net" || host.ends_with(".forgecdn.net"))
+        || !url.username().is_empty() || url.password().is_some()
+        || url.port_or_known_default() != Some(443)
+    {
+        return Err("CurseForge returned an unapproved download URL.".into());
+    }
+    Ok(url)
 }
 
 #[cfg(test)]
@@ -284,6 +345,8 @@ mod tests {
     fn rejects_mismatched_loader_and_version() {
         let file = CurseForgeFile {
             id: 1,
+            mod_id: 2,
+            game_id: 432,
             file_name: "example.jar".into(),
             file_date: "2026-01-01".into(),
             file_length: 2,
@@ -299,5 +362,38 @@ mod tests {
     #[test]
     fn refuses_unverified_bytes() {
         assert!(verify_hash(b"test", &[]).is_err());
+        let hash = CurseForgeHash { algo: 1, value: format!("{:x}", Sha1::digest(b"test")) };
+        assert!(verify_hash(b"test", std::slice::from_ref(&hash)).is_ok());
+        assert!(verify_hash(b"changed", &[hash]).is_err());
+    }
+    #[test]
+    fn refuses_unsafe_file_names_and_urls() {
+        for name in ["../mod.jar", "C:mod.jar", "CON.jar", "mod?.jar", "mod.jar:stream", "a.exe"] {
+            assert!(validate_file_name(name).is_err(), "{name}");
+        }
+        assert!(validate_file_name("fabric-api-1.0.jar").is_ok());
+        assert!(download_url("https://edge.forgecdn.net/files/1/mod.jar").is_ok());
+        for url in ["http://edge.forgecdn.net/a", "https://forgecdn.net.evil.test/a", "https://evil.test/a", "https://user@edge.forgecdn.net/a", "https://edge.forgecdn.net:444/a"] {
+            assert!(download_url(url).is_err(), "{url}");
+        }
+    }
+    #[test]
+    fn rejects_truncated_or_unsafe_archives() {
+        use std::io::{Cursor, Write};
+        assert!(validate_jar(b"PK\x03\x04not-a-jar").is_err());
+        let archive = |name: &str| {
+            let mut zip = zip::ZipWriter::new(Cursor::new(Vec::new()));
+            zip.start_file(name, zip::write::SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Stored)).unwrap();
+            zip.write_all(b"example").unwrap();
+            zip.finish().unwrap().into_inner()
+        };
+        assert!(validate_jar(&archive("fabric.mod.json")).is_ok());
+        assert!(validate_jar(&archive("../escape.class")).is_err());
+        let mut bad_crc = archive("test.class");
+        let name_length = u16::from_le_bytes([bad_crc[26], bad_crc[27]]) as usize;
+        let extra_length = u16::from_le_bytes([bad_crc[28], bad_crc[29]]) as usize;
+        bad_crc[30 + name_length + extra_length] ^= 1;
+        assert!(validate_jar(&bad_crc).is_err());
     }
 }

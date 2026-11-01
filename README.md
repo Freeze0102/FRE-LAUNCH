@@ -1,6 +1,12 @@
 # FRE LAUNCH
 
-**Minecraft Java Edition launcher для Windows** · Tauri 2 · Rust · React · TypeScript
+**Minecraft launcher для Windows** · поточний форк Modrinth: Tauri 2 · Rust · Vue · TypeScript
+
+Поточний лаунчер готується через `FRE-MODRINTH-LOCAL.ps1` із зафіксованого
+Modrinth. Нижче також залишилася документація старої окремої React-реалізації.
+Актуальний стан форка, CurseForge, Horizon і локальних перевірок:
+**[аудит від 01.11.2026](AUDIT_UA.md)**. Повний strict TypeScript gate ще має
+невиправлені помилки; ці зміни не оголошені готовим Windows-релізом.
 
 **Хочеш перевірити найновішу версію прямо зараз?** [Інструкція з локального тестування й створення EXE без GitHub Actions](LOCAL_BUILD_UA.md) — скачай код, розпакуй та запусти `FRE-LAUNCH-LOCAL.cmd`.
 

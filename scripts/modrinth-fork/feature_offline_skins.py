@@ -41,7 +41,13 @@ fn validate_skin_png(bytes: &[u8]) -> crate::Result<()> {
     if bytes.len() > MAX_PNG_BYTES || bytes.len() < 24 {
         bail!("Minecraft skin PNG must be no larger than 512 KiB");
     }
-    // Fully decode, not just inspect the PNG header.
+    let dimensions = image::ImageReader::with_format(
+        std::io::Cursor::new(bytes), image::ImageFormat::Png,
+    ).into_dimensions().context("Skin is not a valid PNG")?;
+    if dimensions.0 != 64 || !matches!(dimensions.1, 32 | 64) {
+        bail!("Minecraft skin must be 64x64 or legacy 64x32 PNG");
+    }
+    // Check dimensions before allocating decoded pixels, then verify the PNG.
     let image = image::load_from_memory_with_format(bytes, image::ImageFormat::Png)
         .context("Skin is not a valid PNG")?;
     if image.width() != 64 || !matches!(image.height(), 32 | 64) {
@@ -96,14 +102,8 @@ async fn save_skin_bytes(id: Uuid, encoded: &str, state: &State) -> crate::Resul
     let temp = parent.join(format!(".{}.tmp", Uuid::new_v4().simple()));
     tokio::fs::write(&temp, &bytes).await?;
     if let Err(error) = tokio::fs::rename(&temp, &path).await {
-        // Windows rename cannot replace an existing file.
-        if tokio::fs::try_exists(&path).await? {
-            tokio::fs::remove_file(&path).await?;
-            tokio::fs::rename(&temp, &path).await?;
-        } else {
-            let _ = tokio::fs::remove_file(&temp).await;
-            return Err(error.into());
-        }
+        let _ = tokio::fs::remove_file(&temp).await;
+        return Err(error.into());
     }
     Ok(())
 }

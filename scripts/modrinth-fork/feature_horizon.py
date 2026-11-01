@@ -42,6 +42,10 @@ def apply(root: Path):
     exactly(permissions, '"instance:default",',
             '"instance:default",\n\t\t"fre-horizon:default",')
 
+    exactly(root / "apps/app/Cargo.toml",
+            'tokio = { workspace = true, features = ["time"] }',
+            'tokio = { workspace = true, features = ["time", "process", "io-util", "sync"] }')
+
     wizard = root / "packages/ui/src/components/flows/creation-flow-modal/index.vue"
     exactly(wizard,
         "\t\tfetchExistingInstanceNames?: () => Promise<string[]>",

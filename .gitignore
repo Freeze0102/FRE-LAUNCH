@@ -3,3 +3,7 @@ dist/
 src-tauri/target/
 .env
 *.log
+__pycache__/
+FRE-Modrinth-Source/
+FRE-Modrinth-Source-archive-*/
+.audit/

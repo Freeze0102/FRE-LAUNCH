@@ -2,11 +2,35 @@
 """Customize pinned GPLv3 Modrinth desktop sources into FRE LAUNCH."""
 import argparse
 import json
+import re
 import shutil
 import struct
 import zlib
 from pathlib import Path
 
+PINNED_UPSTREAM_SHA = '4ccf4d51804627cd0687ce7dfd5004f20c267acc'
+
+
+def patch_cargo_lock(root):
+    lock = root / 'Cargo.lock'
+    contents = lock.read_text(encoding='utf-8')
+    for package, additions in {
+        'theseus': ['md5'],
+        'theseus_gui': ['sha1 0.10.6', 'zip 6.0.0'],
+    }.items():
+        pattern = rf'(\[\[package\]\]\nname = "{package}"\n.*?dependencies = \[\n)(.*?)(\n\])'
+        matches = list(re.finditer(pattern, contents, re.S))
+        if len(matches) != 1:
+            raise RuntimeError(f'Cargo.lock package anchor drift: {package}')
+        match = matches[0]
+        dependencies = [line.strip().strip(',').strip('"') for line in match[2].splitlines()]
+        for addition in additions:
+            if addition in dependencies:
+                raise RuntimeError(f'Already patched lockfile dependency: {addition}')
+        dependencies = sorted(dependencies + additions)
+        updated = '\n'.join(f' "{dependency}",' for dependency in dependencies)
+        contents = contents[:match.start(2)] + updated + contents[match.end(2):]
+    lock.write_text(contents, encoding='utf-8')
 
 def edit(path, old, new):
     contents=path.read_text(encoding="utf-8")
@@ -88,6 +112,25 @@ def replace_art(root):
 
 
 def customize(root,revision):
+    if revision != PINNED_UPSTREAM_SHA:
+        raise RuntimeError(f"Unsupported Modrinth revision: {revision}; expected {PINNED_UPSTREAM_SHA}")
+    marker = root / "FRE_LAUNCH_FORK.md"
+    if marker.exists():
+        raise RuntimeError("Source is already customized; use a fresh copy of the pinned upstream")
+    frontend = root / "apps/app-frontend"
+    package = frontend / "package.json"
+    scripts = json.loads(package.read_text(encoding="utf-8"))
+    scripts["scripts"]["tsc:check"] = "vue-tsc --noEmit -p tsconfig.app.json"
+    scripts["scripts"]["build"] = "pnpm run tsc:check && vite build"
+    scripts["scripts"]["test"] = "pnpm run tsc:check"
+    package.write_text(json.dumps(scripts, ensure_ascii=False, indent='\t') + '\n', encoding="utf-8")
+    tsconfig = frontend / "tsconfig.app.json"
+    compiler = json.loads(tsconfig.read_text(encoding="utf-8"))
+    compiler["compilerOptions"]["lib"] = ["ES2023", "DOM", "DOM.Iterable"]
+    compiler["compilerOptions"]["types"] = ["vite/client", "vite-svg-loader"]
+    compiler["compilerOptions"]["paths"]["#ui/*"] = ["../../packages/ui/src/*"]
+    compiler["compilerOptions"]["paths"]["@modrinth/ui/src/*"] = ["../../packages/ui/src/*"]
+    tsconfig.write_text(json.dumps(compiler, indent='\t') + '\n', encoding="utf-8")
     app=root/"apps/app-frontend/src/App.vue"
     if not app.exists():
         raise RuntimeError("Expected Modrinth Vue app not found")
@@ -191,7 +234,7 @@ def customize(root,revision):
     # Keep the ENTIRE pinned Modrinth monorepo, including the real Vue/Tauri/Rust
     # engine and all workspace dependencies. This is a source fork, not an imitation.
     # The Windows launcher builds only the desktop app target.
-    (root/"FRE_LAUNCH_FORK.md").write_text(
+    fork_notice = (
         "# FRE LAUNCH: GPLv3 Modrinth desktop fork\n\n"
         "This is a modified copy of Modrinth App desktop source by Rinth, Inc.\n"
         "Original: https://github.com/modrinth/code\n"
@@ -205,7 +248,9 @@ def customize(root,revision):
         "This is not an official Modrinth, Minecraft or Microsoft product.\n\n"
         "This fork uses a distinct application identifier and will not migrate or overwrite\n"
         "worlds/profiles from the separate FRE LAUNCH React app automatically.\n"
-        "Minecraft account sign-in still needs verification for third-party clients.\n",encoding="utf-8"
+        "Minecraft account sign-in still needs verification for third-party clients.\n"
+        "Saved nickname profiles use offline UUIDs and do not authenticate to\n"
+        "Minecraft Services, online-mode servers, or Microsoft.\n"
     )
     replace_art(root)
     from feature_local_accounts import apply as add_local_accounts
@@ -232,6 +277,9 @@ def customize(root,revision):
     add_curseforge_source(root)
     add_horizon_client(root)
     finish_ukrainian(root)
+    patch_cargo_lock(root)
+    # Publish the completion marker only after every patch succeeds.
+    marker.write_text(fork_notice, encoding="utf-8")
     print("Prepared distinct FRE LAUNCH source fork from",revision)
 
 

@@ -52,8 +52,20 @@ def apply(root: Path):
     cargo = root / "apps/app/Cargo.toml"
     exactly(cargo, "sha2 = { workspace = true }",
                   "sha1 = { workspace = true }\nsha2 = { workspace = true }")
+    exactly(cargo, "urlencoding = { workspace = true }",
+                  "urlencoding = { workspace = true }\nzip = { workspace = true }")
 
     browse = root / "apps/app-frontend/src/pages/Browse.vue"
+    # This pin still resets a removed breadcrumb handle and writes a readonly
+    # computed ref when leaving an instance's catalog. Both derive from route.
+    exactly(browse, "\tisServerInstance.value = false\n\tbrowseBreadcrumb.reset()\n", "")
+    exactly(browse, "\t\t\ttitle: project.title,", "\t\t\ttitle: project.name,")
+    exactly(browse, "\t\t\t\t\thandleError(err)",
+            "\t\t\t\t\thandleError(err instanceof Error ? err : new Error(String(err)))")
+    exactly(root / "apps/app-frontend/src/components/ui/AddContentButton.vue",
+            "project.path ?? project", "project")
+    exactly(root / "apps/app-frontend/src/components/ui/InstanceIndicator.vue",
+            "type Instance = {\n", "type Instance = {\n\tid: string\n")
     exactly(browse,
             "import { useAppServerBrowse } from '@/composables/browse/use-app-server-browse'",
             "import CurseForgeBrowser from '@/components/ui/CurseForgeBrowser.vue'\n"

@@ -140,7 +140,7 @@ def verify(root):
     assert "fre-curseforge:default" in cf_capabilities["permissions"], "CurseForge Tauri commands must be explicitly permitted"
     for label, source, snippets in (
         ("CurseForge backend", cf_backend, ["FRE_CURSEFORGE_API_KEY", "x-api-key", "allow_mod_distribution", "is_available", "validated_api_key",
-            "gameVersion", "modLoaderType", "file_length", "verify_hash", "write_instance_file",
+            "gameVersion", "modLoaderType", "file_length", "verify_hash", "add_project_from_path",
             "sync_content_files", "cf_search", "cf_install", "loader_type"]),
         ("CurseForge browser", cf_frontend, ["plugin:fre-curseforge|cf_search",
             "plugin:fre-curseforge|cf_install", "instanceId", "apiKey"]),
@@ -173,7 +173,7 @@ def verify(root):
         (horizon_backend, ["horizon_instances", "horizon_create", "horizon_play", "horizon_logs",
             "horizon_versions", "horizon_install_version", "horizon_set_version", "horizon_prepare",
             '"instance", "create"', '"play", "--instance"', "validate_launcher",
-            "validate_name", "validate_version", "spawn_blocking"]),
+            "validate_name", "validate_version", "run_cli", "kill_on_drop", "timeout"]),
         (horizon_ui, ["plugin:fre-horizon|horizon_create",
             "plugin:fre-horizon|horizon_play", "plugin:fre-horizon|horizon_versions",
             "plugin:fre-horizon|horizon_install_version", "plugin:fre-horizon|horizon_set_version",
@@ -187,6 +187,7 @@ def verify(root):
         for snippet in snippets:
             assert snippet in source, f"Horizon integration missing: {snippet}"
     for key in ("fre-launch.horizon.title", "fre-launch.horizon.play", "fre-launch.horizon.error",
+                "fre-launch.horizon.minecraft-folder",
                 "fre-launch.horizon.first-run", "fre-launch.horizon.install-version",
                 "fre-launch.horizon.use-version", "fre-launch.horizon.prepare"):
         assert key in app_uk and key in app_en, f"Horizon app translation missing: {key}"
@@ -216,6 +217,9 @@ def verify(root):
     assert 'watch(\n\t[stateInitialized, showAd, adConsentAvailable],' not in app
     assert (root/"packages/app-lib/.env").is_file(), "Missing production API environment file"
     assert (root/"FRE_LAUNCH_FORK.md").is_file()
+    scripts = json.loads((root/"apps/app-frontend/package.json").read_text(encoding="utf-8"))["scripts"]
+    assert "-p tsconfig.app.json" in scripts["tsc:check"], "Type checking must inspect source, not an empty references-only config"
+    assert "write_instance_file(" not in cf_backend, "Files API rejects writes to mods/ at the pinned revision"
     print(f"Source check passed: {len(app_en)} App messages and {len(ui_en)} UI messages covered in UK + EN.")
     print("Nickname path, unique identifier, advertising and hosting checks passed.")
     print("Note: this does not replace real Rust/Vue/Windows compilation or Minecraft runtime testing.")
