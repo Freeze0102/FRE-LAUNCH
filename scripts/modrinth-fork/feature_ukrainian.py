@@ -305,8 +305,8 @@ def _complete(english, ukrainian, curated, field):
     return added, english_fallback
 
 HORIZON_UI_NEW = {
-"fre-launch.horizon.option.title":("Horizon (Rust)","Horizon (Rust)"),
-"fre-launch.horizon.option.description":("Окремий Minecraft на Rust з власними версіями й світами. FRE LAUNCH запускає гру напряму.","Separate native Rust Minecraft client and versions; FRE LAUNCH launches the game directly."),
+"fre-launch.horizon.option.title":("Minecraft на Rust","Minecraft (Rust)"),
+"fre-launch.horizon.option.description":("Власний Minecraft на Rust, вбудований у FRE LAUNCH. Без окремого лаунчера.","An independent Rust game, installed and played inside FRE LAUNCH."),
 }
 
 NEW.update({
@@ -329,6 +329,35 @@ NEW.update({
 "fre-launch.rust.library.needs-prepare":("Потрібно встановити гру або підготувати ресурси","Installation or resources required"),
 "fre-launch.rust.library.ready":("Готово до запуску","Ready to play"),
 "fre-launch.rust.library.error":("Horizon: {reason}","Horizon: {reason}"),
+})
+
+
+# The native FRE LAUNCH game is distinct from the historical Horizon adapter.
+NEW.update({
+"fre-rust.setup.title":("Minecraft на Rust — FRE LAUNCH", "Minecraft on Rust — FRE LAUNCH"),
+"fre-rust.setup.intro":("Твої власні Rust-збірки. FRE LAUNCH запускає Minecraft напряму, без іншого лаунчера.", "Your own Rust Minecraft profiles, installed and launched directly by FRE LAUNCH. No second launcher."),
+"fre-rust.setup.name":("Назва збірки", "Profile name"),
+"fre-rust.setup.create":("Створити Rust-збірку", "Create Rust profile"),
+"fre-rust.setup.creating":("Створюємо…", "Creating..."),
+"fre-rust.setup.play":("Грати", "Play"),
+"fre-rust.setup.playing":("Запускаємо…", "Starting..."),
+"fre-rust.setup.close":("Закрити", "Close"),
+"fre-rust.setup.installed":("Rust-гру вбудовано", "Native Rust game bundled"),
+"fre-rust.setup.missing":("У цій збірці FRE LAUNCH ще немає Rust-гри.", "Native Rust game is not installed in this FRE LAUNCH build."),
+"fre-rust.setup.ready":("Ресурси Minecraft готові", "Minecraft resources prepared"),
+"fre-rust.setup.not-ready":("Ресурси Minecraft не підготовлені", "Minecraft resources not prepared"),
+"fre-rust.setup.details":("Rust-клієнт і ресурси додаються під час локальної збірки FRE LAUNCH. Ресурси Minecraft беруться з твоєї власної законно встановленої Java Edition.", "Rust engine and resources are packaged during your local FRE LAUNCH build. Minecraft resources must come from your own legally installed Java Edition; they are not downloaded from unknown sources."),
+"fre-rust.setup.none":("Rust-збірок ще немає.", "No Rust profiles yet."),
+"fre-rust.setup.logs":("Показати лог гри", "Show game log"),
+"fre-rust.setup.error":("Помилка: {reason}", "Error: {reason}"),
+"fre-rust.library.title":("Minecraft на Rust", "Minecraft on Rust"),
+"fre-rust.library.new":("Створити Rust-збірку", "Create Rust profile"),
+"fre-rust.library.ready":("Готово", "Ready"),
+"fre-rust.library.install":("Потрібні файли гри", "Game files required"),
+"fre-rust.library.play":("Грати", "Play"),
+"fre-rust.library.playing":("Запускаємо…", "Starting..."),
+"fre-rust.library.manage":("Налаштувати", "Manage"),
+"fre-rust.library.error":("Rust-гра: {reason}", "Rust game: {reason}"),
 })
 
 def apply(root):
