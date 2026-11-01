@@ -112,7 +112,7 @@ def apply(root: Path):
 \t},
 \thorizonDescription: {
 \t\tid: 'fre-launch.horizon.option.description',
-\t\tdefaultMessage: 'Separate native Rust Minecraft client and versions; runs through the official Horizon launcher.',
+\t\tdefaultMessage: 'Separate native Rust Minecraft client and versions; FRE LAUNCH launches the game directly.',
 \t},
 \tcustomSetupTitle: {''')
 
