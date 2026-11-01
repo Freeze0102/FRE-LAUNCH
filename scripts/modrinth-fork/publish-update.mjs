@@ -55,6 +55,10 @@ async function request(url, method = 'GET', body) {
 // The source must already be accessible in this repository, before creating its tag.
 if (!(await request(`${api}/git/commits/${provenance.sourceCommit}`))) throw Error('Push the exact reviewed source before releasing')
 const tag = `v${channel.version}`
+const ref = await request(`${api}/git/ref/tags/${tag}`)
+if (ref && (ref.object?.type !== 'commit' || ref.object.sha !== provenance.sourceCommit)) {
+  throw Error('Existing tag does not directly identify the reviewed source; nothing was changed')
+}
 const releases = await request(`${api}/releases?per_page=100`)
 const matching = releases.filter(release => release.tag_name === tag)
 if (matching.length > 1) throw Error('Ambiguous existing release tag; nothing was changed')
@@ -62,6 +66,7 @@ let release = matching[0]
 if (release && (!release.draft || release.target_commitish !== provenance.sourceCommit)) {
   throw Error('Existing release is published or targets another source; it was not changed')
 }
+if (release && release.body !== notes) throw Error('Existing draft notes differ from the reviewed local notes')
 if (!release) release = await request(`${api}/releases`, 'POST', {
   tag_name: tag, target_commitish: provenance.sourceCommit,
   name: `FRE LAUNCH ${channel.version} — Horizon setup and signed updates`,

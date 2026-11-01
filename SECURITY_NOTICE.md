@@ -64,3 +64,26 @@ The publisher can submit the original trusted-source build for Microsoft's suspe
 - No production release or silent-update manifest has been published in this
   local review. The existing installed launcher, profiles and worlds were not
   used for testing. No GitHub Actions were run.
+
+### v0.5.9 — maintainer-requested update delivery test
+
+The maintainer has requested testing the signed update from their installed
+0.5.8 to 0.5.9. This is a **separate newly built artifact**, from source commit
+`b83f78f822612d6a288f172c89686bdc38a4720f`, with the same updater key and app
+identity as 0.5.8. The local Vue/Rust/NSIS build, regression gates, PE checks,
+actual updater signature and Defender scans have passed. The draft's uploaded
+asset SHA-256 digests were checked against these exact local files.
+
+Distribution decision: release 0.5.9 for this explicitly requested update
+delivery test, with its source, checksums, scan provenance and limitations
+published together. This is not independent external AV clearance, Windows
+Authenticode signing, or a claim that installation/restart has already been
+verified on the maintainer's installed client. That transition remains the
+next test; it must be reported separately from successful download/signature
+verification. No user profiles or worlds are used by the automated tests.
+
+The v0.5.5 alert is **still unclassified**. Its release remains a draft/on hold;
+its binaries must not be restored or reused. This decision for newly reviewed
+0.5.9 does not reclassify that sample or approve the old 0.5.6/0.5.7 review ZIPs.
+The legacy CI approval variable and security protections were not changed;
+GitHub Actions were not run. See the exact 0.5.9 results in [AUDIT_UA.md](AUDIT_UA.md).
