@@ -177,7 +177,7 @@ def verify(root):
     for source, markers in (
         (rust_backend, [
             'Builder::new("fre-rust")', "async fn rust_create_profile",
-            "async fn rust_launch", "async fn rust_profiles", "async fn rust_runtime",
+            "async fn rust_import_resources", "async fn rust_launch", "async fn rust_profiles", "async fn rust_runtime",
             "async fn rust_logs", '"fre-rust-client.exe"', 'Command::new(client)',
             '"--resources"', '"--home"', '"--game-dir"', '"--session-stdin"',
             "Credentials::get_default_credential", "online_profile_fresh",
@@ -185,7 +185,7 @@ def verify(root):
             "profile_id_valid", "read_profile",
         ]),
         (rust_panel, [
-            "plugin:fre-rust|rust_create_profile", "plugin:fre-rust|rust_launch",
+            "plugin:fre-rust|rust_import_resources", "plugin:fre-rust|rust_create_profile", "plugin:fre-rust|rust_launch",
             "plugin:fre-rust|rust_profiles", "plugin:fre-rust|rust_runtime",
             "fre-rust-library-refresh",
         ]),
@@ -206,6 +206,7 @@ def verify(root):
             assert marker in source, f"Standalone Rust Minecraft integration missing: {marker}"
     for key in (
         "fre-rust.setup.title", "fre-rust.setup.create", "fre-rust.setup.error",
+        "fre-rust.setup.import", "fre-rust.setup.source",
         "fre-rust.library.title", "fre-rust.library.play", "fre-rust.library.error",
     ):
         assert key in app_uk and key in app_en, f"FRE Rust localization missing: {key}"
@@ -217,7 +218,9 @@ def verify(root):
     if runtime_source.is_dir():
         assert rust_mapping["fre-rust-runtime/BUILD-INFO.json"] == "fre-rust/BUILD-INFO.json"
         assert rust_mapping["fre-rust-runtime/fre-rust-client.exe"] == "fre-rust/fre-rust-client.exe"
-        assert rust_mapping["fre-rust-runtime/resources/"] == "fre-rust/resources/"
+        assert rust_mapping.get("fre-rust-runtime/resources/") == (
+            "fre-rust/resources/" if (runtime_source/"resources/horizon-resources.json").is_file() else None
+        )
     else:
         assert "fre-rust-runtime/fre-rust-client.exe" not in rust_mapping
 
