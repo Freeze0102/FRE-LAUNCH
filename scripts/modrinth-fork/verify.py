@@ -11,7 +11,7 @@ from pathlib import Path
 def verify(root):
     root=root.resolve()
     path=Path(__file__).resolve().parent
-    for item in ("prepare.py","feature_local_accounts.py","feature_skin_notice.py","feature_offline_skins.py","feature_local_skin_preview.py","feature_ui_polish.py","feature_guest_launch.py","feature_java_nickname_lookup.py","feature_remove_modrinth_login.py","feature_brand_presence.py","feature_curseforge.py","feature_horizon.py","feature_ukrainian.py","verify.py"):
+    for item in ("prepare.py","feature_local_accounts.py","feature_skin_notice.py","feature_offline_skins.py","feature_local_skin_preview.py","feature_ui_polish.py","feature_guest_launch.py","feature_java_nickname_lookup.py","feature_remove_modrinth_login.py","feature_brand_presence.py","feature_curseforge.py","feature_horizon.py","feature_fre_rust.py","feature_ukrainian.py","verify.py"):
         py_compile.compile(str(path/item),doraise=True)
     expected={"Notch":"b50ad385-829d-3141-a216-7e7d7539ba7f",
               "Steve":"5627dd98-e6be-3c21-b8a8-e92344183641"}
@@ -160,64 +160,58 @@ def verify(root):
     for key in ("fre-launch.cf.source", "fre-launch.cf.api-key", "fre-launch.cf.install-error"):
         assert key in app_uk and key in app_en, f"CurseForge translation missing: {key}"
 
-    # Horizon is a separate client: check actual local CLI wiring, no mock Play.
-    horizon_backend=(root/"apps/app/src/api/horizon.rs").read_text(encoding="utf-8")
-    horizon_ui=(root/"apps/app-frontend/src/components/ui/HorizonRustPanel.vue").read_text(encoding="utf-8")
-    horizon_stage=(root/"packages/ui/src/components/flows/creation-flow-modal/components/SetupTypeStage.vue").read_text(encoding="utf-8")
-    horizon_modal=(root/"packages/ui/src/components/flows/creation-flow-modal/index.vue").read_text(encoding="utf-8")
-    horizon_context=(root/"packages/ui/src/components/flows/creation-flow-modal/creation-flow-context.ts").read_text(encoding="utf-8")
-    horizon_app=(root/"apps/app-frontend/src/App.vue").read_text(encoding="utf-8")
-    horizon_capabilities=json.loads((root/"apps/app/capabilities/plugins.json").read_text(encoding="utf-8"))
-    assert "fre-horizon:default" in horizon_capabilities["permissions"]
-    for source, snippets in (
-        (horizon_backend, ["horizon_instances", "horizon_create", "horizon_play", "horizon_logs",
-            "horizon_versions", "horizon_install_version", "horizon_set_version", "horizon_prepare",
-            "horizon_direct_play", "horizon-client.exe", "horizon-resources.json",
-            '"instance", "create"', '"play", "--instance"', "validate_launcher",
-            "validate_name", "validate_version", "run_cli", "kill_on_drop", "timeout"]),
-        (horizon_ui, ["plugin:fre-horizon|horizon_create",
-            "plugin:fre-horizon|horizon_direct_play", "plugin:fre-horizon|horizon_versions",
-            "plugin:fre-horizon|horizon_install_version", "plugin:fre-horizon|horizon_set_version",
-            "plugin:fre-horizon|horizon_prepare", "horizon-launcher.exe",
-            "https://playhorizon.dev/docs/install"]),
-        (horizon_stage, ["fre-launch.horizon.option.title", "ctx.onHorizon?.()"]),
-        (horizon_context, ["onHorizon"]),
-        (horizon_modal, ["onHorizon: props.onHorizon"]),
-        (horizon_app, ["HorizonRustPanel", 'ref="horizonWizard"', ':on-horizon="showHorizonWizard"']),
-    ):
-        for snippet in snippets:
-            assert snippet in source, f"Horizon integration missing: {snippet}"
-    rust_library=(root/"apps/app-frontend/src/components/ui/HorizonLibrary.vue").read_text(encoding="utf-8")
+    # The new implementation does not invoke a foreign Minecraft launcher.
+    rust_backend=(root/"apps/app/src/api/fre_rust.rs").read_text(encoding="utf-8")
+    rust_panel=(root/"apps/app-frontend/src/components/ui/FreRustPanel.vue").read_text(encoding="utf-8")
+    rust_library=(root/"apps/app-frontend/src/components/ui/FreRustLibrary.vue").read_text(encoding="utf-8")
+    rust_stage=(root/"packages/ui/src/components/flows/creation-flow-modal/components/SetupTypeStage.vue").read_text(encoding="utf-8")
     rust_index=(root/"apps/app-frontend/src/pages/Index.vue").read_text(encoding="utf-8")
     rust_main=(root/"apps/app/src/main.rs").read_text(encoding="utf-8")
     rust_build=(root/"apps/app/build.rs").read_text(encoding="utf-8")
+    rust_app=(root/"apps/app-frontend/src/App.vue").read_text(encoding="utf-8")
+    rust_permissions=json.loads((root/"apps/app/capabilities/plugins.json").read_text(encoding="utf-8"))
+    assert "fre-rust:default" in rust_permissions["permissions"]
+    assert "fre-horizon:default" not in rust_permissions["permissions"]
+    assert 'pub mod fre_rust;' in (root/"apps/app/src/api/mod.rs").read_text(encoding="utf-8")
+    assert "pub mod horizon;" not in (root/"apps/app/src/api/mod.rs").read_text(encoding="utf-8")
     for source, markers in (
-        (rust_library, ["fre-launch.rust.library.title", "plugin:fre-horizon|horizon_status",
-                        "plugin:fre-horizon|horizon_direct_play", "fre-horizon-library-refresh",
-                        "showHorizonWizard"]),
-        (rust_index, ['import HorizonLibrary', "<HorizonLibrary"]),
-        (horizon_app, ["provide('showHorizonWizard', showHorizonWizard)", "import { computed, nextTick, onMounted, onUnmounted, provide, ref, watch }"]),
-        (rust_main, [".plugin(api::horizon::init())"]),
-        (rust_build, ['"horizon_direct_play"', '"fre-horizon"']),
+        (rust_backend, [
+            'Builder::new("fre-rust")', "async fn rust_create_profile",
+            "async fn rust_launch", "async fn rust_profiles", "async fn rust_runtime",
+            "async fn rust_logs", '"fre-rust-client.exe"', 'Command::new(client)',
+            '"--resources"', '"--home"', "profile_id_valid", "read_profile",
+        ]),
+        (rust_panel, [
+            "plugin:fre-rust|rust_create_profile", "plugin:fre-rust|rust_launch",
+            "plugin:fre-rust|rust_profiles", "plugin:fre-rust|rust_runtime",
+            "fre-rust-library-refresh",
+        ]),
+        (rust_library, [
+            "plugin:fre-rust|rust_profiles", "plugin:fre-rust|rust_launch",
+            "showFreRustWizard", "fre-rust-library-refresh",
+        ]),
+        (rust_index, ["import FreRustLibrary", "<FreRustLibrary"]),
+        (rust_app, [
+            "import FreRustPanel", "<FreRustPanel", "showFreRustWizard",
+            "provide('showFreRustWizard', showFreRustWizard)",
+        ]),
+        (rust_stage, ["Minecraft (Rust)", "ctx.onHorizon?.()"]),
+        (rust_main, [".plugin(api::fre_rust::init())"]),
+        (rust_build, ['"fre-rust"', '"rust_create_profile"', '"rust_launch"']),
     ):
         for marker in markers:
-            assert marker in source, f"Rust library integration missing: {marker}"
-    for key in ("fre-launch.rust.library.title", "fre-launch.rust.library.play",
-                "fre-launch.rust.library.manage", "fre-launch.rust.library.error"):
-        assert key in app_uk and key in app_en, f"Rust library translation missing: {key}"
-    assert 'horizon_direct_play' in horizon_backend
-    assert 'horizon_client' not in rust_library, "UI must not pretend to launch native process directly"
-
-    for key in ("fre-launch.horizon.title", "fre-launch.horizon.play", "fre-launch.horizon.error",
-                "fre-launch.horizon.minecraft-folder",
-                "fre-launch.horizon.first-run", "fre-launch.horizon.install-version",
-                "fre-launch.horizon.use-version", "fre-launch.horizon.prepare"):
-        assert key in app_uk and key in app_en, f"Horizon app translation missing: {key}"
-    from feature_ukrainian import HORIZON_UI_NEW
-    for key,(uk,en) in HORIZON_UI_NEW.items():
-        assert ui_uk[key]["defaultMessage"] == uk, f"Horizon wizard Ukrainian translation missing: {key}"
-        assert ui_en[key]["defaultMessage"] == en, f"Horizon wizard English translation missing: {key}"
-    assert "horizon" not in (root/"apps/app-frontend/src/pages/Browse.vue").read_text(encoding="utf-8").split("const freContentSource =",1)[1].split("\n",1)[0], "Horizon must not share Java mod catalog"
+            assert marker in source, f"Standalone Rust Minecraft integration missing: {marker}"
+    for key in (
+        "fre-rust.setup.title", "fre-rust.setup.create", "fre-rust.setup.error",
+        "fre-rust.library.title", "fre-rust.library.play", "fre-rust.library.error",
+    ):
+        assert key in app_uk and key in app_en, f"FRE Rust localization missing: {key}"
+    # Old plugin and its binary must not be compiled or included in the output.
+    assert not (root/"apps/app/src/api/horizon.rs").exists()
+    assert not (root/"apps/app-frontend/src/components/ui/HorizonRustPanel.vue").exists()
+    assert "horizon-launcher.exe" not in rust_backend
+    assert "horizon-launcher.exe" not in rust_panel
+    assert "horizon-launcher.exe" not in rust_library
 
     splash=(root/"apps/app-frontend/src/components/ui/SplashScreen.vue").read_text(encoding="utf-8")
     assert 'aria-label="FRE LAUNCH"' in splash, "FRE LAUNCH startup branding is missing"
