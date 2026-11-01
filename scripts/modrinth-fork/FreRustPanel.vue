@@ -20,7 +20,11 @@ const m = defineMessages({
   missing: { id: 'fre-rust.setup.missing', defaultMessage: 'Native Rust game is not installed in this FRE LAUNCH build.' },
   ready: { id: 'fre-rust.setup.ready', defaultMessage: 'Minecraft resources prepared' },
   notReady: { id: 'fre-rust.setup.not-ready', defaultMessage: 'Minecraft resources not prepared' },
-  details: { id: 'fre-rust.setup.details', defaultMessage: 'Rust engine and resources are packaged during your local FRE LAUNCH build. Minecraft resources must come from your own legally installed Java Edition; they are not downloaded from unknown sources.' },
+  details: { id: 'fre-rust.setup.details', defaultMessage: 'The Rust engine is part of FRE LAUNCH. Import the prepared game resources from your own Minecraft Java Edition installation; private resources are never included in public updates.' },
+  source: { id: 'fre-rust.setup.source', defaultMessage: 'Prepared game resources folder (optional; leave blank for automatic detection)' },
+  import: { id: 'fre-rust.setup.import', defaultMessage: 'Import Minecraft resources' },
+  importing: { id: 'fre-rust.setup.importing', defaultMessage: 'Importing game resources...' },
+  importHelp: { id: 'fre-rust.setup.import-help', defaultMessage: 'Import a prepared resource folder containing horizon-resources.json. Your original files and worlds are not moved or deleted.' },
   none: { id: 'fre-rust.setup.none', defaultMessage: 'No Rust profiles yet.' },
   logs: { id: 'fre-rust.setup.logs', defaultMessage: 'Show game log' },
   error: { id: 'fre-rust.setup.error', defaultMessage: 'Error: {reason}' },
@@ -29,11 +33,12 @@ const visible = ref(false)
 const profiles = ref<Profile[]>([])
 const runtime = ref<Runtime | null>(null)
 const name = ref('')
+const source = ref('')
 const selectedId = ref('')
 const error = ref('')
 const notice = ref('')
 const logs = ref('')
-const pending = ref<'load' | 'create' | 'play' | 'logs' | null>(null)
+const pending = ref<'load' | 'create' | 'play' | 'logs' | 'import' | null>(null)
 const playable = computed(() => runtime.value?.installed === true && runtime.value?.prepared === true)
 
 function reason(e: unknown): string {
@@ -81,6 +86,21 @@ async function create() {
     selectedId.value = profile.id
     name.value = ''
     notice.value = profile.name
+  } catch (e) { error.value = t(m.error, { reason: reason(e) }) }
+  finally { pending.value = null }
+}
+
+async function importResources() {
+  if (pending.value || !runtime.value?.installed || runtime.value.prepared) return
+  pending.value = 'import'
+  error.value = ''
+  notice.value = ''
+  try {
+    const result = await invoke<string>('plugin:fre-rust|rust_import_resources', {
+      source: source.value.trim(),
+    })
+    notice.value = result
+    await refresh()
   } catch (e) { error.value = t(m.error, { reason: reason(e) }) }
   finally { pending.value = null }
 }
@@ -133,6 +153,15 @@ defineExpose({ show, hide })
       </div>
       <p v-if="runtime?.reason" class="mt-3 text-sm text-secondary">{{ runtime.reason }}</p>
       <p class="mt-2 text-xs text-secondary">{{ t(m.details) }}</p>
+      <div v-if="runtime?.installed && !runtime.prepared" class="mt-4 rounded-xl border border-solid border-surface-5 p-4">
+        <p class="m-0 text-xs text-secondary">{{ t(m.importHelp) }}</p>
+        <form class="mt-3 flex flex-wrap gap-2" @submit.prevent="importResources">
+          <input v-model="source" class="min-w-48 flex-1 rounded-lg bg-button-bg p-3 text-contrast" :placeholder="t(m.source)" :disabled="!!pending" />
+          <button type="submit" class="rounded-lg border-0 bg-brand px-4 py-2 font-semibold text-white disabled:opacity-40" :disabled="!!pending">
+            {{ pending === 'import' ? t(m.importing) : t(m.import) }}
+          </button>
+        </form>
+      </div>
 
       <form class="mt-5 flex flex-wrap gap-2" @submit.prevent="create">
         <input v-model="name" class="min-w-48 flex-1 rounded-lg bg-button-bg p-3 text-contrast" maxlength="64" :placeholder="t(m.name)" :disabled="!!pending" />
