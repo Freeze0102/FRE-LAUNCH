@@ -113,6 +113,9 @@ jobs:
           $exe = Get-ChildItem 'FRE-Modrinth-Source/target/release' -File -Filter '*.exe' | Select-Object -First 1
           if (!$exe) { throw 'Vue/Tauri desktop executable missing' }
           Start-MpScan -ScanType CustomScan -ScanPath $exe.FullName -ErrorAction Stop
+          $rustExe = (Resolve-Path 'scripts/modrinth-fork/fre-rust-runtime/fre-rust-client.exe').Path
+          Start-MpScan -ScanType CustomScan -ScanPath $rustExe -ErrorAction Stop
+          if (!(Test-Path -LiteralPath $rustExe)) { throw 'Rust game executable was quarantined' }
           if (@(Get-MpThreatDetection).Count) { throw 'Defender reported a malware detection: release blocked' }
           Write-Host "Scanned executable: $($exe.Name)"
           Write-Host "Scanned installer: $($installer.Name)"
@@ -163,12 +166,12 @@ jobs:
         with:
           name: FRE-LAUNCH-v0.5.10-Vue-Rust-Windows-REVIEW
           path: |
-            ${{ env.FRE_REVIEW_STAGE }}/FRE-LAUNCH-Windows-x64-Setup.exe
-            ${{ env.FRE_REVIEW_STAGE }}/FRE-LAUNCH-Windows-x64-Setup.exe.sig
-            ${{ env.FRE_REVIEW_STAGE }}/latest.json
-            ${{ env.FRE_REVIEW_STAGE }}/SHA256SUMS.txt
-            ${{ env.FRE_REVIEW_STAGE }}/PROVENANCE.json
-            ${{ env.FRE_REVIEW_STAGE }}/NOTES.md
+            release-staging/v0.5.10/FRE-LAUNCH-Windows-x64-Setup.exe
+            release-staging/v0.5.10/FRE-LAUNCH-Windows-x64-Setup.exe.sig
+            release-staging/v0.5.10/latest.json
+            release-staging/v0.5.10/SHA256SUMS.txt
+            release-staging/v0.5.10/PROVENANCE.json
+            release-staging/v0.5.10/NOTES.md
           if-no-files-found: error
           retention-days: 7
 
