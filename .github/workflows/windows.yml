@@ -1,4 +1,5 @@
-name: Windows Build
+name: Legacy React Windows Build (NOT Vue Rust Update)
+# Historical React launcher only. For Vue/Rust signed updates use fre-modrinth-rust-update.yml.
 # Heavy Windows installers consume private-repository Actions minutes.
 # Run only when explicitly requested in GitHub -> Actions -> Windows Build.
 on:
