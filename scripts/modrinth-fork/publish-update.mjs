@@ -22,6 +22,7 @@ verifyTauriSignature(installer, signature, channel.publicKey)
 if (manifest.version !== channel.version || manifest.platforms?.['windows-x86_64']?.signature !== signature ||
     manifest.platforms['windows-x86_64'].url !== `https://github.com/${channel.repository}/releases/download/v${channel.version}/${assetName}` ||
     provenance.installer.sha256 !== sha(installer) || !provenance.installer.signatureVerified ||
+    provenance.proprietaryMinecraftAssetsIncluded !== false ||
     provenance.defender?.active !== true || provenance.defender.threatsFound !== 0 ||
     provenance.defender.launcherExitCode !== 0 || provenance.defender.installerExitCode !== 0 ||
     files.get('SHA256SUMS.txt').toString().trim() !== `${sha(installer)}  ${assetName}` ||
@@ -34,15 +35,20 @@ if (process.argv.includes('--dry-run')) {
     assets: names.map(name => ({ name, bytes: files.get(name).length, sha256: sha(files.get(name)) })), uploaded: false }, null, 2))
   process.exit(0)
 }
-let raw
-try {
-  raw = execFileSync('git', ['credential', 'fill'], { cwd: root,
-    input: 'protocol=https\nhost=github.com\npath=Freeze0102/FRE-LAUNCH.git\n\n', encoding: 'utf8',
-    env: { ...process.env, GIT_TERMINAL_PROMPT: '0', GCM_INTERACTIVE: 'never' }, timeout: 20_000,
-    stdio: ['pipe', 'pipe', 'pipe'] })
-} catch { throw Error('Existing GitHub authorization is unavailable') }
-const token = raw.split(/\r?\n/).find(line => line.startsWith('password='))?.slice(9)
-if (!token) throw Error('Existing GitHub authorization is unavailable')
+// GitHub Actions has a short-lived, scoped GITHUB_TOKEN. Outside Actions
+// retain the existing local Git credential helper. Never echo either secret.
+let token = process.env.GITHUB_ACTIONS === 'true' ? process.env.GH_TOKEN : null
+if (!token) {
+  let raw
+  try {
+    raw = execFileSync('git', ['credential', 'fill'], { cwd: root,
+      input: 'protocol=https\nhost=github.com\npath=Freeze0102/FRE-LAUNCH.git\n\n', encoding: 'utf8',
+      env: { ...process.env, GIT_TERMINAL_PROMPT: '0', GCM_INTERACTIVE: 'never' }, timeout: 20_000,
+      stdio: ['pipe', 'pipe', 'pipe'] })
+  } catch { throw Error('Existing GitHub authorization is unavailable') }
+  token = raw.split(/\r?\n/).find(line => line.startsWith('password='))?.slice(9)
+}
+if (!token) throw Error('GitHub authorization is unavailable')
 const headers = { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'User-Agent': 'FRE-LAUNCH-local-release' }
 const api = `https://api.github.com/repos/${channel.repository}`
 async function request(url, method = 'GET', body) {
@@ -69,7 +75,7 @@ if (release && (!release.draft || release.target_commitish !== provenance.source
 if (release && release.body !== notes) throw Error('Existing draft notes differ from the reviewed local notes')
 if (!release) release = await request(`${api}/releases`, 'POST', {
   tag_name: tag, target_commitish: provenance.sourceCommit,
-  name: `FRE LAUNCH ${channel.version} — Horizon setup and signed updates`,
+  name: `FRE LAUNCH ${channel.version} — Minecraft Rust and signed updates`,
   body: notes, draft: true, prerelease: false,
 })
 for (const name of names) {
