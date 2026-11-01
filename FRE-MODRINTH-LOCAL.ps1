@@ -67,7 +67,7 @@ $requiredSourceFiles = @(
     'pnpm-workspace.yaml',
     'pnpm-lock.yaml'
 )
-$patchNames = @('prepare.py','feature_local_accounts.py','feature_ukrainian.py','feature_skin_notice.py','feature_offline_skins.py','feature_local_skin_preview.py','feature_ui_polish.py','feature_guest_launch.py','feature_java_nickname_lookup.py','feature_remove_modrinth_login.py','feature_brand_presence.py','feature_curseforge.py','curseforge_backend.rs','CurseForgeBrowser.vue','feature_horizon.py','horizon_backend.rs','HorizonRustPanel.vue','verify.py')
+$patchNames = @('prepare.py','feature_local_accounts.py','feature_ukrainian.py','feature_skin_notice.py','feature_offline_skins.py','feature_local_skin_preview.py','feature_ui_polish.py','feature_guest_launch.py','feature_java_nickname_lookup.py','feature_remove_modrinth_login.py','feature_brand_presence.py','feature_curseforge.py','curseforge_backend.rs','CurseForgeBrowser.vue','feature_horizon.py','horizon_backend.rs','HorizonRustPanel.vue','HorizonLibrary.vue','verify.py')
 $patchNames += @('feature_updates.py','fre-app-updater.ts','fre-update-ui.js','fre_update_policy.rs','fre_updater_impl.rs','fre-update-test.json')
 $patchNames += @('feature_frontend_types.py','frontend-type-fixes.json','fre-query-options.ts')
 $patchNames += @('fre-compat.d.ts')
