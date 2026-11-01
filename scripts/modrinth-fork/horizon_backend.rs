@@ -17,6 +17,7 @@ pub fn init<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
             horizon_instances, horizon_create, horizon_play, horizon_logs,
             horizon_versions, horizon_install_version, horizon_set_version, horizon_prepare,
             horizon_install_launcher, horizon_detect_launcher, horizon_status, horizon_open_launcher,
+            horizon_direct_play,
         ])
         .build()
 }
@@ -253,6 +254,99 @@ async fn horizon_prepare(exe_path: String, minecraft_path: Option<String>, versi
         args.extend(["--minecraft", path]);
     }
     run_cli(&exe, &args, INSTALL_TIMEOUT).await
+}
+
+/// FRE LAUNCH owns the Play action. The official Horizon CLI is used only for
+/// verified installation and preparing Minecraft resources, not for starting
+/// the game. The actual program here is horizon-client.exe.
+#[tauri::command]
+async fn horizon_direct_play<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>, exe_path: String, name: String,
+) -> Result<String, String> {
+    let exe = validate_launcher(&exe_path)?;
+    let name = validate_name(&name)?;
+    // Never infer an instance from a folder typed by the caller: trust the
+    // official locally installed instance manifest returned by the CLI.
+    let state = horizon_status(exe_path.clone()).await?;
+    let profile = state.instances.iter().find(|instance| instance.id == name)
+        .ok_or("Horizon profile is no longer present; refresh the library.")?;
+    if profile.id != "horizon"
+        && (!profile.id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+            || profile.id.starts_with('-')) {
+        return Err("Only ordinary, independent Horizon profiles can be launched directly.".into());
+    }
+    let version = profile.version.as_deref()
+        .filter(|tag| *tag != "latest")
+        .or(state.selected_version.as_deref())
+        .or_else(|| state.installed_versions.first().map(String::as_str))
+        .ok_or("Install a Horizon game version before playing.")?;
+    let version = validate_version(version)?.to_owned();
+    if !state.installed_versions.iter().any(|v| v == &version)
+        || !state.prepared_versions.iter().any(|v| v == &version) {
+        return Err("Horizon game version or Minecraft resources are not prepared. Open Manage.".into());
+    }
+
+    // Horizon itself uses dirs::data_dir()/horizon-launcher and
+    // dirs::data_dir()/horizon (APPDATA on Windows). Respect documented
+    // overrides so profiles created by the official installer remain visible.
+    let data = std::env::var_os("APPDATA").map(PathBuf::from)
+        .unwrap_or(app.path().data_dir().map_err(|e| e.to_string())?);
+    let launcher_home = std::env::var_os("HORIZON_LAUNCHER_HOME")
+        .filter(|v| !v.is_empty()).map(PathBuf::from)
+        .unwrap_or_else(|| data.join("horizon-launcher"));
+    let game_home = std::env::var_os("HORIZON_HOME")
+        .filter(|v| !v.is_empty()).map(PathBuf::from)
+        .unwrap_or_else(|| data.join("horizon"));
+    let release_dir = launcher_home.join("versions").join(&version);
+    let binary = release_dir.join("horizon-client.exe");
+    if !release_dir.join(".installed").is_file() || !binary.is_file() {
+        return Err(format!("Native Rust game binary missing for {version}. Reinstall the game from Manage."));
+    }
+    let game_version = std::fs::read(release_dir.join("research-lock.json"))
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
+        .and_then(|v| v.pointer("/minecraft/version").and_then(|x| x.as_str()).map(str::to_string))
+        .unwrap_or_else(|| "26.3".to_owned());
+    // Prevent resource traversal even if a release's metadata was modified.
+    if !game_version.chars().all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '_' || c == '-')
+        || !game_version.starts_with(|c: char| c.is_ascii_digit()) {
+        return Err("Horizon release has an invalid Minecraft resource version.".into());
+    }
+    let resources = release_dir.join(".local").join("horizon-client").join(&game_version);
+    if !resources.join("horizon-resources.json").is_file() {
+        return Err("Minecraft game resources were not prepared for this Horizon build.".into());
+    }
+    let home = if profile.id == "horizon" {
+        game_home.clone()
+    } else {
+        game_home.join("instances").join(&profile.id)
+    };
+    if !home.is_dir() {
+        return Err("Horizon profile folder was removed. Refresh the library.".into());
+    }
+    // The official client refreshes authenticated sessions through the
+    // installed helper only if it needs to. That does not start its GUI.
+    let mut child = Command::new(&binary);
+    child.current_dir(&home)
+        .env("HORIZON_HOME", &home)
+        .env("HORIZON_LAUNCHER_EXE", &exe)
+        .arg("--resources").arg(&resources)
+        .stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
+    #[cfg(windows)]
+    child.creation_flags(0x08000000); // no console window
+    let mut child = child.spawn().map_err(|e| format!("Could not start the Rust client: {e}"))?;
+    let pid = child.id().unwrap_or_default();
+    let mut task = tokio::spawn(async move { child.wait().await });
+    match tokio::time::timeout(Duration::from_millis(1000), &mut task).await {
+        Ok(result) => {
+            let status = result.map_err(|e| e.to_string())?.map_err(|e| e.to_string())?;
+            if !status.success() {
+                return Err(format!("Rust client exited immediately ({status}). Open Horizon logs."));
+            }
+            Ok(format!("Rust client exited normally. Profile: {}.", profile.name))
+        }
+        Err(_) => Ok(format!("Started horizon-client.exe directly for {} (PID {pid}).", profile.name)),
+    }
 }
 
 #[cfg(test)]
