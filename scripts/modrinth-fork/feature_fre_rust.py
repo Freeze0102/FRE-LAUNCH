@@ -134,7 +134,7 @@ def apply(root: Path):
         resources = settings["bundle"].setdefault("resources", {})
         if not isinstance(resources, dict):
             raise RuntimeError("Unexpected Tauri bundle.resources configuration.")
-        for file in binaries:
+        for file in binaries + ("BUILD-INFO.json",):
             resources[f"fre-rust-runtime/{file}"] = f"fre-rust/{file}"
         resources["fre-rust-runtime/resources/"] = "fre-rust/resources/"
         conf.write_text(json.dumps(settings, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
