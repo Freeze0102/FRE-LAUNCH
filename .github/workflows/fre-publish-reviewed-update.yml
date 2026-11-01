@@ -1,0 +1,95 @@
+name: Publish reviewed FRE LAUNCH Vue Rust update
+
+on:
+  workflow_dispatch:
+    inputs:
+      review_run_id:
+        description: 'Successful FRE LAUNCH Vue Rust Windows Update run number (not the old Windows Build workflow)'
+        type: string
+        required: true
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: frelaunch-vue-rust-release
+  cancel-in-progress: false
+
+jobs:
+  publish-reviewed:
+    if: github.ref == 'refs/heads/main' && vars.FRE_LAUNCH_SECURITY_APPROVED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout exactly the source being released
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install release verification runtime
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Verify reviewed Windows run belongs to current main
+        shell: bash
+        env:
+          REVIEW_RUN_ID: ${{ inputs.review_run_id }}
+        run: |
+          set -euo pipefail
+          [[ "$REVIEW_RUN_ID" =~ ^[0-9]+$ ]] || { echo 'Invalid run ID'; exit 1; }
+          data=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$REVIEW_RUN_ID")
+          echo "$data" | jq -e --arg source "$GITHUB_SHA" \
+            '.conclusion == "success" and .status == "completed" and .head_sha == $source and .head_branch == "main" and (.path | contains("fre-modrinth-rust-update.yml"))' \
+            >/dev/null || { echo 'Review run is not a successful native Vue/Rust build of current main'; exit 1; }
+          if gh release view v0.5.10 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo 'Version v0.5.10 already exists, no replacement allowed'
+            exit 1
+          fi
+
+      - name: Download the signed Windows EXE and its review evidence
+        shell: bash
+        env:
+          REVIEW_RUN_ID: ${{ inputs.review_run_id }}
+        run: |
+          set -euo pipefail
+          mkdir -p release-staging/v0.5.10
+          gh run download "$REVIEW_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            -n 'FRE-LAUNCH-v0.5.10-Vue-Rust-Windows-REVIEW' \
+            -D release-staging/v0.5.10
+          test -s release-staging/v0.5.10/FRE-LAUNCH-Windows-x64-Setup.exe
+          test -s release-staging/v0.5.10/latest.json
+          test -s release-staging/v0.5.10/PROVENANCE.json
+          jq -e --arg sha "$GITHUB_SHA" \
+            '.sourceCommit == $sha and .proprietaryMinecraftAssetsIncluded == false and .defender.active == true and .defender.threatsFound == 0 and .defender.launcherExitCode == 0 and .defender.installerExitCode == 0' \
+            release-staging/v0.5.10/PROVENANCE.json >/dev/null
+
+      - name: Cryptographically verify update, signatures, Defender report and commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/modrinth-fork/publish-update.mjs --dry-run
+
+      - name: Create verified GitHub Release and enable in-launcher update
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/modrinth-fork/publish-update.mjs --publish
+
+      - name: Check anonymous updater delivery and signature
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3 4; do
+            if node scripts/modrinth-fork/smoke-update.mjs 0.5.9; then
+              echo 'Anonymous signed v0.5.10 FRE LAUNCH auto-update is available'
+              exit 0
+            fi
+            sleep 15
+          done
+          echo 'Release was published but anonymous delivery verification failed'
+          exit 1
