@@ -67,17 +67,32 @@ $requiredSourceFiles = @(
     'pnpm-workspace.yaml',
     'pnpm-lock.yaml'
 )
-$patchNames = @('prepare.py','feature_local_accounts.py','feature_ukrainian.py','feature_skin_notice.py','feature_offline_skins.py','feature_local_skin_preview.py','feature_ui_polish.py','feature_guest_launch.py','feature_java_nickname_lookup.py','feature_remove_modrinth_login.py','feature_brand_presence.py','feature_curseforge.py','curseforge_backend.rs','CurseForgeBrowser.vue','feature_horizon.py','horizon_backend.rs','HorizonRustPanel.vue','HorizonLibrary.vue','verify.py')
+$patchNames = @('prepare.py','feature_local_accounts.py','feature_ukrainian.py','feature_skin_notice.py','feature_offline_skins.py','feature_local_skin_preview.py','feature_ui_polish.py','feature_guest_launch.py','feature_java_nickname_lookup.py','feature_remove_modrinth_login.py','feature_brand_presence.py','feature_curseforge.py','curseforge_backend.rs','CurseForgeBrowser.vue','feature_horizon.py','horizon_backend.rs','HorizonRustPanel.vue','HorizonLibrary.vue','feature_fre_rust.py','fre_rust_backend.rs','FreRustPanel.vue','FreRustLibrary.vue','verify.py')
 $patchNames += @('feature_updates.py','fre-app-updater.ts','fre-update-ui.js','fre_update_policy.rs','fre_updater_impl.rs','fre-update-test.json')
 $patchNames += @('feature_frontend_types.py','frontend-type-fixes.json','fre-query-options.ts')
 $patchNames += @('fre-compat.d.ts')
 $patchNames += @('feature_security_dependencies.py','security-dependencies.json','security-pnpm-lock.yaml')
 $patchNames += @('horizon_bootstrap.rs','horizon-setup-messages.json')
+# Own native Rust engine is an optional local binary. A cached generated tree
+# must be rebuilt when it becomes available or changes. It is never uploaded
+# to GitHub and no CI minutes are used by this script.
+$rustRuntimeFolder = Join-Path $projectRoot 'scripts\modrinth-fork\fre-rust-runtime'
+$rustRuntimeInputs = @('fre-rust-client.exe', 'resources\horizon-resources.json', 'BUILD-INFO.json')
+$rustRuntimeSignature = if (Test-Path -LiteralPath $rustRuntimeFolder -PathType Container) {
+    ($rustRuntimeInputs | ForEach-Object {
+        $file = Join-Path $rustRuntimeFolder $_
+        if (-not (Test-Path -LiteralPath $file -PathType Leaf)) {
+            throw "Native Rust runtime is incomplete: $file. Rebuild it with BUILD-FRE-RUST.ps1."
+        }
+        (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash
+    }) -join ':'
+} else { 'fre-rust-not-built' }
+
 $signature = ($revision + ':' + (($patchNames | ForEach-Object {
     $sourceFile = Join-Path $projectRoot ('scripts\modrinth-fork\' + $_)
     if (-not (Test-Path $sourceFile)) { throw "Missing source patcher: $sourceFile" }
     (Get-FileHash $sourceFile -Algorithm SHA256).Hash
-}) -join ':') + ':' + (Get-FileHash (Join-Path $projectRoot 'update-channel.json') -Algorithm SHA256).Hash)
+}) -join ':') + ':' + (Get-FileHash (Join-Path $projectRoot 'update-channel.json') -Algorithm SHA256).Hash + ':' + $rustRuntimeSignature)
 if (Test-Path $destination) {
     $incompletePreparation = -not (Test-Path $prepared)
     if ($incompletePreparation) {
