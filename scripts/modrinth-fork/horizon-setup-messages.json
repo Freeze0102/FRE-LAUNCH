@@ -4,28 +4,28 @@
     "Horizon — Minecraft in Rust"
   ],
   "intro": [
-    "Три кроки для першого запуску. Після налаштування достатньо натиснути «Грати».",
-    "Three steps for your first launch. Afterwards, just press Play."
+    "Створи власну Rust-збірку. FRE LAUNCH встановлює гру й запускає horizon-client.exe безпосередньо.",
+    "Create your own Rust profile. FRE LAUNCH installs the game and starts horizon-client.exe directly."
   ],
   "close": [
     "Закрити",
     "Close"
   ],
   "launcherStep": [
-    "Лаунчер Horizon",
-    "Horizon launcher"
+    "Компоненти Rust-гри",
+    "Rust game setup"
   ],
   "launcherHelp": [
-    "FRE LAUNCH сам завантажить офіційний лаунчер для Windows і перевірить файл. ZIP вручну розпаковувати не потрібно.",
-    "FRE LAUNCH downloads the official Windows launcher and verifies the file. No manual ZIP extraction is needed."
+    "FRE LAUNCH безпечно завантажує офіційні компоненти встановлення. Для гри не потрібно відкривати інший лаунчер.",
+    "FRE LAUNCH securely downloads the official setup components. No second launcher window is required to play."
   ],
   "done": [
     "Готово",
     "Ready"
   ],
   "download": [
-    "Завантажити Horizon для Windows",
-    "Download Horizon for Windows"
+    "Встановити компоненти Rust-гри",
+    "Install Rust game components"
   ],
   "downloading": [
     "Завантажуємо… {percent}%",
@@ -108,24 +108,24 @@
     "Play Horizon"
   ],
   "playing": [
-    "Передаємо запуск Horizon…",
-    "Starting through Horizon…"
+    "Запускаємо Minecraft на Rust…",
+    "Starting Rust Minecraft…"
   ],
   "prepareFirst": [
     "Спочатку встанови Horizon й підготуй ресурси Minecraft у кроках 2–3.",
     "First install Horizon and prepare Minecraft resources in steps 2–3."
   ],
   "accountHelp": [
-    "Офіційний Horizon перевіряє Microsoft-акаунт із Minecraft Java. Для входу та налаштувань відкрий його вікно кнопкою нижче.",
-    "The official Horizon launcher checks a Microsoft account that owns Minecraft Java. Open its window below to sign in or change its settings."
+    "Для перевірки акаунта окремі версії Horizon можуть вимагати разовий вхід через офіційний допоміжний компонент. Звичайна кнопка «Грати» запускає Rust-клієнт напряму.",
+    "For account verification, some Horizon versions still require the original sign-in helper once. Normal Play starts the Rust client directly."
   ],
   "openLauncher": [
     "Відкрити Horizon / увійти в акаунт",
     "Open Horizon / sign in"
   ],
   "launchRequested": [
-    "Команду запуску передано Horizon. Стан самої гри перевіряй у Horizon або його логах.",
-    "The launch request was passed to Horizon. Check Horizon or its logs for the game's status."
+    "FRE LAUNCH запустив Minecraft на Rust напряму. Якщо гра закрилась, переглянь логи.",
+    "FRE LAUNCH started the native Rust Minecraft client. If it closes, check the logs."
   ],
   "wait": [
     "Команда Horizon виконується. Встановлення та підготовка можуть тривати кілька хвилин.",
@@ -152,8 +152,8 @@
     "Create a separate instance"
   ],
   "created": [
-    "Збірку створено й вибрано у списку запуску.",
-    "The instance was created and selected for Play."
+    "Твою Rust-збірку додано до бібліотеки FRE LAUNCH.",
+    "Your Rust profile is now in the FRE LAUNCH library."
   ],
   "releaseTag": [
     "Точний тег версії або latest",
@@ -204,7 +204,7 @@
     "Horizon error: {reason}"
   ],
   "about": [
-    "Horizon розробляє окрема команда. FRE LAUNCH керує його офіційним лаунчером; Java-моди не стають Rust-модами, а рушій гри тут не змінюється.",
-    "Horizon is developed by a separate team. FRE LAUNCH controls its official launcher; Java mods do not become Rust mods, and the game engine is unchanged."
+    "Horizon — незалежна Rust-гра. FRE LAUNCH встановлює та запускає її клієнт безпосередньо. Офіційний допоміжний компонент зберігається для перевірених оновлень, ресурсів та за потреби оновлення акаунта.",
+    "Horizon is an independent Rust game. FRE LAUNCH installs and starts the native client directly; its official helper is kept for verified updates, resources and optional account refresh."
   ]
 }
