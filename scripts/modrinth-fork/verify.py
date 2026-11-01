@@ -240,6 +240,13 @@ def verify(root):
     updater = (root/'apps/app/src/updater_impl.rs').read_text()
     assert updater.index('verify_signature(') < updater.index('replace((update, bytes))')
     assert 'MAX_UPDATE_BYTES' in updater
+    from feature_security_dependencies import workspace_overrides
+    security = json.loads((Path(__file__).parent / 'security-dependencies.json').read_text())
+    lock = (root / 'pnpm-lock.yaml').read_text(encoding='utf-8')
+    assert hashlib.sha256(lock.encode()).hexdigest() == security['patchedLockSha256']
+    workspace = (root / 'pnpm-workspace.yaml').read_text(encoding='utf-8')
+    assert 'minimumReleaseAge: 10080' in workspace
+    assert workspace.endswith(workspace_overrides(security)), 'Security overrides differ from the audited lock'
     print(f"Source check passed: {len(app_en)} App messages and {len(ui_en)} UI messages covered in UK + EN.")
     print("Nickname path, unique identifier, advertising and hosting checks passed.")
     print("Note: this does not replace real Rust/Vue/Windows compilation or Minecraft runtime testing.")

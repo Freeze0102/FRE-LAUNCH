@@ -70,6 +70,7 @@ $patchNames = @('prepare.py','feature_local_accounts.py','feature_ukrainian.py',
 $patchNames += @('feature_updates.py','fre-app-updater.ts','fre-update-ui.js','fre_update_policy.rs','fre_updater_impl.rs','fre-update-test.json')
 $patchNames += @('feature_frontend_types.py','frontend-type-fixes.json','fre-query-options.ts')
 $patchNames += @('fre-compat.d.ts')
+$patchNames += @('feature_security_dependencies.py','security-dependencies.json','security-pnpm-lock.yaml')
 $signature = ($revision + ':' + (($patchNames | ForEach-Object {
     $sourceFile = Join-Path $projectRoot ('scripts\modrinth-fork\' + $_)
     if (-not (Test-Path $sourceFile)) { throw "Missing source patcher: $sourceFile" }
@@ -188,7 +189,7 @@ if ($BuildWindows -or $RunDev) {
                 if (-not $env:TAURI_SIGNING_PRIVATE_KEY) {
                     throw 'Signed releases require TAURI_SIGNING_PRIVATE_KEY. See UPDATES_UA.md. Never generate a replacement key for an existing channel.'
                 }
-                pnpm.cmd --filter '@modrinth/app' tauri build --bundles nsis
+                pnpm.cmd --filter '@modrinth/app' tauri build --ci --bundles nsis
                 if ($LASTEXITCODE -ne 0) { throw 'Tauri build failed' }
             } finally { $env:TAURI_SIGNING_PRIVATE_KEY = $previousSigningKey }
             Write-Host 'Windows NSIS installer generated under FRE-Modrinth-Source/target/release/bundle/nsis' -ForegroundColor Green

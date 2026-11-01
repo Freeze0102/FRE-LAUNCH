@@ -18,6 +18,23 @@ TEMP_ROOT.mkdir(exist_ok=True)
 
 
 class PatchTests(unittest.TestCase):
+    def test_security_lock_drift_cannot_mutate_workspace(self):
+        import feature_security_dependencies
+        with tempfile.TemporaryDirectory(dir=TEMP_ROOT, prefix='test-security-drift-') as directory:
+            root = Path(directory)
+            (root / 'pnpm-lock.yaml').write_text('wrong upstream lock')
+            (root / 'pnpm-workspace.yaml').write_text('original workspace')
+            with self.assertRaisesRegex(RuntimeError, 'lockfile base drift'):
+                feature_security_dependencies.apply(root)
+            self.assertEqual((root / 'pnpm-workspace.yaml').read_text(), 'original workspace')
+
+    def test_security_release_age_exceptions_are_exact(self):
+        import feature_security_dependencies
+        with self.assertRaisesRegex(RuntimeError, 'exact security releases'):
+            feature_security_dependencies.workspace_overrides({
+                'overrides': {}, 'minimumReleaseAgeExclude': ['glob@*'],
+            })
+
     def test_frontend_fixes_are_transactional(self):
         import feature_frontend_types
         with tempfile.TemporaryDirectory(dir=TEMP_ROOT, prefix='test-frontend-drift-') as directory:
