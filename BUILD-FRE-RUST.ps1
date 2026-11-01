@@ -34,6 +34,10 @@ $actual = (& git -C $SourceDir rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $actual -ne $revision) {
     throw "Wrong Rust engine revision: $actual. Expected $revision. Refusing to build unknown code."
 }
+$sourceChanges = @(& git -C $SourceDir status --porcelain --untracked-files=normal)
+if ($LASTEXITCODE -ne 0 -or @($sourceChanges | Where-Object { $_ }).Count -gt 0) {
+    throw 'Rust engine checkout contains local changes. Use a separate clean pinned checkout, so BUILD-INFO.json is not misleading.'
+}
 foreach ($relative in @('LICENSE', 'research-lock.json', 'crates\horizon-client\Cargo.toml',
     'crates\horizon-prepare\Cargo.toml')) {
     if (-not (Test-Path -LiteralPath (Join-Path $SourceDir $relative))) {
