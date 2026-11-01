@@ -3,6 +3,7 @@
 //! client is bundled from openly licensed Rust sources at local build time.
 //! Private Minecraft game resources are supplied only from the owner's copy.
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -177,6 +178,48 @@ fn runtime_files(root: &Path) -> (PathBuf, PathBuf) {
     (root.join("fre-rust-client.exe"), root.join("resources"))
 }
 
+#[derive(Deserialize)]
+struct GameBuildInfo {
+    engine_license: String,
+    source_commit: String,
+    game_exe_sha256: String,
+}
+
+/// Validate the local, pinned open-source engine before it ever starts.
+/// Private Minecraft assets remain in their own read-only package folder.
+fn verify_native_client(root: &Path) -> Result<(), String> {
+    use std::io::Read;
+    let info_path = root.join("BUILD-INFO.json");
+    let bytes = fs::read(info_path).map_err(|e| format!("Rust build manifest missing: {e}"))?;
+    if bytes.len() > 8192 {
+        return Err("Rust build manifest is unexpectedly large.".into());
+    }
+    let bytes = bytes.strip_prefix(&[0xef, 0xbb, 0xbf]).unwrap_or(&bytes);
+    let info: GameBuildInfo = serde_json::from_slice(bytes)
+        .map_err(|e| format!("Invalid Rust build manifest: {e}"))?;
+    if info.engine_license != "MIT"
+        || info.source_commit != "975c07d9151847e6af13afc4b5ab37b6bbe78ef5"
+        || info.game_exe_sha256.len() != 64
+        || !info.game_exe_sha256.bytes().all(|b| b.is_ascii_hexdigit())
+    {
+        return Err("Rust engine build provenance is invalid.".into());
+    }
+    let binary = root.join("fre-rust-client.exe");
+    let mut file = fs::File::open(binary).map_err(|e| format!("Rust game executable missing: {e}"))?;
+    let mut hasher = Sha256::new();
+    let mut buf = [0u8; 1024 * 1024];
+    loop {
+        let count = file.read(&mut buf).map_err(|e| e.to_string())?;
+        if count == 0 { break; }
+        hasher.update(&buf[..count]);
+    }
+    let digest = format!("{:x}", hasher.finalize());
+    if !digest.eq_ignore_ascii_case(&info.game_exe_sha256) {
+        return Err("Rust game executable checksum mismatch; reinstall a trusted FRE LAUNCH build.".into());
+    }
+    Ok(())
+}
+
 fn ready(root: &Path) -> RustRuntime {
     let (client, resources) = runtime_files(root);
     let installed = client.is_file();
@@ -216,6 +259,7 @@ async fn rust_launch<R: tauri::Runtime>(
     if let Some(message) = runtime.reason {
         return Err(message);
     }
+    verify_native_client(&runtime_dir)?;
     let (client, resources) = runtime_files(&runtime_dir);
     let client = client.canonicalize().map_err(|e| e.to_string())?;
     let resources = resources.canonicalize().map_err(|e| e.to_string())?;
@@ -327,6 +371,18 @@ mod tests {
         assert_eq!(read_profile(&dir, "123456789").unwrap().created, 1234);
         fs::write(dir.join("profile.json"), b"garbage").unwrap();
         assert!(read_profile(&dir, "123456789").is_none());
+    }
+    #[test]
+    fn refuses_modified_or_unknown_rust_executable() {
+        let directory = tempfile::tempdir().unwrap();
+        fs::write(directory.path().join("fre-rust-client.exe"), b"MZ trusted build").unwrap();
+        let digest = format!("{:x}", Sha256::digest(b"MZ trusted build"));
+        fs::write(directory.path().join("BUILD-INFO.json"), format!(
+            "{{\"engine_license\":\"MIT\",\"source_commit\":\"975c07d9151847e6af13afc4b5ab37b6bbe78ef5\",\"game_exe_sha256\":\"{digest}\"}}"
+        )).unwrap();
+        assert!(verify_native_client(directory.path()).is_ok());
+        fs::write(directory.path().join("fre-rust-client.exe"), b"MZ tampered").unwrap();
+        assert!(verify_native_client(directory.path()).is_err());
     }
     #[test]
     fn missing_game_is_not_reported_as_ready() {
