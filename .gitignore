@@ -7,3 +7,5 @@ __pycache__/
 FRE-Modrinth-Source/
 FRE-Modrinth-Source-archive-*/
 .audit/
+.fre-update-keys/
+release-staging/

@@ -16,7 +16,7 @@ def patch_cargo_lock(root):
     contents = lock.read_text(encoding='utf-8')
     for package, additions in {
         'theseus': ['md5'],
-        'theseus_gui': ['sha1 0.10.6', 'zip 6.0.0'],
+        'theseus_gui': ['minisign-verify', 'sha1 0.10.6', 'zip 6.0.0'],
     }.items():
         pattern = rf'(\[\[package\]\]\nname = "{package}"\n.*?dependencies = \[\n)(.*?)(\n\])'
         matches = list(re.finditer(pattern, contents, re.S))
@@ -240,7 +240,7 @@ def customize(root,revision):
         "Original: https://github.com/modrinth/code\n"
         "Pinned source revision: "+revision+"\n\n"
         "Changes: FRE LAUNCH identity and original neutral artwork; no hosting menu or routes,\n"
-        "advertising window initialization, promotion banners or upstream auto-updater.\n"
+        "advertising window initialization or promotion banners; signed FRE LAUNCH updates.\n"
         "The complete pinned upstream source tree and all original license notices are retained.\n\n"
         "License: GPL-3.0-only for the Modrinth App code, with original copyright and\n"
         "license notices retained. Redistributors must provide corresponding source.\n"
@@ -265,6 +265,7 @@ def customize(root,revision):
     from feature_brand_presence import apply as brand_startup_and_discord
     from feature_curseforge import apply as add_curseforge_source
     from feature_horizon import apply as add_horizon_client
+    from feature_updates import apply as add_signed_updates
     add_local_accounts(root)
     guard_offline_skins(root)
     add_offline_skin_support(root)
@@ -277,6 +278,7 @@ def customize(root,revision):
     add_curseforge_source(root)
     add_horizon_client(root)
     finish_ukrainian(root)
+    add_signed_updates(root)
     patch_cargo_lock(root)
     # Publish the completion marker only after every patch succeeds.
     marker.write_text(fork_notice, encoding="utf-8")

@@ -38,15 +38,19 @@ $requiredSourceFiles = @(
     'apps\app-frontend\package.json',
     'apps\frontend\package.json',
     'apps\app\package.json',
+    'apps\app\src\fre_update_policy.rs',
+    'apps\app\src\fre_update_channel.rs',
+    'apps\app-frontend\src\helpers\fre-app-updater.ts',
     'pnpm-workspace.yaml',
     'pnpm-lock.yaml'
 )
 $patchNames = @('prepare.py','feature_local_accounts.py','feature_ukrainian.py','feature_skin_notice.py','feature_offline_skins.py','feature_local_skin_preview.py','feature_ui_polish.py','feature_guest_launch.py','feature_java_nickname_lookup.py','feature_remove_modrinth_login.py','feature_brand_presence.py','feature_curseforge.py','curseforge_backend.rs','CurseForgeBrowser.vue','feature_horizon.py','horizon_backend.rs','HorizonRustPanel.vue','verify.py')
+$patchNames += @('feature_updates.py','fre-app-updater.ts','fre-update-ui.js','fre_update_policy.rs','fre_updater_impl.rs','fre-update-test.json')
 $signature = ($revision + ':' + (($patchNames | ForEach-Object {
     $sourceFile = Join-Path $projectRoot ('scripts\modrinth-fork\' + $_)
     if (-not (Test-Path $sourceFile)) { throw "Missing source patcher: $sourceFile" }
     (Get-FileHash $sourceFile -Algorithm SHA256).Hash
-}) -join ':'))
+}) -join ':') + ':' + (Get-FileHash (Join-Path $projectRoot 'update-channel.json') -Algorithm SHA256).Hash)
 if (Test-Path $destination) {
     $incompletePreparation = -not (Test-Path $prepared)
     if ($incompletePreparation) {
@@ -63,6 +67,10 @@ if (Test-Path $destination) {
     if ($incompletePreparation -or $previousSignature -ne $signature -or $missingSourceFiles.Count -gt 0) {
         $archive = Join-Path $projectRoot ('FRE-Modrinth-Source-archive-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
         if (Test-Path $archive) { throw "Archive destination exists: $archive" }
+        if ([IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($destination)) -ne $projectRoot -or
+            [IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($archive)) -ne $projectRoot) {
+            throw 'Generated source paths must remain inside the repository.'
+        }
         Write-Host 'Archiving existing generated source before regeneration:' $archive -ForegroundColor Yellow
         Move-Item -LiteralPath $destination -Destination $archive
     } else {
@@ -148,8 +156,18 @@ if ($BuildWindows -or $RunDev) {
             pnpm.cmd --filter '@modrinth/app' tauri dev
             if ($LASTEXITCODE -ne 0) { throw 'Tauri dev failed' }
         } else {
-            pnpm.cmd --filter '@modrinth/app' tauri build --bundles nsis
-            if ($LASTEXITCODE -ne 0) { throw 'Tauri build failed' }
+            $previousSigningKey = $env:TAURI_SIGNING_PRIVATE_KEY
+            $localSigningKey = Join-Path $projectRoot '.fre-update-keys\frelaunch.key'
+            try {
+                if (-not $env:TAURI_SIGNING_PRIVATE_KEY -and (Test-Path -LiteralPath $localSigningKey)) {
+                    $env:TAURI_SIGNING_PRIVATE_KEY = $localSigningKey
+                }
+                if (-not $env:TAURI_SIGNING_PRIVATE_KEY) {
+                    throw 'Signed releases require TAURI_SIGNING_PRIVATE_KEY. See UPDATES_UA.md. Never generate a replacement key for an existing channel.'
+                }
+                pnpm.cmd --filter '@modrinth/app' tauri build --bundles nsis
+                if ($LASTEXITCODE -ne 0) { throw 'Tauri build failed' }
+            } finally { $env:TAURI_SIGNING_PRIVATE_KEY = $previousSigningKey }
             Write-Host 'Windows NSIS installer generated under FRE-Modrinth-Source/target/release/bundle/nsis' -ForegroundColor Green
         }
     } finally { Pop-Location }

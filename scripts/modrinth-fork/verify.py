@@ -220,6 +220,26 @@ def verify(root):
     scripts = json.loads((root/"apps/app-frontend/package.json").read_text(encoding="utf-8"))["scripts"]
     assert "-p tsconfig.app.json" in scripts["tsc:check"], "Type checking must inspect source, not an empty references-only config"
     assert "write_instance_file(" not in cf_backend, "Files API rejects writes to mods/ at the pinned revision"
+    from feature_updates import read_channel
+    channel = read_channel()
+    update_conf = json.loads((root/'apps/app/tauri.conf.json').read_text(encoding='utf-8'))
+    assert update_conf['plugins']['updater']['pubkey'] == channel['publicKey']
+    assert update_conf['plugins']['updater']['endpoints'] == [
+        f'https://github.com/{channel["repository"]}/releases/latest/download/latest.json']
+    assert update_conf['bundle']['createUpdaterArtifacts'] is True
+    assert 'updater' in update_conf['build']['features']
+    assert 'updater' in update_conf['app']['security']['capabilities']
+    updater_cap = json.loads((root/'apps/app/capabilities/updater.json').read_text(encoding='utf-8'))
+    assert updater_cap['permissions'] == ['updater:allow-check']
+    assert 'launcher-files.modrinth.com' not in (root/'apps/app/tauri-release.conf.json').read_text()
+    assert 'launcher-files.modrinth.com' not in app
+    assert 'watch(stateInitialized' in app and 'freAppUpdater.start()' in app
+    assert 'false // Do not overwrite' not in cf_main
+    assert json.loads((root/'apps/app-frontend/package.json').read_text())['version'] == channel['version']
+    assert f'version = "{channel["version"]}"' in (root/'apps/app/Cargo.toml').read_text()
+    updater = (root/'apps/app/src/updater_impl.rs').read_text()
+    assert updater.index('verify_signature(') < updater.index('replace((update, bytes))')
+    assert 'MAX_UPDATE_BYTES' in updater
     print(f"Source check passed: {len(app_en)} App messages and {len(ui_en)} UI messages covered in UK + EN.")
     print("Nickname path, unique identifier, advertising and hosting checks passed.")
     print("Note: this does not replace real Rust/Vue/Windows compilation or Minecraft runtime testing.")
