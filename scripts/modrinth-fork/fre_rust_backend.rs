@@ -20,6 +20,7 @@ const MAX_METADATA: u64 = 8192;
 // duplicate visible profile names or compete for the same metadata.
 static PROFILE_CREATION: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 static RUNNING_PROFILES: tokio::sync::Mutex<Vec<String>> = tokio::sync::Mutex::const_new(Vec::new());
+static RESOURCE_IMPORT: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -44,6 +45,7 @@ pub fn init<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
             rust_profiles,
             rust_create_profile,
             rust_runtime,
+            rust_import_resources,
             rust_launch,
             rust_logs,
         ])
@@ -229,11 +231,20 @@ fn verify_native_client(root: &Path) -> Result<(), String> {
     Ok(())
 }
 
-fn ready(root: &Path) -> RustRuntime {
-    let (client, resources) = runtime_files(root);
+fn local_resources(data_root: &Path, bundle_root: &Path) -> PathBuf {
+    let local = data_root.join("prepared");
+    if local.join("horizon-resources.json").is_file() {
+        local
+    } else {
+        bundle_root.join("resources") // backwards-compatible personal installer
+    }
+}
+
+fn ready(root: &Path, data_root: &Path) -> RustRuntime {
+    let (client, _) = runtime_files(root);
     let installed = client.is_file() && root.join("BUILD-INFO.json").is_file()
         && root.join("research-lock.json").is_file();
-    let prepared = resources.join("horizon-resources.json").is_file();
+    let prepared = local_resources(data_root, root).join("horizon-resources.json").is_file();
     let reason = if !installed {
         Some("The FRE LAUNCH Rust game was not included in this installer. Build and bundle the native client first.".into())
     } else if !prepared {
@@ -253,7 +264,113 @@ fn ready(root: &Path) -> RustRuntime {
 async fn rust_runtime<R: tauri::Runtime>(
     app: tauri::AppHandle<R>,
 ) -> Result<RustRuntime, String> {
-    Ok(ready(&bundle(&app)?))
+    Ok(ready(&bundle(&app)?, &base(&app)?))
+}
+
+// Import only the owner's already-prepared game files from a local folder.
+// The game engine is open source and bundled, but Mojang resources must
+// never be copied into a PUBLIC installer or downloaded from an unknown host.
+fn copy_prepared(source: &Path, target: &Path) -> Result<u64, String> {
+    if !source.join("horizon-resources.json").is_file() {
+        return Err("Selected folder is not a prepared Minecraft Rust resource directory.".into());
+    }
+    if target.exists() {
+        return Err("Resources are already installed. Back them up before replacing.".into());
+    }
+    let source = source.canonicalize().map_err(|e| e.to_string())?;
+    let target_parent = target.parent().ok_or("Invalid resource destination")?;
+    fs::create_dir_all(target_parent).map_err(|e| e.to_string())?;
+    let pending = target_parent.join("prepared.pending");
+    if pending.exists() {
+        return Err("Previous resource import was interrupted. Inspect prepared.pending before retrying.".into());
+    }
+    let mut queue = vec![(source.clone(), pending.clone(), 0usize)];
+    let mut total = 0u64;
+    let mut count = 0usize;
+    let result = (|| -> Result<u64, String> {
+        while let Some((from, to, depth)) = queue.pop() {
+            if depth > 20 { return Err("Too many nested folders in Minecraft resources.".into()); }
+            if fs::symlink_metadata(&from).map_err(|e| e.to_string())?.file_type().is_symlink() {
+                return Err("Symbolic links are not permitted inside imported Minecraft resources.".into());
+            }
+            fs::create_dir(&to).map_err(|e| format!("Could not create resource folder: {e}"))?;
+            for entry in fs::read_dir(&from).map_err(|e| e.to_string())? {
+                let entry = entry.map_err(|e| e.to_string())?;
+                count += 1;
+                if count > 100_000 { return Err("Minecraft resource set has too many files.".into()); }
+                let child = entry.path();
+                let kind = entry.file_type().map_err(|e| e.to_string())?;
+                if kind.is_symlink() { return Err("Resource symlinks are not permitted.".into()); }
+                let dest = to.join(entry.file_name());
+                if kind.is_dir() {
+                    queue.push((child, dest, depth + 1));
+                } else if kind.is_file() {
+                    total = total.checked_add(entry.metadata().map_err(|e| e.to_string())?.len())
+                        .ok_or("Resource size overflow")?;
+                    if total > 12 * 1024 * 1024 * 1024 {
+                        return Err("Minecraft resource set exceeds the 12 GiB safety limit.".into());
+                    }
+                    fs::copy(child, dest).map_err(|e| format!("Could not copy Minecraft resources: {e}"))?;
+                } else {
+                    return Err("Unexpected special file inside Minecraft resources.".into());
+                }
+            }
+        }
+        if !pending.join("horizon-resources.json").is_file() {
+            return Err("Prepared resources manifest was not copied.".into());
+        }
+        fs::rename(&pending, target).map_err(|e| format!("Unable to finish resource import: {e}"))?;
+        Ok(total)
+    })();
+    if result.is_err() && pending.exists() {
+        // This is only our new empty/fresh import staging folder; leave the
+        // user's source, existing game saves and finished installations intact.
+        let _ = fs::remove_dir_all(&pending);
+    }
+    result
+}
+
+fn find_legacy_resources() -> Result<PathBuf, String> {
+    let home = std::env::var_os("APPDATA").map(PathBuf::from)
+        .ok_or("Windows application data folder unavailable.")?;
+    let versions = home.join("horizon-launcher").join("versions");
+    if !versions.is_dir() {
+        return Err("Choose the folder containing prepared Minecraft Rust resources.".into());
+    }
+    let mut entries = fs::read_dir(versions).map_err(|e| e.to_string())?;
+    for _ in 0..128 {
+        let Some(entry) = entries.next() else { break };
+        let entry = entry.map_err(|e| e.to_string())?;
+        let folder = entry.path().join(".local").join("horizon-client").join("26.3");
+        if folder.join("horizon-resources.json").is_file() { return Ok(folder); }
+    }
+    Err("No prepared Minecraft Rust resources were found. Select a folder with horizon-resources.json.".into())
+}
+
+#[tauri::command]
+async fn rust_import_resources<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>, source: String,
+) -> Result<String, String> {
+    let _guard = RESOURCE_IMPORT.lock().await;
+    let runtime = bundle(&app)?;
+    verify_native_client(&runtime)?;
+    let state = State::get().await.map_err(|e| e.to_string())?;
+    let credentials = Credentials::get_default_credential(&state.pool).await
+        .map_err(|e| e.to_string())?
+        .ok_or("Sign in to the Microsoft account that owns Minecraft: Java Edition first.")?;
+    if credentials.is_offline_profile() || credentials.online_profile_fresh().await.is_none() {
+        return Err("Minecraft Java Edition ownership could not be verified.".into());
+    }
+    let selected = if source.trim().is_empty() {
+        find_legacy_resources()?
+    } else {
+        PathBuf::from(source.trim())
+    };
+    if !selected.is_dir() { return Err("Minecraft resource folder not found.".into()); }
+    let destination = base(&app)?.join("prepared");
+    let bytes = tokio::task::spawn_blocking(move || copy_prepared(&selected, &destination))
+        .await.map_err(|e| e.to_string())??;
+    Ok(format!("Imported {bytes} bytes of your Minecraft resources into FRE LAUNCH."))
 }
 
 #[tauri::command]
@@ -265,12 +382,13 @@ async fn rust_launch<R: tauri::Runtime>(
     let profile = read_profile(&dir, &profile_id)
         .ok_or("Rust profile not found. Refresh the library.")?;
     let runtime_dir = bundle(&app)?;
-    let runtime = ready(&runtime_dir);
+    let runtime = ready(&runtime_dir, &root);
     if let Some(message) = runtime.reason {
         return Err(message);
     }
     verify_native_client(&runtime_dir)?;
-    let (client, resources) = runtime_files(&runtime_dir);
+    let (client, _) = runtime_files(&runtime_dir);
+    let resources = local_resources(&root, &runtime_dir);
     let client = client.canonicalize().map_err(|e| e.to_string())?;
     let resources = resources.canonicalize().map_err(|e| e.to_string())?;
     // The native client's Launch API requires an authenticated Microsoft
@@ -425,7 +543,7 @@ mod tests {
     #[test]
     fn missing_game_is_not_reported_as_ready() {
         let folder = tempfile::tempdir().unwrap();
-        let info = ready(folder.path());
+        let info = ready(folder.path(), folder.path());
         assert!(!info.installed);
         assert!(!info.prepared);
         assert!(info.reason.is_some());
