@@ -10,6 +10,8 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use tauri::Manager;
+use tokio::io::AsyncWriteExt;
+use theseus::{State, state::Credentials};
 
 const MAX_NAME: usize = 64;
 const MAX_METADATA: u64 = 8192;
@@ -207,20 +209,55 @@ async fn rust_launch<R: tauri::Runtime>(
     let (client, resources) = runtime_files(&runtime_dir);
     let client = client.canonicalize().map_err(|e| e.to_string())?;
     let resources = resources.canonicalize().map_err(|e| e.to_string())?;
-    // The engine reads --home and --resources directly; FRE LAUNCH never
-    // runs the upstream launcher or passes the user's input to a shell.
+    // The native client's Launch API requires an authenticated Microsoft
+    // owner session (docs/api/launch.md). Reuse the active FRE LAUNCH
+    // Minecraft account, never launch an online-mode client using a fake
+    // nickname or an expired guest token.
+    let state = State::get().await
+        .map_err(|e| format!("Minecraft account state unavailable: {e}"))?;
+    let credentials = Credentials::get_default_credential(&state.pool).await
+        .map_err(|e| format!("Could not refresh Minecraft account: {e}"))?
+        .ok_or("Sign in with the Microsoft account that owns Minecraft: Java Edition before playing Rust Minecraft.")?;
+    if credentials.access_token.trim().is_empty()
+        || credentials.access_token.starts_with("fre-offline:")
+        || credentials.offline_profile.id.is_nil()
+    {
+        return Err("Rust Minecraft requires an authenticated Microsoft Java Edition account.".into());
+    }
+    let verified = credentials.online_profile_fresh().await
+        .ok_or("Minecraft Java Edition ownership could not be verified. Reconnect your Microsoft account and retry.")?;
+    let session = serde_json::json!({
+        "name": verified.name,
+        "uuid": verified.id.simple().to_string(),
+        "access_token": credentials.access_token,
+        "user_type": "msa",
+    });
+    let session_bytes = serde_json::to_vec(&session)
+        .map_err(|_| "Could not prepare the Minecraft session.".to_owned())?;
+
+    // The engine reads --home, --game-dir, --resources, and
+    // --session-stdin directly (Horizon native Launch API 0.1).
+    // Account tokens only travel through the child's private stdin pipe,
+    // never in command-line arguments, logs or profile metadata.
     let mut cmd = tokio::process::Command::new(client);
     cmd.current_dir(&dir)
-        .args(["--home", dir.to_str().ok_or("Invalid profile folder")?])
-        .arg("--resources")
-        .arg(resources)
-        .stdin(Stdio::null())
+        .arg("--game-dir").arg(&dir)
+        .arg("--home").arg(&dir)
+        .arg("--resources").arg(resources)
+        .arg("--session-stdin")
+        .stdin(Stdio::piped())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .kill_on_drop(false);
     #[cfg(windows)]
     cmd.creation_flags(0x08000000);
     let mut child = cmd.spawn().map_err(|e| format!("Could not start Rust Minecraft: {e}"))?;
+    let mut stdin = child.stdin.take().ok_or("Could not open the Minecraft session pipe.")?;
+    if let Err(err) = stdin.write_all(&session_bytes).await {
+        let _ = child.kill().await;
+        return Err(format!("Could not securely hand the Minecraft account to the Rust game: {err}"));
+    }
+    drop(stdin);
     let pid = child.id().unwrap_or_default();
     let mut task = tokio::spawn(async move { child.wait().await });
     match tokio::time::timeout(Duration::from_millis(1200), &mut task).await {
