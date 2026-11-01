@@ -161,17 +161,18 @@ function openKeyHelp() {
         <span class="rounded-lg border border-solid border-surface-5 px-3 py-1 text-xs text-secondary">CurseForge API</span>
       </div>
 
-      <div class="mt-4 grid gap-3 md:grid-cols-2">
-        <label class="flex flex-col gap-2 text-sm text-secondary">
-          {{ t(m.instance) }}
-          <select v-model="instanceId" :disabled="installing !== null" class="min-h-10 w-full rounded-lg bg-button-bg p-2 text-contrast">
-            <option value="">{{ t(m.selectInstance) }}</option>
-            <option v-for="i in instances" :key="i.id" :value="i.id">
-              {{ i.name }} · {{ i.game_version }} · {{ i.loader }}
-            </option>
-          </select>
-        </label>
-        <label class="flex flex-col gap-2 text-sm text-secondary">
+      <label class="mt-4 flex flex-col gap-2 text-sm text-secondary">
+        {{ t(m.instance) }}
+        <select v-model="instanceId" :disabled="installing !== null" class="min-h-10 w-full rounded-lg bg-button-bg p-2 text-contrast">
+          <option value="">{{ t(m.selectInstance) }}</option>
+          <option v-for="i in instances" :key="i.id" :value="i.id">
+            {{ i.name }} · {{ i.game_version }} · {{ i.loader }}
+          </option>
+        </select>
+      </label>
+      <details class="mt-3 rounded-lg border border-solid border-surface-5 p-3">
+        <summary class="cursor-pointer text-sm text-secondary">{{ t(m.apiKey) }}</summary>
+        <label class="mt-3 flex flex-col gap-2 text-sm text-secondary">
           {{ t(m.apiKey) }}
           <input
             v-model="apiKey"
@@ -182,11 +183,11 @@ function openKeyHelp() {
             placeholder="x-api-key"
           />
         </label>
-      </div>
-      <p class="mt-3 mb-1 text-xs text-secondary">{{ t(m.keyHelp) }}</p>
-      <button class="cursor-pointer border-0 bg-transparent p-0 text-sm text-brand hover:underline" @click="openKeyHelp">
-        {{ t(m.helpLink) }}
-      </button>
+        <p class="mt-3 mb-1 text-xs text-secondary">{{ t(m.keyHelp) }}</p>
+        <button class="cursor-pointer border-0 bg-transparent p-0 text-sm text-brand hover:underline" @click="openKeyHelp">
+          {{ t(m.helpLink) }}
+        </button>
+      </details>
 
       <form class="mt-4 flex flex-wrap gap-2" @submit.prevent="doSearch">
         <input
