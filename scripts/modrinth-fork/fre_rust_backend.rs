@@ -166,6 +166,14 @@ async fn rust_create_profile<R: tauri::Runtime>(
                     let _ = fs::remove_dir_all(&dir); // Only our newly created directory.
                     return Err(format!("Could not write profile metadata: {error}"));
                 }
+                // A real independent game home, not a shortcut to a foreign
+                // launcher. Each instance has its own worlds and native mods.
+                for folder in ["saves", "mods", "resourcepacks", "shaderpacks", "screenshots", "logs"] {
+                    if let Err(error) = fs::create_dir(dir.join(folder)) {
+                        let _ = fs::remove_dir_all(&dir); // Freshly created, never user data.
+                        return Err(format!("Could not initialize Rust game folders: {error}"));
+                    }
+                }
                 return Ok(profile);
             }
             Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
