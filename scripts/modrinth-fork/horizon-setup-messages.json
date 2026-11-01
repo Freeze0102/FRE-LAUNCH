@@ -1,0 +1,210 @@
+{
+  "title": [
+    "Horizon — Minecraft на Rust",
+    "Horizon — Minecraft in Rust"
+  ],
+  "intro": [
+    "Три кроки для першого запуску. Після налаштування достатньо натиснути «Грати».",
+    "Three steps for your first launch. Afterwards, just press Play."
+  ],
+  "close": [
+    "Закрити",
+    "Close"
+  ],
+  "launcherStep": [
+    "Лаунчер Horizon",
+    "Horizon launcher"
+  ],
+  "launcherHelp": [
+    "FRE LAUNCH сам завантажить офіційний лаунчер для Windows і перевірить файл. ZIP вручну розпаковувати не потрібно.",
+    "FRE LAUNCH downloads the official Windows launcher and verifies the file. No manual ZIP extraction is needed."
+  ],
+  "done": [
+    "Готово",
+    "Ready"
+  ],
+  "download": [
+    "Завантажити Horizon для Windows",
+    "Download Horizon for Windows"
+  ],
+  "downloading": [
+    "Завантажуємо… {percent}%",
+    "Downloading… {percent}%"
+  ],
+  "chooseExe": [
+    "У мене вже є horizon-launcher.exe",
+    "I already have horizon-launcher.exe"
+  ],
+  "launcherReady": [
+    "Лаунчер Horizon готовий. Далі встанови гру у кроці 2.",
+    "Horizon launcher is ready. Next, install the game in step 2."
+  ],
+  "wrongExe": [
+    "Вибери horizon-launcher.exe з офіційного архіву Horizon.",
+    "Choose horizon-launcher.exe from the official Horizon archive."
+  ],
+  "gameStep": [
+    "Установити гру",
+    "Install the game"
+  ],
+  "gameHelp": [
+    "Завантажиться поточна рекомендована версія Horizon. Вона зберігається окремо від твоїх Java-збірок.",
+    "Downloads the current recommended Horizon build. It is stored separately from your Java instances."
+  ],
+  "installGame": [
+    "Установити Horizon",
+    "Install Horizon"
+  ],
+  "updateGame": [
+    "Перевірити й установити новішу версію",
+    "Check and install the latest build"
+  ],
+  "installing": [
+    "Установлюємо гру…",
+    "Installing the game…"
+  ],
+  "gameReady": [
+    "Версію Horizon встановлено. Тепер підготуй ресурси у кроці 3.",
+    "Horizon is installed. Now prepare the resources in step 3."
+  ],
+  "assetsStep": [
+    "Підготувати ресурси Minecraft",
+    "Prepare Minecraft resources"
+  ],
+  "assetsHelp": [
+    "Потрібна Minecraft Java 26.3, яку ти вже запускав хоча б раз. Натисни «Підготувати». Якщо Horizon не знайде файли, вибери папку саме тієї збірки 26.3.",
+    "You need Minecraft Java 26.3, started at least once. Press Prepare. If Horizon cannot find the files, select that 26.3 instance's folder."
+  ],
+  "prepare": [
+    "Підготувати ресурси",
+    "Prepare resources"
+  ],
+  "preparing": [
+    "Готуємо ресурси…",
+    "Preparing resources…"
+  ],
+  "prepareDone": [
+    "Команда підготовки завершилась. Стан ресурсів перевірено повторно.",
+    "Preparation completed. The resource status has been checked again."
+  ],
+  "minecraftFolder": [
+    "Вибрати папку збірки 26.3",
+    "Choose the 26.3 instance folder"
+  ],
+  "autoFolder": [
+    "Шукати автоматично",
+    "Find automatically"
+  ],
+  "folderAuto": [
+    "Папку Minecraft спочатку шукатиме сам Horizon.",
+    "Horizon will first try to find your Minecraft folder automatically."
+  ],
+  "instance": [
+    "Збірка для запуску",
+    "Instance to play"
+  ],
+  "play": [
+    "Грати в Horizon",
+    "Play Horizon"
+  ],
+  "playing": [
+    "Передаємо запуск Horizon…",
+    "Starting through Horizon…"
+  ],
+  "prepareFirst": [
+    "Спочатку встанови Horizon й підготуй ресурси Minecraft у кроках 2–3.",
+    "First install Horizon and prepare Minecraft resources in steps 2–3."
+  ],
+  "accountHelp": [
+    "Офіційний Horizon перевіряє Microsoft-акаунт із Minecraft Java. Для входу та налаштувань відкрий його вікно кнопкою нижче.",
+    "The official Horizon launcher checks a Microsoft account that owns Minecraft Java. Open its window below to sign in or change its settings."
+  ],
+  "openLauncher": [
+    "Відкрити Horizon / увійти в акаунт",
+    "Open Horizon / sign in"
+  ],
+  "launchRequested": [
+    "Команду запуску передано Horizon. Стан самої гри перевіряй у Horizon або його логах.",
+    "The launch request was passed to Horizon. Check Horizon or its logs for the game's status."
+  ],
+  "wait": [
+    "Команда Horizon виконується. Встановлення та підготовка можуть тривати кілька хвилин.",
+    "Horizon is working. Installation and preparation can take a few minutes."
+  ],
+  "advanced": [
+    "Інші збірки, версії та діагностика",
+    "Other instances, versions and diagnostics"
+  ],
+  "defaultInstance": [
+    "Для першого запуску вже є збірка Horizon. Нову створюй лише тоді, коли хочеш окремі світи й налаштування.",
+    "A Horizon instance already exists for your first launch. Create another only when you want separate worlds and settings."
+  ],
+  "name": [
+    "Назва нової збірки",
+    "New instance name"
+  ],
+  "placeholder": [
+    "Мій Minecraft на Rust",
+    "My Rust Minecraft"
+  ],
+  "create": [
+    "Створити окрему збірку",
+    "Create a separate instance"
+  ],
+  "created": [
+    "Збірку створено й вибрано у списку запуску.",
+    "The instance was created and selected for Play."
+  ],
+  "releaseTag": [
+    "Точний тег версії або latest",
+    "Exact version tag or latest"
+  ],
+  "installVersion": [
+    "Установити цей тег",
+    "Install this tag"
+  ],
+  "useVersion": [
+    "Призначити вибраній збірці",
+    "Use for the selected instance"
+  ],
+  "versionChanged": [
+    "Версію збірки змінено.",
+    "The instance version was changed."
+  ],
+  "showVersions": [
+    "Показати встановлені версії",
+    "Show installed versions"
+  ],
+  "selectInstance": [
+    "Вибери Horizon-збірку зі списку.",
+    "Select a Horizon instance from the list."
+  ],
+  "refresh": [
+    "Оновити стан і список збірок",
+    "Refresh status and instances"
+  ],
+  "logs": [
+    "Показати логи",
+    "Show logs"
+  ],
+  "release": [
+    "Офіційна інструкція / ручне завантаження",
+    "Official guide / manual download"
+  ],
+  "logPrivacy": [
+    "Логи читаються тільки локально; нічого не надсилаємо.",
+    "Logs are read locally; nothing is uploaded."
+  ],
+  "notConfigured": [
+    "Спочатку завантаж Horizon у кроці 1 або вибери наявний EXE.",
+    "Download Horizon in step 1 or select an existing EXE first."
+  ],
+  "error": [
+    "Помилка Horizon: {reason}",
+    "Horizon error: {reason}"
+  ],
+  "about": [
+    "Horizon розробляє окрема команда. FRE LAUNCH керує його офіційним лаунчером; Java-моди не стають Rust-модами, а рушій гри тут не змінюється.",
+    "Horizon is developed by a separate team. FRE LAUNCH controls its official launcher; Java mods do not become Rust mods, and the game engine is unchanged."
+  ]
+}

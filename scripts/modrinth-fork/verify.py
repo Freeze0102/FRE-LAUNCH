@@ -240,6 +240,8 @@ def verify(root):
     updater = (root/'apps/app/src/updater_impl.rs').read_text()
     assert updater.index('verify_signature(') < updater.index('replace((update, bytes))')
     assert 'MAX_UPDATE_BYTES' in updater
+    assert (root / 'apps/app/src/api/horizon_bootstrap.rs').is_file()
+    assert 'horizon_install_launcher' in (root / 'apps/app/build.rs').read_text()
     from feature_security_dependencies import workspace_overrides
     security = json.loads((Path(__file__).parent / 'security-dependencies.json').read_text())
     lock = (root / 'pnpm-lock.yaml').read_text(encoding='utf-8')

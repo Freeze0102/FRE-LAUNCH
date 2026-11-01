@@ -309,6 +309,13 @@ HORIZON_UI_NEW = {
 "fre-launch.horizon.option.description":("Окремий Minecraft на Rust зі своїми версіями та модами. Працює через офіційний лаунчер Horizon.","Separate native Rust Minecraft client and versions; runs through the official Horizon launcher."),
 }
 
+NEW.update({
+    'fre-launch.horizon.setup.' + name: tuple(translations)
+    for name, translations in json.loads(
+        (Path(__file__).parent / 'horizon-setup-messages.json').read_text(encoding='utf-8')
+    ).items()
+})
+
 def apply(root):
     app_uk=root/"apps/app-frontend/src/locales/uk-UA/index.json"
     app_en=root/"apps/app-frontend/src/locales/en-US/index.json"

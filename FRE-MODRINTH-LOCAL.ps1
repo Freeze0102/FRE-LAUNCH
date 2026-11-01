@@ -59,6 +59,7 @@ $requiredSourceFiles = @(
     'apps\frontend\package.json',
     'apps\app\package.json',
     'apps\app\src\fre_update_policy.rs',
+    'apps\app\src\api\horizon_bootstrap.rs',
     'apps\app\src\fre_update_channel.rs',
     'apps\app-frontend\src\helpers\fre-app-updater.ts',
     'apps\app-frontend\src\fre-compat.d.ts',
@@ -71,6 +72,7 @@ $patchNames += @('feature_updates.py','fre-app-updater.ts','fre-update-ui.js','f
 $patchNames += @('feature_frontend_types.py','frontend-type-fixes.json','fre-query-options.ts')
 $patchNames += @('fre-compat.d.ts')
 $patchNames += @('feature_security_dependencies.py','security-dependencies.json','security-pnpm-lock.yaml')
+$patchNames += @('horizon_bootstrap.rs','horizon-setup-messages.json')
 $signature = ($revision + ':' + (($patchNames | ForEach-Object {
     $sourceFile = Join-Path $projectRoot ('scripts\modrinth-fork\' + $_)
     if (-not (Test-Path $sourceFile)) { throw "Missing source patcher: $sourceFile" }

@@ -17,6 +17,7 @@ def exactly(path: Path, before: str, after: str):
 def apply(root: Path):
     here = Path(__file__).resolve().parent
     shutil.copyfile(here / "horizon_backend.rs", root / "apps/app/src/api/horizon.rs")
+    shutil.copyfile(here / "horizon_bootstrap.rs", root / "apps/app/src/api/horizon_bootstrap.rs")
     shutil.copyfile(here / "HorizonRustPanel.vue", root / "apps/app-frontend/src/components/ui/HorizonRustPanel.vue")
 
     api = root / "apps/app/src/api/mod.rs"
@@ -32,7 +33,7 @@ def apply(root: Path):
             '''            .plugin(
                 "fre-horizon",
                 InlinedPlugin::new()
-                    .commands(&["horizon_instances", "horizon_create", "horizon_play", "horizon_logs", "horizon_versions", "horizon_install_version", "horizon_set_version", "horizon_prepare"])
+                    .commands(&["horizon_instances", "horizon_create", "horizon_play", "horizon_logs", "horizon_versions", "horizon_install_version", "horizon_set_version", "horizon_prepare", "horizon_install_launcher", "horizon_detect_launcher", "horizon_status", "horizon_open_launcher"])
                     .default_permission(DefaultPermissionRule::AllowAllCommands),
             )
             .plugin(

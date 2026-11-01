@@ -1,6 +1,10 @@
 //! FRE LAUNCH delegates Horizon operations to the user-selected official CLI.
 use std::{path::{Path, PathBuf}, process::{Output, Stdio}, time::Duration};
 use tokio::{io::{AsyncRead, AsyncReadExt}, process::Command};
+use tauri::{Emitter, Manager};
+
+#[path = "horizon_bootstrap.rs"]
+mod bootstrap;
 
 const OUTPUT_LIMIT: usize = 24_000;
 const QUICK_TIMEOUT: Duration = Duration::from_secs(60);
@@ -12,8 +16,89 @@ pub fn init<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
         .invoke_handler(tauri::generate_handler![
             horizon_instances, horizon_create, horizon_play, horizon_logs,
             horizon_versions, horizon_install_version, horizon_set_version, horizon_prepare,
+            horizon_install_launcher, horizon_detect_launcher, horizon_status, horizon_open_launcher,
         ])
         .build()
+}
+
+fn launcher_directory<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Result<PathBuf, String> {
+    Ok(app.path().app_data_dir().map_err(|e| e.to_string())?
+        .join("horizon-launcher").join(bootstrap::VERSION))
+}
+
+#[tauri::command]
+async fn horizon_detect_launcher<R: tauri::Runtime>(app: tauri::AppHandle<R>) -> Result<Option<String>, String> {
+    let directory = launcher_directory(&app)?;
+    Ok(bootstrap::cached(&directory).map(|p| p.to_string_lossy().into_owned()))
+}
+
+#[tauri::command]
+async fn horizon_install_launcher<R: tauri::Runtime>(app: tauri::AppHandle<R>) -> Result<String, String> {
+    if !cfg!(all(windows, target_arch = "x86_64")) { return Err("Horizon automatic setup supports Windows x64.".into()); }
+    let _operation = OPERATION.try_lock().map_err(|_| "Another Horizon operation is still running.")?;
+    bootstrap::install(&launcher_directory(&app)?, |percent| {
+        let _ = app.emit("fre-horizon-bootstrap-progress", percent);
+    }).await.map(|p| p.to_string_lossy().into_owned())
+}
+
+#[tauri::command]
+async fn horizon_open_launcher(exe_path: String) -> Result<(), String> {
+    let exe = validate_launcher(&exe_path)?;
+    let mut child = command(&exe).stdout(Stdio::null()).stderr(Stdio::null())
+        .spawn().map_err(|e| e.to_string())?;
+    tokio::spawn(async move { let _ = child.wait().await; });
+    Ok(())
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct HorizonInstance {
+    id: String,
+    name: String,
+    #[serde(default)]
+    version: Option<String>,
+    #[serde(default)]
+    selected: bool,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct HorizonStatus {
+    instances: Vec<HorizonInstance>,
+    installed_versions: Vec<String>,
+    prepared_versions: Vec<String>,
+    selected_version: Option<String>,
+}
+
+fn parse_status(instances: &str, versions: &str, detail: &str) -> Result<HorizonStatus, String> {
+    let rows: Vec<serde_json::Value> = serde_json::from_str(instances)
+        .map_err(|_| "Horizon did not return an instance list. Use launcher 0.2.33 or newer.")?;
+    let mut parsed = Vec::new();
+    for row in rows {
+        // Java instances managed by Horizon are a separate path, never mistaken for Rust ones.
+        if row.get("kind").and_then(|v| v.as_str()) == Some("java") || !row["java"].is_null() { continue; }
+        let instance: HorizonInstance = serde_json::from_value(row).map_err(|e| e.to_string())?;
+        validate_name(&instance.id)?;
+        parsed.push(instance);
+    }
+    #[derive(serde::Deserialize)]
+    struct Versions { installed: Vec<String>, selected: Option<String> }
+    let versions: Versions = serde_json::from_str(versions).map_err(|e| e.to_string())?;
+    let prepared = versions.installed.iter().filter(|tag| detail.lines().any(|line| {
+        let line = line.trim_start().trim_start_matches('*').trim_start();
+        line.strip_prefix(tag.as_str()).is_some_and(|tail| tail.starts_with("  prepared"))
+    })).cloned().collect();
+    Ok(HorizonStatus { instances: parsed, installed_versions: versions.installed,
+        prepared_versions: prepared, selected_version: versions.selected })
+}
+
+#[tauri::command]
+async fn horizon_status(exe_path: String) -> Result<HorizonStatus, String> {
+    let exe = validate_launcher(&exe_path)?;
+    let instances = run_cli(&exe, &["instance", "list", "--json"], QUICK_TIMEOUT).await?;
+    let versions = run_cli(&exe, &["versions", "--installed", "--json"], QUICK_TIMEOUT).await?;
+    let detail = run_cli(&exe, &["versions", "--installed"], QUICK_TIMEOUT).await?;
+    parse_status(&instances, &versions, &detail)
 }
 
 fn validate_launcher(path: &str) -> Result<PathBuf, String> {
@@ -174,6 +259,34 @@ async fn horizon_prepare(exe_path: String, minecraft_path: Option<String>, versi
 mod tests {
     use super::*;
     static PROCESS_TEST: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+    #[test]
+    fn status_uses_real_cli_json_and_never_calls_unprepared_ready() {
+        let instances = r#"[{"id":"horizon","name":"Horizon","kind":"default","version":null,"java":null,"selected":true},
+            {"id":"java","name":"Java","kind":"java","java":{"minecraft":"26.3"}}]"#;
+        let status = parse_status(instances,
+            r#"{"installed":["nightly-new","nightly-old"],"selected":"nightly-new"}"#,
+            "* nightly-new  not prepared\n  nightly-old  prepared, no sounds (prepare again)").unwrap();
+        assert_eq!(status.instances.len(), 1);
+        assert_eq!(status.prepared_versions, vec!["nightly-old"]);
+        assert_eq!(status.selected_version.as_deref(), Some("nightly-new"));
+        assert!(parse_status("not JSON", "{}", "").is_err());
+    }
+    #[cfg(windows)]
+    #[tokio::test]
+    #[ignore = "requires official launcher download and explicit isolated HOME overrides"]
+    async fn official_windows_cli_smoke() {
+        let home = PathBuf::from(std::env::var_os("HORIZON_LAUNCHER_HOME").expect("isolated HOME required"));
+        assert!(home.is_absolute() && home.components().any(|p| p.as_os_str() == ".audit"));
+        let directory = home.parent().unwrap().join("managed-native-smoke");
+        let exe = bootstrap::install(&directory, |_| {}).await.unwrap();
+        assert!(bootstrap::cached(&directory).is_some());
+        let path = exe.to_string_lossy().into_owned();
+        let status = horizon_status(path.clone()).await.unwrap();
+        assert!(status.instances.iter().any(|i| i.id == "horizon"));
+        let name = format!("FRE audit {}", uuid::Uuid::new_v4());
+        horizon_create(path.clone(), name.clone()).await.unwrap();
+        assert!(horizon_status(path).await.unwrap().instances.iter().any(|i| i.name == name));
+    }
     #[test]
     fn validates_instance_name_and_version() {
         assert_eq!(validate_name("  Мій Horizon  ").unwrap(), "Мій Horizon");

@@ -11,7 +11,7 @@ const ts = workspace('typescript')
 const vue = workspace('vue')
 const compiler = rootRequire('@vue/compiler-sfc')
 
-function component(file, invoke, instances = []) {
+function component(file, invoke, instances = [], options = {}) {
   const text = fs.readFileSync(path.join(__dirname, file), 'utf8')
   const { descriptor, errors } = compiler.parse(text, { filename: file })
   assert.deepEqual(errors, [])
@@ -25,6 +25,7 @@ function component(file, invoke, instances = []) {
   const unmounted = []
   const mocks = {
     '@tauri-apps/api/core': { invoke },
+    '@tauri-apps/api/event': { listen: options.listen || (async () => () => {}) },
     '@tauri-apps/plugin-opener': { openUrl: async () => {} },
     '@tauri-apps/plugin-dialog': { open: async () => null },
     '@/helpers/instance': { list: async () => instances },
@@ -34,7 +35,7 @@ function component(file, invoke, instances = []) {
   }
   const names = file === 'CurseForgeBrowser.vue'
     ? 'instanceId,searchText,apiKey,results,loading,notice,error,installing,doSearch,install'
-    : 'minecraftPath,executable,instanceName,launchName,pending,error,feedback,manageHorizon,createInstance,playInstance'
+    : 'minecraftPath,executable,instanceName,launchName,pending,error,feedback,status,prepared,canPlay,activeVersion,releaseTag,downloadProgress,manageHorizon,createInstance,playInstance,downloadLauncher,show,hide,visible'
   const setup = new Function('require', 'defineProps', 'defineExpose', 'localStorage', 'exports',
     `${output}\nreturn {${names}}`)
   const state = setup(name => {
@@ -101,7 +102,9 @@ test('CurseForge refuses unavailable distribution and keeps install destination 
 
 test('Horizon forwards the optional Minecraft folder using the official prepare flag input', async () => {
   const calls = []
-  const c = component('HorizonRustPanel.vue', async (command, args) => { calls.push({ command, args }); return 'prepared' })
+  const c = component('HorizonRustPanel.vue', async (command, args) => {
+    calls.push({ command, args }); return command.endsWith('|horizon_status') ? horizonStatus : 'prepared'
+  })
   c.state.executable.value = 'C:\\Horizon\\horizon-launcher.exe'
   c.state.minecraftPath.value = 'D:\\My Minecraft'
   await c.state.manageHorizon('prepare')
@@ -116,6 +119,7 @@ test('Horizon prevents duplicate launch requests and shows CLI failures', async 
   const c = component('HorizonRustPanel.vue', () => { calls++; return request.promise })
   c.state.executable.value = 'C:\\Horizon\\horizon-launcher.exe'
   c.state.launchName.value = 'Survival'
+  c.state.status.value = { ...horizonStatus, instances: [{ id: 'Survival', name: 'Survival', version: null }] }
   const play = c.state.playInstance()
   await c.state.playInstance()
   assert.equal(calls, 1)
@@ -123,6 +127,62 @@ test('Horizon prevents duplicate launch requests and shows CLI failures', async 
   await play
   assert.match(c.state.error.value, /Missing installed version/)
   assert.equal(c.state.pending.value, null)
+})
+
+const horizonStatus = { instances: [{ id: 'horizon', name: 'Horizon', version: null, selected: true }],
+  installedVersions: ['nightly-test'], preparedVersions: ['nightly-test'], selectedVersion: 'nightly-test' }
+
+test('Horizon downloads its launcher once, listens before starting, and selects the real default instance', async () => {
+  const order = [], request = deferred()
+  let listener, unlistened = 0
+  const c = component('HorizonRustPanel.vue', (command) => {
+    order.push(command)
+    return command.endsWith('|horizon_install_launcher') ? request.promise : Promise.resolve(horizonStatus)
+  }, [], { listen: async (event, callback) => { order.push(event); listener = callback; return () => unlistened++ } })
+  const first = c.state.downloadLauncher()
+  await Promise.resolve()
+  await c.state.downloadLauncher()
+  assert.equal(order[0], 'fre-horizon-bootstrap-progress')
+  assert.equal(order.filter(x => x.endsWith('|horizon_install_launcher')).length, 1)
+  listener({ payload: 55 })
+  assert.equal(c.state.downloadProgress.value, 55)
+  request.resolve('C:\\managed\\horizon-launcher.exe')
+  await first
+  assert.equal(c.state.executable.value, 'C:\\managed\\horizon-launcher.exe')
+  assert.equal(c.state.launchName.value, 'horizon')
+  assert.equal(c.state.canPlay.value, true)
+  assert.equal(c.state.pending.value, null)
+  assert.equal(unlistened, 1)
+})
+
+test('Horizon never offers Play before the selected instance version is prepared', async () => {
+  const calls = []
+  const c = component('HorizonRustPanel.vue', async command => calls.push(command))
+  c.state.executable.value = 'C:\\managed\\horizon-launcher.exe'
+  c.state.status.value = { ...horizonStatus, preparedVersions: [] }
+  assert.equal(c.state.canPlay.value, false)
+  await c.state.playInstance()
+  assert.equal(calls.length, 0)
+  c.state.status.value = { ...horizonStatus, instances: [{ id: 'horizon', name: 'Horizon', version: 'older' }] }
+  assert.equal(c.state.activeVersion.value, 'older')
+  assert.equal(c.state.canPlay.value, false)
+})
+
+test('Horizon uses a selected pinned version for preparation and reports bootstrap errors without advancing', async () => {
+  const calls = []
+  const c = component('HorizonRustPanel.vue', async (command, args) => {
+    calls.push({ command, args })
+    if (command.endsWith('|horizon_install_launcher')) throw new Error('SHA-256 mismatch')
+    return command.endsWith('|horizon_status') ? horizonStatus : 'prepared'
+  })
+  await c.state.downloadLauncher()
+  assert.match(c.state.error.value, /SHA-256 mismatch/)
+  assert.equal(c.state.status.value, null)
+  assert.equal(c.state.executable.value, '')
+  c.state.executable.value = 'C:\\managed\\horizon-launcher.exe'
+  c.state.status.value = { ...horizonStatus, instances: [{ id: 'horizon', name: 'Horizon', version: 'older' }] }
+  await c.state.manageHorizon('prepare')
+  assert.equal(calls.find(x => x.command.endsWith('|horizon_prepare')).args.version, 'older')
 })
 
 test('Leaving an instance catalog resets context without stale breadcrumb handles', () => {
