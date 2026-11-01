@@ -9,3 +9,6 @@ FRE-Modrinth-Source-archive-*/
 .audit/
 .fre-update-keys/
 release-staging/
+vendor/fre-rust-source/
+scripts/modrinth-fork/fre-rust-runtime/
+scripts/modrinth-fork/fre-rust-runtime.pending/
