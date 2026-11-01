@@ -9,12 +9,12 @@ import { computed, ref } from 'vue'
 const { formatMessage: t } = useVIntl()
 const messages = defineMessages({
   title: { id: "fre-launch.horizon.setup.title", defaultMessage: "Horizon — Minecraft in Rust" },
-  intro: { id: "fre-launch.horizon.setup.intro", defaultMessage: "Three steps for your first launch. Afterwards, just press Play." },
+  intro: { id: "fre-launch.horizon.setup.intro", defaultMessage: "Create your own Rust profile. FRE LAUNCH installs the game and starts horizon-client.exe directly." },
   close: { id: "fre-launch.horizon.setup.close", defaultMessage: "Close" },
-  launcherStep: { id: "fre-launch.horizon.setup.launcherStep", defaultMessage: "Horizon launcher" },
-  launcherHelp: { id: "fre-launch.horizon.setup.launcherHelp", defaultMessage: "FRE LAUNCH downloads the official Windows launcher and verifies the file. No manual ZIP extraction is needed." },
+  launcherStep: { id: "fre-launch.horizon.setup.launcherStep", defaultMessage: "Rust game setup" },
+  launcherHelp: { id: "fre-launch.horizon.setup.launcherHelp", defaultMessage: "FRE LAUNCH securely downloads the official setup components. No second launcher window is required to play." },
   done: { id: "fre-launch.horizon.setup.done", defaultMessage: "Ready" },
-  download: { id: "fre-launch.horizon.setup.download", defaultMessage: "Download Horizon for Windows" },
+  download: { id: "fre-launch.horizon.setup.download", defaultMessage: "Install Rust game components" },
   downloading: { id: "fre-launch.horizon.setup.downloading", defaultMessage: "Downloading… {percent}%" },
   chooseExe: { id: "fre-launch.horizon.setup.chooseExe", defaultMessage: "I already have horizon-launcher.exe" },
   launcherReady: { id: "fre-launch.horizon.setup.launcherReady", defaultMessage: "Horizon launcher is ready. Next, install the game in step 2." },
@@ -35,18 +35,18 @@ const messages = defineMessages({
   folderAuto: { id: "fre-launch.horizon.setup.folderAuto", defaultMessage: "Horizon will first try to find your Minecraft folder automatically." },
   instance: { id: "fre-launch.horizon.setup.instance", defaultMessage: "Instance to play" },
   play: { id: "fre-launch.horizon.setup.play", defaultMessage: "Play Horizon" },
-  playing: { id: "fre-launch.horizon.setup.playing", defaultMessage: "Starting through Horizon…" },
+  playing: { id: "fre-launch.horizon.setup.playing", defaultMessage: "Starting Rust Minecraft…" },
   prepareFirst: { id: "fre-launch.horizon.setup.prepareFirst", defaultMessage: "First install Horizon and prepare Minecraft resources in steps 2–3." },
-  accountHelp: { id: "fre-launch.horizon.setup.accountHelp", defaultMessage: "The official Horizon launcher checks a Microsoft account that owns Minecraft Java. Open its window below to sign in or change its settings." },
+  accountHelp: { id: "fre-launch.horizon.setup.accountHelp", defaultMessage: "For account verification, some Horizon versions still require the original sign-in helper once. Normal Play starts the Rust client directly." },
   openLauncher: { id: "fre-launch.horizon.setup.openLauncher", defaultMessage: "Open Horizon / sign in" },
-  launchRequested: { id: "fre-launch.horizon.setup.launchRequested", defaultMessage: "The launch request was passed to Horizon. Check Horizon or its logs for the game's status." },
+  launchRequested: { id: "fre-launch.horizon.setup.launchRequested", defaultMessage: "FRE LAUNCH started the native Rust Minecraft client. If it closes, check the logs." },
   wait: { id: "fre-launch.horizon.setup.wait", defaultMessage: "Horizon is working. Installation and preparation can take a few minutes." },
   advanced: { id: "fre-launch.horizon.setup.advanced", defaultMessage: "Other instances, versions and diagnostics" },
   defaultInstance: { id: "fre-launch.horizon.setup.defaultInstance", defaultMessage: "A Horizon instance already exists for your first launch. Create another only when you want separate worlds and settings." },
   name: { id: "fre-launch.horizon.setup.name", defaultMessage: "New instance name" },
   placeholder: { id: "fre-launch.horizon.setup.placeholder", defaultMessage: "My Rust Minecraft" },
   create: { id: "fre-launch.horizon.setup.create", defaultMessage: "Create a separate instance" },
-  created: { id: "fre-launch.horizon.setup.created", defaultMessage: "The instance was created and selected for Play." },
+  created: { id: "fre-launch.horizon.setup.created", defaultMessage: "Your Rust profile is now in the FRE LAUNCH library." },
   releaseTag: { id: "fre-launch.horizon.setup.releaseTag", defaultMessage: "Exact version tag or latest" },
   installVersion: { id: "fre-launch.horizon.setup.installVersion", defaultMessage: "Install this tag" },
   useVersion: { id: "fre-launch.horizon.setup.useVersion", defaultMessage: "Use for the selected instance" },
@@ -59,7 +59,7 @@ const messages = defineMessages({
   logPrivacy: { id: "fre-launch.horizon.setup.logPrivacy", defaultMessage: "Logs are read locally; nothing is uploaded." },
   notConfigured: { id: "fre-launch.horizon.setup.notConfigured", defaultMessage: "Download Horizon in step 1 or select an existing EXE first." },
   error: { id: "fre-launch.horizon.setup.error", defaultMessage: "Horizon error: {reason}" },
-  about: { id: "fre-launch.horizon.setup.about", defaultMessage: "Horizon is developed by a separate team. FRE LAUNCH controls its official launcher; Java mods do not become Rust mods, and the game engine is unchanged." },
+  about: { id: "fre-launch.horizon.setup.about", defaultMessage: "Horizon is an independent Rust game. FRE LAUNCH installs and starts the native client directly; its official helper is kept for verified updates, resources and optional account refresh." },
 })
 
 interface HorizonStatus {
@@ -114,6 +114,7 @@ async function refreshStatus() {
   const next = await invoke<HorizonStatus>('plugin:fre-horizon|horizon_status', { exePath: path })
   if (path !== executable.value) return
   status.value = next
+  window.dispatchEvent(new Event('fre-horizon-library-refresh'))
   if (!next.instances.some(i => i.id === launchName.value)) {
     launchName.value = next.instances.find(i => i.selected)?.id || next.instances[0]?.id || ''
   }
@@ -206,7 +207,7 @@ async function playInstance() {
   error.value = ''
   feedback.value = ''
   try {
-    output.value = await invoke<string>('plugin:fre-horizon|horizon_play', { exePath: executable.value, name: launchName.value })
+    output.value = await invoke<string>('plugin:fre-horizon|horizon_direct_play', { exePath: executable.value, name: launchName.value })
     try { localStorage.setItem('fre-launch-horizon-instance', launchName.value) } catch { /* optional */ }
     feedback.value = t(messages.launchRequested)
   } catch (err) { error.value = t(messages.error, { reason: failure(err) }) }
@@ -311,19 +312,21 @@ defineExpose({ show, hide })
           <option v-if="!status?.instances.length" value="horizon">Horizon</option>
         </select>
         <button type="button" class="w-full cursor-pointer rounded-lg border-0 bg-brand px-4 py-3 font-semibold text-white disabled:opacity-40" :disabled="!canPlay" @click="playInstance">{{ pending === 'play' ? t(messages.playing) : t(messages.play) }}</button>
-        <p class="mb-0 mt-3 text-xs text-secondary">{{ t(messages.accountHelp) }}</p>
-        <button type="button" class="mt-2 cursor-pointer border-0 bg-transparent p-0 text-sm text-brand hover:underline disabled:opacity-40" :disabled="!!pending || !executable" @click="openLauncher">{{ t(messages.openLauncher) }}</button>
       </div>
       <p v-if="pending && pending !== 'bootstrap'" role="status" class="mt-4 text-sm text-secondary">{{ t(messages.wait) }}</p>
       <p v-if="error" role="alert" class="mt-4 break-words rounded-lg border border-solid border-red-500/50 p-3 text-sm text-red-400">{{ error }}</p>
       <p v-if="feedback" role="status" class="mt-4 rounded-lg border border-solid border-surface-5 p-3 text-sm text-brand">{{ feedback }}</p>
+      <div class="mt-5 rounded-xl border border-solid border-surface-4 p-4">
+        <h3 class="m-0 text-base font-semibold text-contrast">{{ t(messages.name) }}</h3>
+        <div class="mt-3 flex flex-wrap gap-2">
+          <input v-model="instanceName" class="min-w-48 flex-1 rounded-lg bg-button-bg p-3 text-contrast" maxlength="64" :placeholder="t(messages.placeholder)" :disabled="!!pending" />
+          <button type="button" class="cursor-pointer rounded-lg border-0 bg-brand px-4 py-2 font-semibold text-white disabled:opacity-40" :disabled="!!pending || !status || !instanceName.trim()" @click="createInstance">{{ t(messages.create) }}</button>
+        </div>
+        <p class="mb-0 mt-2 text-xs text-secondary">{{ t(messages.defaultInstance) }}</p>
+      </div>
       <details class="mt-5 rounded-xl border border-solid border-surface-4 p-4">
         <summary class="cursor-pointer text-sm font-semibold text-contrast">{{ t(messages.advanced) }}</summary>
         <div class="mt-4 space-y-3">
-          <p class="m-0 text-xs text-secondary">{{ t(messages.defaultInstance) }}</p>
-          <label for="fre-horizon-new" class="block text-sm text-secondary">{{ t(messages.name) }}</label>
-          <input id="fre-horizon-new" v-model="instanceName" class="w-full rounded-lg bg-button-bg p-3 text-contrast" maxlength="64" :placeholder="t(messages.placeholder)" :disabled="!!pending" />
-          <button type="button" class="cursor-pointer rounded-lg border border-solid border-surface-5 bg-button-bg px-3 py-2 text-sm text-contrast disabled:opacity-40" :disabled="!!pending || !status || !instanceName.trim()" @click="createInstance">{{ t(messages.create) }}</button>
           <label for="fre-horizon-version" class="block text-sm text-secondary">{{ t(messages.releaseTag) }}</label>
           <input id="fre-horizon-version" v-model="releaseTag" class="w-full rounded-lg bg-button-bg p-3 text-contrast" maxlength="80" :disabled="!!pending" />
           <div class="flex flex-wrap gap-2">
@@ -331,6 +334,8 @@ defineExpose({ show, hide })
             <button type="button" class="cursor-pointer rounded-lg border border-solid border-surface-5 bg-button-bg px-3 py-2 text-sm text-contrast disabled:opacity-40" :disabled="!!pending || !activeInstance || !releaseTag.trim()" @click="manageHorizon('set-version', true)">{{ t(messages.useVersion) }}</button>
             <button type="button" class="cursor-pointer rounded-lg border border-solid border-surface-5 bg-button-bg px-3 py-2 text-sm text-contrast disabled:opacity-40" :disabled="!!pending || !status" @click="manageHorizon('versions')">{{ t(messages.showVersions) }}</button>
           </div>
+          <p class="mt-3 text-xs text-secondary">{{ t(messages.accountHelp) }}</p>
+          <button type="button" class="cursor-pointer border-0 bg-transparent p-0 text-sm text-brand hover:underline disabled:opacity-40" :disabled="!!pending || !executable" @click="openLauncher">{{ t(messages.openLauncher) }}</button>
           <div class="flex flex-wrap gap-3">
             <button type="button" class="cursor-pointer border-0 bg-transparent p-0 text-sm text-brand hover:underline disabled:opacity-40" :disabled="!!pending || !executable" @click="refreshInstances">{{ t(messages.refresh) }}</button>
             <button type="button" class="cursor-pointer border-0 bg-transparent p-0 text-sm text-brand hover:underline disabled:opacity-40" :disabled="!!pending || !executable" @click="showLogs">{{ t(messages.logs) }}</button>
