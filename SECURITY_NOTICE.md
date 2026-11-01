@@ -45,3 +45,22 @@ The publisher can submit the original trusted-source build for Microsoft's suspe
 ### v0.5.7 status
 
 - Private GitHub Actions security-review ZIPs for v0.5.7 are explicitly labeled `SECURITY-REVIEW-ONLY` and are **not installation approval**. The v0.5.5 malware alert has not been independently classified. Public release and silent self-update publication remain on hold.
+
+### v0.5.8 local Modrinth-fork review — 1 November 2026
+
+- The current Vue/Tauri fork now has a separate signed updater channel. Its
+  Minisign signature authenticates updater bytes; it is **not Windows
+  Authenticode publisher signing or malware clearance**.
+- The exact pinned source, Python patches, strict frontend build and native
+  regressions have been checked locally. Production npm audit reports zero
+  known advisories; the desktop dependency closure including development tools
+  has zero high/critical and two open moderate advisories. See
+  [AUDIT_UA.md](AUDIT_UA.md) and
+  [SECURITY_DEPENDENCIES.md](scripts/modrinth-fork/SECURITY_DEPENDENCIES.md).
+- The build, signature and Defender results for the exact new artifacts are
+  recorded in the audit report. A clean local scan does not independently
+  classify the reported v0.5.5 sample. The previous incident review and an
+  isolated Windows install/update/restart test remain release requirements.
+- No production release or silent-update manifest has been published in this
+  local review. The existing installed launcher, profiles and worlds were not
+  used for testing. No GitHub Actions were run.

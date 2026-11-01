@@ -3,9 +3,11 @@
 Доповнення цієї ж дати: реалізовано власний updater для Vue/Tauri-форка;
 результати наведено в кінці звіту та в [UPDATES_UA.md](UPDATES_UA.md).
 
-Новіше доповнення: блокер 308 TypeScript-діагностик усунуто, справжній strict
-check проходить. Розділи з 308 помилками нижче описують попередні етапи;
-актуальні результати наведено в останньому доповненні.
+Актуально: strict TypeScript 308 → **0**, повний локальний Windows build **0.5.8
+успішний**; створено й перевірено підписаний NSIS. Defender не виявив загроз
+у нових EXE та інсталяторі. Пакет залишається **SECURITY-REVIEW-ONLY**, без
+публічного релізу. Розділи з попередніми блокерами нижче є історією аудиту;
+остаточні результати, хеші й відкриті питання наведено в кінці.
 
 Об'єкт перевірки: `main`, початковий коміт `38213c807c8d07644a7a45d6ff22bb24107e3c00`,
 генератор `scripts/modrinth-fork` і Modrinth
@@ -262,9 +264,99 @@ feature_frontend_types.py, який застосовується після ре
   ще 6 регресій nullable Modrinth dependencies, застарілої відповіді модпака,
   відсутнього ID інсталяції, серверних назв, native error payload і невідомих тегів.
 - Strict TypeScript **0 діагностик**; PowerShell синтаксис пройдено.
-- Розпочато повну локальну Windows release збірку штатним сценарієм з усіма
-  frontend gates та підписанням Tauri. Остаточний результат фіксується нижче
-  після завершення, створення NSIS та перевірки артефактів.
+- Повну локальну Windows release збірку завершено штатним сценарієм з усіма
+  frontend gates та підписанням Tauri. Остаточні результати наведено нижче.
 
 Встановлений лаунчер, профілі та світи не використовувалися для цих тестів.
 GitHub Actions не запускалися. Тести Horizon перевіряють контракт CLI, не рушій.
+
+## Доповнення: security-залежності та остаточна збірка 0.5.8
+
+Вихідний код остаточного білду: коміт
+`217473ce080b104a3f31ca2bc75e8d998f38d8b1`, той самий immutable pin Modrinth.
+Виправлено інтерактивне зависання підписувача в headless PowerShell:
+локальний Tauri CLI використовує `build --ci --bundles nsis` і не очікує
+введення пароля. GitHub Actions це не запускає.
+
+Оновлено залежності HTML/Markdown, Vue i18n, парсерів ZIP/кольорів і build tools;
+справжній pnpm lockfile зафіксовано разом із перевіркою SHA-256 бази та
+результату. Діапазони overrides зберігають старі API, де це можливо. Загальна
+семиденна перевірка віку пакетів діє; чотири винятки називають тільки точні
+перевірені security-релізи. Деталі та посилання на advisories:
+[SECURITY_DEPENDENCIES.md](scripts/modrinth-fork/SECURITY_DEPENDENCIES.md).
+
+Фінальні перевірки після оновлення залежностей:
+
+- Python **7/7**: pipeline на чистому pin, захист від drift/повторного
+  застосування, транзакційність frontend-патчів, захист шляхів, lockfile drift
+  без зміни workspace та заборона wildcard у release-age винятках.
+- Node **26/26**: пошук/стан інсталяції, CLI UI, updater races/offline/retry,
+  реальні Minisign-підписи, nullable API; додано виконання справжнього Markdown
+  renderer, очищення небезпечного HTML та власного ICU compiler з новим Vue i18n
+  для українських plural forms і fallback.
+- Windows native Rust **12 passed, 1 ignored**: фактичні fixture-процеси CLI,
+  timeout/kill, валідація та цілісність CurseForge, URL і підпис updater.
+  Ignored — лише дочірня sleep-fixture для тесту timeout.
+- Строгий `vue-tsc --noEmit -p tsconfig.app.json`: **0 діагностик**.
+  Звичайний Vue/Vite build також проходить зі штатним TypeScript gate.
+- Незалежна підготовка чистого pin побайтово звірена з 125 файлами, зміненими
+  frontend-патчами та dependency updates; локальний Rust-кеш збережено.
+- `pnpm --filter '@modrinth/app...' audit --prod --json`: **0 advisories**.
+  Такий самий audit з dev-залежностями: **0 high/critical, 2 moderate** —
+  Vite 6 у Storybook та minimatch у старих API-гілках lint/API Extractor.
+  Findings залишаються відкритими, не приховані audit ignore-списком.
+- PowerShell AST та `git diff --check`: пройдено.
+
+Логи повного build, тестів і перевірок бінарних артефактів зберігаються
+локально в ігнорованому `.audit/`; вони не містять приватного ключа.
+
+Остаточний `FRE-MODRINTH-LOCAL.ps1 -BuildWindows -PythonExe …` завершився
+з кодом **0**. Нативний optimized release етап тривав 8 хв 50 с; штатний Tauri
+створив NSIS та `.exe.sig`. Залишились попередження upstream BigInt target,
+Ace worker eval і deprecated STATIC_VCRUNTIME; це не помилки компіляції.
+
+Перевірені кінцеві файли:
+
+| Артефакт | Байти | SHA-256 |
+| --- | ---: | --- |
+| `target/release/FRE LAUNCH.exe` | 42 631 168 | `a3cc2e104182566ab0ab089086f1e80079299706b351531063b7b1829b2602a6` |
+| `FRE-LAUNCH-Windows-x64-Setup.exe` | 22 007 207 | `eee3e33027b1bbd3c81cbc4b36d011cef1badc54b56ed58dd3acfd882c7e2c6b` |
+
+PE заголовок головної EXE: AMD64/PE32+, Windows GUI subsystem 2,
+резерв стека **16 777 220 байт**, ProductVersion/FileVersion **0.5.8**.
+Після scan SHA-256 не змінилися. Tauri-підпис фактичного нового інсталятора
+криптографічно перевірено власним public key через Node crypto; перевірено
+збіг manifest version/platform/signature та очікуваної версійованої адреси.
+
+Microsoft Defender був активний, сигнатури **1.463.72.0**, оновлені
+01.11.2026 о 05:59:50 +02:00. Окремі custom scans обох кінцевих бінарних файлів
+повернули **exit 0, found no threats**; у MSFT_MpThreatDetection відповідних
+build-файлам спрацювань немає. Захист, quarantine та exclusions не змінювали.
+Це результат локального сканування точних хешів, не гарантія безпеки та не
+незалежна класифікація зразка v0.5.5.
+
+Локальний `release-staging/v0.5.8` містить канонічну EXE, SIG, `latest.json`,
+`SHA256SUMS.txt`, `NOTES.md` та `PROVENANCE.json`. Пакет створено тільки після
+перевірки справжнього підпису. Він і приватний ключ виключені з Git;
+пакет не завантажували до Releases. Публічні Releases під час перевірки порожні.
+
+Залишаються блокери публічного випуску й межі перевірки:
+
+- Ізольований Windows прогін NSIS: встановлення, перехід зі старої версії,
+  автоматичне завантаження, закриття/перезапуск, збереження тестових профілів.
+  Локальний Windows Sandbox вимкнений; наявна папка даних користувацького
+  форка не використовувалася. Сама EXE та інсталятор **не запускалися**.
+- Незалежний розгляд старого Defender-інциденту згідно з
+  [SECURITY_NOTICE.md](SECURITY_NOTICE.md) і рішення про дистрибуцію.
+  Windows Authenticode сертифіката немає; updater Minisign є окремим підписом.
+- Два moderate dev advisories описані вище; це не нульовий audit усіх
+  інструментів, Rust crates або старої React-реалізації.
+- Реальний Minecraft/Microsoft login, повний CurseForge install з API-ключем
+  і запуск гри Horizon не підтверджені mock/fixture тестами. Тест пошуку й
+  завантаження Fabric API з SHA-512 є перевіркою API/байтів, не запуском Minecraft.
+
+Новий updater реалізує сценарій «перевірити → завантажити → запропонувати
+перезапуск», але доставки користувачам ще немає: потрібен перевірений публічний
+випуск з `latest.json` та підписаною EXE. Старій EXE з вимкненим updater
+потрібне одноразове ручне встановлення перевіреної версії.
+Встановлена EXE, профілі та світи не змінені. GitHub Actions не запускалися.

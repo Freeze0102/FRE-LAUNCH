@@ -18,7 +18,7 @@ Modrinth. Нижче також залишилася документація с
 [UPDATES_UA.md](UPDATES_UA.md). Сценарій `FRE-LAUNCH-LOCAL.cmd` і
 [LOCAL_BUILD_UA.md](LOCAL_BUILD_UA.md) стосуються окремої старої React-реалізації.
 
-> **Alpha 0.5.7 — у розробці.** FRE LAUNCH є незалежним неофіційним проєктом і не пов'язаний з Mojang, Microsoft, Modrinth або CurseForge.
+> **Vue/Tauri 0.5.8 — локальний SECURITY-REVIEW-ONLY білд; стара React-версія — Alpha 0.5.7.** FRE LAUNCH є незалежним неофіційним проєктом і не пов'язаний з Mojang, Microsoft, Modrinth або CurseForge.
 
 > [!CAUTION]
 > **Зверни увагу на безпеку збірок.** Для інсталятора v0.5.5 раніше було повідомлено про спрацювання Microsoft Defender (`Trojan:Win32/Bearfoos.B!ml`). Причина **не встановлена**: це може бути помилкове спрацювання або загроза. **Не завантажуй, не запускай і не відновлюй v0.5.5 з карантину.** Нові CI-артефакти v0.5.7 позначені **SECURITY-REVIEW-ONLY**, а не «готовий перевірений реліз». Дивись [SECURITY_NOTICE.md](SECURITY_NOTICE.md).
@@ -26,6 +26,10 @@ Modrinth. Нижче також залишилася документація с
 [![Windows Build](https://github.com/Freeze0102/FRE-LAUNCH/actions/workflows/windows.yml/badge.svg)](https://github.com/Freeze0102/FRE-LAUNCH/actions/workflows/windows.yml)
 
 ## Що таке FRE LAUNCH?
+
+Нижче наведено документацію **старої окремої React-реалізації**. Поточні
+можливості Vue/Tauri-форка, зокрема CurseForge/Horizon, описані в
+[актуальному аудиті](AUDIT_UA.md).
 
 FRE LAUNCH — десктопний лаунчер із темним інтерфейсом, бібліотекою окремих збірок і каталогом модів. Мета — встановлювати Minecraft, керувати світами та ресурсами й запускати гру з одного місця.
 
