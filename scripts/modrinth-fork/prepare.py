@@ -265,6 +265,7 @@ def customize(root,revision):
     from feature_brand_presence import apply as brand_startup_and_discord
     from feature_curseforge import apply as add_curseforge_source
     from feature_horizon import apply as add_horizon_client
+    from feature_fre_rust import apply as add_native_rust
     from feature_updates import apply as add_signed_updates
     from feature_frontend_types import apply as fix_frontend_types
     from feature_security_dependencies import apply as fix_security_dependencies
@@ -279,6 +280,7 @@ def customize(root,revision):
     brand_startup_and_discord(root)
     add_curseforge_source(root)
     add_horizon_client(root)
+    add_native_rust(root)
     finish_ukrainian(root)
     add_signed_updates(root)
     fix_frontend_types(root)
