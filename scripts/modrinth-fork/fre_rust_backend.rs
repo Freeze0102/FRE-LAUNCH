@@ -15,6 +15,9 @@ use theseus::{State, state::Credentials};
 
 const MAX_NAME: usize = 64;
 const MAX_METADATA: u64 = 8192;
+// Creation must be serialized: two simultaneous requests cannot create
+// duplicate visible profile names or compete for the same metadata.
+static PROFILE_CREATION: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -85,6 +88,9 @@ fn read_profile(dir: &Path, id: &str) -> Option<RustProfile> {
         return None;
     }
     let metadata = dir.join("profile.json");
+    if metadata.symlink_metadata().ok()?.file_type().is_symlink() {
+        return None;
+    }
     if metadata.metadata().ok()?.len() > MAX_METADATA {
         return None;
     }
@@ -121,6 +127,7 @@ async fn rust_create_profile<R: tauri::Runtime>(
     app: tauri::AppHandle<R>,
     name: String,
 ) -> Result<RustProfile, String> {
+    let _guard = PROFILE_CREATION.lock().await;
     let name = name.trim().to_owned();
     if !name_valid(&name) {
         return Err("Name must contain 1–64 characters without control characters.".into());
@@ -131,6 +138,9 @@ async fn rust_create_profile<R: tauri::Runtime>(
     }
     let profiles_dir = root.join("profiles");
     fs::create_dir_all(&profiles_dir).map_err(|e| e.to_string())?;
+    if fs::symlink_metadata(&profiles_dir).map_err(|e| e.to_string())?.file_type().is_symlink() {
+        return Err("Refusing to create a Minecraft profile through a symbolic link.".into());
+    }
     let stamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_err(|e| e.to_string())?;
@@ -302,6 +312,21 @@ mod tests {
         assert!(!name_valid(""));
         assert!(!name_valid("bad\nname"));
         assert!(name_valid("Мій Minecraft Rust"));
+        assert!(!profile_id_valid("123/../../"));
+        assert!(!profile_id_valid("123\\345"));
+    }
+    #[test]
+    fn valid_profile_round_trip_and_corrupt_metadata_are_ignored() {
+        let root = tempfile::tempdir().unwrap();
+        let dir = profile_dir(root.path(), "123456789").unwrap();
+        fs::create_dir_all(&dir).unwrap();
+        let expected = RustProfile { id: "123456789".into(), name: "Тест Rust".into(), created: 1234 };
+        fs::write(dir.join("profile.json"), serde_json::to_vec(&expected).unwrap()).unwrap();
+        assert_eq!(read_profile(&dir, "123456789").unwrap().name, "Тест Rust");
+        // A read profile must keep the original name and owner-supplied metadata.
+        assert_eq!(read_profile(&dir, "123456789").unwrap().created, 1234);
+        fs::write(dir.join("profile.json"), b"garbage").unwrap();
+        assert!(read_profile(&dir, "123456789").is_none());
     }
     #[test]
     fn missing_game_is_not_reported_as_ready() {
