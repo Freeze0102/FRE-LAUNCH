@@ -155,6 +155,47 @@ provide('showFreRustWizard', showFreRustWizard)""")
             "defaultMessage: 'Separate native Rust Minecraft client and versions; FRE LAUNCH launches the game directly.'",
             "defaultMessage: 'An independent Rust game, installed and played inside FRE LAUNCH.'")
 
+    # The Rust instance details share the launcher's UA/EN locale system.
+    # Keep all UI strings localizable rather than painting Ukrainian over EN.
+    grid_translations = {
+        'open': ('Відкрити {name}', 'Open {name}'),
+        'start': ('Запустити {name}', 'Play {name}'),
+        'close': ('Закрити', 'Close'),
+        'starting': ('Запуск…', 'Starting…'),
+        'play': ('Грати', 'Play'),
+        'setup': ('Налаштувати гру', 'Set up game'),
+        'settings': ('Налаштування', 'Settings'),
+        'open-folder': ('Відкрити папку', 'Open folder'),
+        'files': ('Файли збірки', 'Instance files'),
+        'search-files': ('Пошук файлів…', 'Search files…'),
+        'refresh': ('Оновити', 'Refresh'),
+        'reading': ('Зчитування файлів…', 'Reading files…'),
+        'no-files': ('У цій папці немає файлів.', 'No files in this folder.'),
+        'folder': ('Папка', 'Folder'),
+        'native-required': ('Перед запуском імпортуй власні ресурси Minecraft у налаштуваннях Rust.',
+                            'Import your own Minecraft resources in Rust settings before playing.'),
+        'game-required': ('Потрібні твої встановлені файли Minecraft.',
+                          'Your own installed Minecraft resources are required.'),
+        'horizon-required': ('Спочатку підготуй версію Horizon у налаштуваннях.',
+                             'Prepare this Horizon version in settings before playing.'),
+        'mods-warning': ('Java JAR-моди не підтримуються нативним Rust-клієнтом. '
+                         'Світи та файли кожної збірки зберігаються окремо.',
+                         'Java JAR mods are not supported by the native Rust client. '
+                         'Each profile keeps its own worlds and files.'),
+        'mods': ('Моди', 'Mods'),
+        'resourcepacks': ('Ресурс-паки', 'Resource packs'),
+        'shaderpacks': ('Шейдери', 'Shaders'),
+        'saves': ('Світи', 'Worlds'),
+        'logs': ('Журнали', 'Logs'),
+        'root': ('Усі файли', 'All files'),
+    }
+    for language, position in (('uk-UA', 0), ('en-US', 1)):
+        locale = frontend / 'src/locales' / language / 'index.json'
+        messages = json.loads(locale.read_text(encoding='utf-8'))
+        for key, pair in grid_translations.items():
+            messages['fre-rust.grid.' + key] = {'message': pair[position]}
+        locale.write_text(json.dumps(messages, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
     # Preserve the older Horizon adapter and its UI so an update does not
     # strand already installed Rust profiles. No automatic world migration.
     # Bundle the native game only when the local build has prepared real
