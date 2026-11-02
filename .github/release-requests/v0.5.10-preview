@@ -1,4 +1,5 @@
-One-shot FRE LAUNCH v0.5.10 Windows preview, retry #4 (2026-11-02).
-Source: main with Horizon wizard patch and platform-independent UTF-8 source verifier.
-First run source customization and static verification, then compile the MIT Rust engine, compile Vue/Tauri, scan in Microsoft Defender, and smoke-test installation.
-Upload an UNSIGNED preview artifact only after all checks succeed; never publish it into the signed auto-update channel.
+One-shot FRE LAUNCH v0.5.10 Windows preview, retry #5 (2026-11-02).
+Source: main; Horizon and native Rust Vue callback syntax changed to plain JS, as required by App.vue.
+First: source patch validation, full pinned pnpm dependency installation, Vue TypeScript check and Java in-app content/Rust profile tests.
+Then: compile MIT Rust client, build unsigned Windows Tauri NSIS installer, run Microsoft Defender and installed-app smoke checks.
+Do not publish this unsigned preview as the signed v0.5.10 auto-update.
