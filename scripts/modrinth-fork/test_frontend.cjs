@@ -78,7 +78,7 @@ test('Keyless CurseForge search opens official mods results without invoking the
   c.state.searchText.value = 'Sodium & shaders'
   await c.state.doSearch()
   assert.deepEqual(invokes, [])
-  assert.deepEqual(urls, ['https://www.curseforge.com/minecraft/mc-mods?search=Sodium%20%26%20shaders'])
+  assert.deepEqual(urls, ['https://www.curseforge.com/minecraft/search?class=mc-mods&search=Sodium%20%26%20shaders'])
   assert.equal(c.state.searched.value, false)
   assert.match(c.state.notice.value, /Opened search results/)
 })
@@ -94,7 +94,7 @@ test('Keyless modpack search opens official modpacks page, never API or Java ins
   await c.state.doSearch()
   await c.state.importDownloadedMod()
   assert.deepEqual(invokes, [])
-  assert.deepEqual(urls, ['https://www.curseforge.com/minecraft/modpacks?search=Better%20Minecraft'])
+  assert.deepEqual(urls, ['https://www.curseforge.com/minecraft/search?class=modpacks&search=Better%20Minecraft'])
 })
 
 test('Manual CurseForge JAR import keeps its original Java instance selected', async () => {
