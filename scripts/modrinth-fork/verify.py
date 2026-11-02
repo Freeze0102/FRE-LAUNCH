@@ -288,25 +288,25 @@ def verify(root):
     assert 'updater' in update_conf['app']['security']['capabilities']
     updater_cap = json.loads((root/'apps/app/capabilities/updater.json').read_text(encoding='utf-8'))
     assert updater_cap['permissions'] == ['updater:allow-check']
-    assert 'launcher-files.modrinth.com' not in (root/'apps/app/tauri-release.conf.json').read_text()
+    assert 'launcher-files.modrinth.com' not in (root/'apps/app/tauri-release.conf.json').read_text(encoding="utf-8")
     assert 'launcher-files.modrinth.com' not in app
     assert 'watch(stateInitialized' in app and 'freAppUpdater.start()' in app
     assert 'false // Do not overwrite' not in cf_main
-    assert json.loads((root/'apps/app-frontend/package.json').read_text())['version'] == channel['version']
-    assert f'version = "{channel["version"]}"' in (root/'apps/app/Cargo.toml').read_text()
-    updater = (root/'apps/app/src/updater_impl.rs').read_text()
+    assert json.loads((root/'apps/app-frontend/package.json').read_text(encoding="utf-8"))['version'] == channel['version']
+    assert f'version = "{channel["version"]}"' in (root/'apps/app/Cargo.toml').read_text(encoding="utf-8")
+    updater = (root/'apps/app/src/updater_impl.rs').read_text(encoding="utf-8")
     assert updater.index('verify_signature(') < updater.index('replace((update, bytes))')
     assert 'MAX_UPDATE_BYTES' in updater
     assert (root / 'apps/app/src/api/fre_rust.rs').is_file()
-    assert 'rust_launch' in (root / 'apps/app/build.rs').read_text()
-    assert 'horizon_install_launcher' in (root / 'apps/app/build.rs').read_text(), 'Horizon compatibility must survive an update'
-    horizon_api = (root / 'apps/app/src/api/horizon.rs').read_text()
+    assert 'rust_launch' in (root / 'apps/app/build.rs').read_text(encoding="utf-8")
+    assert 'horizon_install_launcher' in (root / 'apps/app/build.rs').read_text(encoding="utf-8"), 'Horizon compatibility must survive an update'
+    horizon_api = (root / 'apps/app/src/api/horizon.rs').read_text(encoding="utf-8")
     assert 'horizon_open_folder' in horizon_api and 'horizon_list_files' in horizon_api
     assert '0x00000008 | 0x00000200' in horizon_api, 'Horizon client must detach from terminal and Ctrl+C'
-    assert 'rust_open_folder' in (root / 'apps/app/src/api/fre_rust.rs').read_text()
-    assert 'rust_list_files' in (root / 'apps/app/src/api/fre_rust.rs').read_text()
+    assert 'rust_open_folder' in (root / 'apps/app/src/api/fre_rust.rs').read_text(encoding="utf-8")
+    assert 'rust_list_files' in (root / 'apps/app/src/api/fre_rust.rs').read_text(encoding="utf-8")
     from feature_security_dependencies import workspace_overrides
-    security = json.loads((Path(__file__).parent / 'security-dependencies.json').read_text())
+    security = json.loads((Path(__file__).parent / 'security-dependencies.json').read_text(encoding="utf-8"))
     lock = (root / 'pnpm-lock.yaml').read_text(encoding='utf-8')
     assert hashlib.sha256(lock.encode()).hexdigest() == security['patchedLockSha256']
     workspace = (root / 'pnpm-workspace.yaml').read_text(encoding='utf-8')
