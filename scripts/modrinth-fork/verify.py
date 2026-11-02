@@ -171,9 +171,9 @@ def verify(root):
     rust_app=(root/"apps/app-frontend/src/App.vue").read_text(encoding="utf-8")
     rust_permissions=json.loads((root/"apps/app/capabilities/plugins.json").read_text(encoding="utf-8"))
     assert "fre-rust:default" in rust_permissions["permissions"]
-    assert "fre-horizon:default" not in rust_permissions["permissions"]
+    assert "fre-horizon:default" in rust_permissions["permissions"], "Existing Horizon profiles must remain accessible"
     assert 'pub mod fre_rust;' in (root/"apps/app/src/api/mod.rs").read_text(encoding="utf-8")
-    assert "pub mod horizon;" not in (root/"apps/app/src/api/mod.rs").read_text(encoding="utf-8")
+    assert "pub mod horizon;" in (root/"apps/app/src/api/mod.rs").read_text(encoding="utf-8")
     for source, markers in (
         (rust_backend, [
             'Builder::new("fre-rust")', "async fn rust_create_profile",
@@ -187,27 +187,27 @@ def verify(root):
         (rust_panel, [
             "plugin:fre-rust|rust_import_resources", "plugin:fre-rust|rust_create_profile", "plugin:fre-rust|rust_launch",
             "plugin:fre-rust|rust_profiles", "plugin:fre-rust|rust_runtime",
-            "fre-rust-library-refresh",
+            "fre-rust-library-refresh", "chooseSourceFolder", "@tauri-apps/plugin-dialog",
         ]),
         (rust_library, [
             "plugin:fre-rust|rust_profiles", "plugin:fre-rust|rust_launch",
-            "showFreRustWizard", "fre-rust-library-refresh",
+            "showFreRustWizard", "fre-rust-library-refresh", "fre-rust.library.empty",
         ]),
-        (rust_index, ["import FreRustLibrary", "<FreRustLibrary"]),
+        (rust_index, ["import FreRustLibrary", "<FreRustLibrary", "import HorizonLibrary", "<HorizonLibrary"]),
         (rust_app, [
             "import FreRustPanel", "<FreRustPanel", "showFreRustWizard",
             "provide('showFreRustWizard', showFreRustWizard)",
         ]),
         (rust_stage, ["Minecraft (Rust)", "ctx.onHorizon?.()"]),
-        (rust_main, [".plugin(api::fre_rust::init())"]),
-        (rust_build, ['"fre-rust"', '"rust_create_profile"', '"rust_launch"']),
+        (rust_main, [".plugin(api::fre_rust::init())", ".plugin(api::horizon::init())"]),
+        (rust_build, ['"fre-rust"', '"fre-horizon"', '"rust_create_profile"', '"rust_launch"']),
     ):
         for marker in markers:
             assert marker in source, f"Standalone Rust Minecraft integration missing: {marker}"
     for key in (
         "fre-rust.setup.title", "fre-rust.setup.create", "fre-rust.setup.error",
-        "fre-rust.setup.import", "fre-rust.setup.source",
-        "fre-rust.library.title", "fre-rust.library.play", "fre-rust.library.error",
+        "fre-rust.setup.import", "fre-rust.setup.source", "fre-rust.setup.browse",
+        "fre-rust.library.title", "fre-rust.library.play", "fre-rust.library.error", "fre-rust.library.empty",
     ):
         assert key in app_uk and key in app_en, f"FRE Rust localization missing: {key}"
     # Runtime is either entirely absent (Play remains disabled) or a
@@ -224,9 +224,10 @@ def verify(root):
     else:
         assert "fre-rust-runtime/fre-rust-client.exe" not in rust_mapping
 
-    # Old plugin and its binary must not be compiled or included in the output.
-    assert not (root/"apps/app/src/api/horizon.rs").exists()
-    assert not (root/"apps/app-frontend/src/components/ui/HorizonRustPanel.vue").exists()
+    # The old Horizon profiles remain usable. The new native game never invokes
+    # the external launcher or imports existing worlds without consent.
+    assert (root/"apps/app/src/api/horizon.rs").exists()
+    assert (root/"apps/app-frontend/src/components/ui/HorizonRustPanel.vue").exists()
     assert "horizon-launcher.exe" not in rust_backend
     assert "horizon-launcher.exe" not in rust_panel
     assert "horizon-launcher.exe" not in rust_library
@@ -276,7 +277,7 @@ def verify(root):
     assert 'MAX_UPDATE_BYTES' in updater
     assert (root / 'apps/app/src/api/fre_rust.rs').is_file()
     assert 'rust_launch' in (root / 'apps/app/build.rs').read_text()
-    assert 'horizon_install_launcher' not in (root / 'apps/app/build.rs').read_text()
+    assert 'horizon_install_launcher' in (root / 'apps/app/build.rs').read_text(), 'Horizon compatibility must survive an update'
     from feature_security_dependencies import workspace_overrides
     security = json.loads((Path(__file__).parent / 'security-dependencies.json').read_text())
     lock = (root / 'pnpm-lock.yaml').read_text(encoding='utf-8')
