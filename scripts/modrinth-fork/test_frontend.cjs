@@ -34,13 +34,13 @@ function component(file, invoke, instances = [], options = {}) {
     vue: { ...vue, onMounted: f => mounted.push(f), onUnmounted: f => unmounted.push(f) },
   }
   const names = file === 'CurseForgeBrowser.vue'
-    ? 'instanceId,searchText,apiKey,useApiSearch,importingFile,results,loading,notice,error,installing,doSearch,install,browseWithoutKey,curseForgeWebsiteSearchUrl,importDownloadedMod'
+    ? 'instanceId,searchText,apiKey,results,loading,notice,error,installing,doSearch,install'
     : file === 'FreRustPanel.vue'
       ? 'source,name,selectedId,profiles,runtime,pending,error,notice,chooseSourceFolder,importResources,openProfileFiles,create,refresh,show,hide,visible'
       : file === 'FreRustLibrary.vue'
-        ? 'profiles,runtime,error,refresh,play,openFiles,openRustWizard'
+        ? 'profiles,runtime,error,refresh,play,openFiles,openRustWizard,loadFiles,closeFiles,fileEntries,fileCategory,fileProfile'
         : file === 'HorizonLibrary.vue'
-          ? 'profiles,status,executable,error,refresh,openFiles,openHorizonWizard'
+          ? 'profiles,status,executable,error,refresh,openFiles,openHorizonWizard,refreshFiles,closeFiles,openExplorer,fileEntries,fileCategory,fileProfile'
           : 'minecraftPath,executable,instanceName,launchName,pending,error,feedback,status,prepared,canPlay,activeVersion,releaseTag,downloadProgress,manageHorizon,createInstance,playInstance,downloadLauncher,show,hide,visible'
   const setup = new Function('require', 'defineProps', 'defineExpose', 'localStorage', 'window', 'Event', 'exports',
     `${output}\nreturn {${names}}`)
@@ -68,70 +68,35 @@ const deferred = () => {
   return { promise, resolve, reject }
 }
 
-test('Keyless CurseForge search opens official mods results without invoking the API', async () => {
-  const urls = [], invokes = []
+test('CurseForge uses the in-app API and never redirects a keyless search to a website', async () => {
+  const calls = []
   const c = component('CurseForgeBrowser.vue', async (command, args) => {
-    invokes.push({ command, args })
-    throw new Error('API must not be called without opt-in')
-  }, instances, { openUrl: async url => urls.push(url) })
+    calls.push({ command, args })
+    throw new Error('CurseForge needs an approved API key')
+  }, instances)
   await c.mount()
   c.state.searchText.value = 'Sodium & shaders'
   await c.state.doSearch()
-  assert.deepEqual(invokes, [])
-  assert.deepEqual(urls, ['https://www.curseforge.com/minecraft/search?class=mc-mods&search=Sodium%20%26%20shaders'])
+  assert.deepEqual(calls, [{
+    command: 'plugin:fre-curseforge|cf_search',
+    args: {
+      query: 'Sodium & shaders',
+      gameVersion: '1.21.1',
+      modLoader: 'fabric',
+      contentType: 'mod',
+      apiKey: null,
+    },
+  }])
+  assert.match(c.state.error.value, /approved API key/)
   assert.equal(c.state.searched.value, false)
-  assert.match(c.state.notice.value, /Opened search results/)
-})
-
-test('Keyless modpack search opens official modpacks page, never API or Java installer', async () => {
-  const urls = [], invokes = []
-  const c = component('CurseForgeBrowser.vue', async (command, args) => {
-    invokes.push({ command, args })
-    throw new Error('Modpack must never be installed as JAR')
-  }, instances, { props: { contentType: 'modpack' }, openUrl: async url => urls.push(url) })
-  await c.mount()
-  c.state.searchText.value = 'Better Minecraft'
-  await c.state.doSearch()
-  await c.state.importDownloadedMod()
-  assert.deepEqual(invokes, [])
-  assert.deepEqual(urls, ['https://www.curseforge.com/minecraft/search?class=modpacks&search=Better%20Minecraft'])
-})
-
-test('Manual CurseForge JAR import keeps its original Java instance selected', async () => {
-  const chooser = deferred(), imports = []
-  const c = component('CurseForgeBrowser.vue', async () => {
-    throw new Error('No native API call should be needed')
-  }, instances, {
-    open: async () => chooser.promise,
-    addProjectFromPath: async (instance, file) => imports.push({ instance, file }),
-  })
-  await c.mount()
-  const pending = c.state.importDownloadedMod()
-  c.state.instanceId.value = 'b'
-  chooser.resolve('C:\\Downloads\\demo.jar')
-  await pending
-  assert.deepEqual(imports, [{ instance: 'a', file: 'C:\\Downloads\\demo.jar' }])
-  assert.match(c.state.notice.value, /^Fabric:/)
-  assert.equal(c.state.importingFile.value, false)
-})
-
-test('Manual CurseForge import rejects non-JAR files', async () => {
-  const imports = []
-  const c = component('CurseForgeBrowser.vue', async () => null, instances, {
-    open: async () => 'C:\\Downloads\\untrusted.exe',
-    addProjectFromPath: async (...args) => imports.push(args),
-  })
-  await c.mount()
-  await c.state.importDownloadedMod()
-  assert.deepEqual(imports, [])
-  assert.match(c.state.error.value, /Choose a .jar/)
+  const template = fs.readFileSync(path.join(__dirname, 'CurseForgeBrowser.vue'), 'utf8')
+  assert.doesNotMatch(template, /curseForgeWebsiteSearchUrl|browseWithoutKey|importDownloadedMod|openUrl\(/)
 })
 
 test('CurseForge discards an old search after switching instance', async () => {
   const request = deferred()
   const c = component('CurseForgeBrowser.vue', () => request.promise, instances)
   await c.mount()
-  c.state.useApiSearch.value = true
   const searching = c.state.doSearch()
   c.state.instanceId.value = 'b'
   request.resolve([{ id: 1, name: 'Wrong version' }])
@@ -145,7 +110,6 @@ test('CurseForge latest query wins even when responses arrive out of order', asy
   let calls = 0
   const c = component('CurseForgeBrowser.vue', () => (++calls === 1 ? old : recent).promise, instances)
   await c.mount()
-  c.state.useApiSearch.value = true
   const first = c.state.doSearch()
   c.state.searchText.value = 'new'
   const second = c.state.doSearch()
@@ -181,7 +145,6 @@ test('CurseForge modpack search uses the approved modpack category, not Java mod
     throw new Error(command)
   }, instances, { props: { contentType: 'modpack' } })
   await c.mount()
-  c.state.useApiSearch.value = true
   await c.state.doSearch()
   assert.equal(calls.at(-1).args.contentType, 'modpack')
   assert.equal(calls.at(-1).args.gameVersion, null)
@@ -284,22 +247,43 @@ test('Native Rust manager folder shortcut targets the selected profile', async (
   assert.deepEqual(calls.at(-1), { command: 'plugin:fre-rust|rust_open_folder', args: { profileId: profile.id, folder: 'mods' } })
 })
 
-test('Existing Horizon Files opens its own instance, not the Java folder', async () => {
+test('Existing Horizon Files are listed inside the app and Explorer remains optional', async () => {
   const calls = []
   const profile = { id: 'horizon', name: 'Old Rust game', version: null, selected: true }
   const c = component('HorizonLibrary.vue', async (command, args) => {
     calls.push({ command, args })
     if (command.endsWith('|horizon_detect_launcher')) return 'C:\\Horizon\\horizon-launcher.exe'
     if (command.endsWith('|horizon_status')) return { instances: [profile], installedVersions: ['nightly'], preparedVersions: ['nightly'], selectedVersion: 'nightly' }
+    if (command.endsWith('|horizon_list_files')) return [{ name: 'native-mod.bin', bytes: 1024, isDirectory: false }]
     if (command.endsWith('|horizon_open_folder')) return undefined
     throw new Error(command)
   })
   await c.state.refresh()
   await c.state.openFiles(profile)
   assert.deepEqual(calls.at(-1), {
-    command: 'plugin:fre-horizon|horizon_open_folder',
-    args: { exePath: 'C:\\Horizon\\horizon-launcher.exe', name: profile.id, folder: 'root' },
+    command: 'plugin:fre-horizon|horizon_list_files',
+    args: { exePath: 'C:\\Horizon\\horizon-launcher.exe', name: profile.id, folder: 'mods' },
   })
+  assert.equal(c.state.fileEntries.value[0].name, 'native-mod.bin')
+  await c.state.openExplorer()
+  assert.equal(calls.at(-1).command, 'plugin:fre-horizon|horizon_open_folder')
+})
+
+test('Native Rust Files stay inside selected profile in the launcher', async () => {
+  const calls = []
+  const profile = { id: '12345678', name: 'Rust', created: 1 }
+  const c = component('FreRustLibrary.vue', async (command, args) => {
+    calls.push({ command, args })
+    if (command.endsWith('|rust_list_files')) return [{ name: 'mod.wasm', bytes: 12, isDirectory: false }]
+    throw new Error(command)
+  })
+  await c.state.openFiles(profile)
+  assert.equal(c.state.fileProfile.value.id, profile.id)
+  assert.deepEqual(calls.at(-1), {
+    command: 'plugin:fre-rust|rust_list_files',
+    args: { profileId: profile.id, folder: 'mods' },
+  })
+  assert.equal(c.state.fileEntries.value[0].name, 'mod.wasm')
 })
 
 test('Horizon forwards the optional Minecraft folder using the official prepare flag input', async () => {
