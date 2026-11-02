@@ -56,9 +56,9 @@ def apply(root: Path):
             "const horizonWizard = ref(null)\nconst freRustWizard = ref(null)")
     exactly(app_vue, "provide('showHorizonWizard', showHorizonWizard)",
             """provide('showHorizonWizard', showHorizonWizard)
-function showFreRustWizard() {
+function showFreRustWizard(profileId?: string) {
     installationModal.value?.hide()
-    freRustWizard.value?.show()
+    freRustWizard.value?.show(profileId)
 }
 provide('showFreRustWizard', showFreRustWizard)""")
     # The new Create flow selects the built-in game, while existing Horizon
@@ -68,16 +68,35 @@ provide('showFreRustWizard', showFreRustWizard)""")
     exactly(app_vue, '<HorizonRustPanel ref="horizonWizard" />',
             '<HorizonRustPanel ref="horizonWizard" />\n\t\t<FreRustPanel ref="freRustWizard" />')
 
+    # Render Rust cards within the Java Library section; GameInstance is a
+    # different data model, so do not route Rust through Java launch controls.
+    library_view = frontend / "src/components/ui/library/index.vue"
+    exactly(library_view,
+            '\t\t</section>\n\t</InstanceGroupDnd>',
+            '\t\t\t<slot name="freRustProfiles" />\n\t\t</section>\n\t</InstanceGroupDnd>')
+
     index = frontend / "src/pages/Index.vue"
     exactly(index,
             "import HorizonLibrary from '@/components/ui/HorizonLibrary.vue'",
             "import HorizonLibrary from '@/components/ui/HorizonLibrary.vue'\nimport FreRustLibrary from '@/components/ui/FreRustLibrary.vue'")
+    exactly(index, "import WelcomeScreen from '@/components/ui/WelcomeScreen.vue'\n", "")
     exactly(index,
-            '\t\t<HorizonLibrary />',
-            '\t\t<HorizonLibrary />\n\t\t<FreRustLibrary />')
+            '\t<WelcomeScreen v-if="isReady && !hasCreatedInstance" />\n\t<div\n\t\tv-else-if="isReady"',
+            '\t<div\n\t\tv-if="isReady"')
+    exactly(index,
+            '\t\t<LibrarySection :instances="instances" />\n\t\t<HorizonLibrary />',
+            '''\t\t<LibrarySection :instances="instances">
+\t\t\t<template #freRustProfiles>
+\t\t\t\t<HorizonLibrary />
+\t\t\t\t<FreRustLibrary />
+\t\t\t</template>
+\t\t</LibrarySection>''')
+    exactly(index,
+            '\t\t</LibrarySection>\n\t\t<FreRustLibrary />',
+            '\t\t</LibrarySection>')
     exactly(index,
             '\t<HorizonLibrary v-if="isReady && !hasCreatedInstance" class="px-6 pb-6" />',
-            '\t<HorizonLibrary v-if="isReady && !hasCreatedInstance" class="px-6 pb-6" />\n\t<FreRustLibrary v-if="isReady && !hasCreatedInstance" class="px-6 pb-6" />')
+            '')
 
     stage = root / "packages/ui/src/components/flows/creation-flow-modal/components/SetupTypeStage.vue"
     exactly(stage, "defaultMessage: 'Horizon (Rust)'",
