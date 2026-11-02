@@ -142,11 +142,12 @@ def verify(root):
     for label, source, snippets in (
         ("CurseForge backend", cf_backend, ["FRE_CURSEFORGE_API_KEY", "x-api-key", "allow_mod_distribution", "is_available", "validated_api_key",
             "gameVersion", "modLoaderType", "file_length", "verify_hash", "add_project_from_path",
-            "sync_content_files", "cf_search", "cf_install", "loader_type"]),
+            "sync_content_files", "cf_search", "cf_install", "loader_type", "MINECRAFT_MODPACK_CLASS_ID", "category_id"]),
         ("CurseForge browser", cf_frontend, ["plugin:fre-curseforge|cf_search",
-            "plugin:fre-curseforge|cf_install", "instanceId", "apiKey"]),
+            "plugin:fre-curseforge|cf_install", "instanceId", "apiKey", "contentType", "isModpack", "v-if=\"!isModpack\""]),
         ("Browse source selector", cf_browse, ["CurseForgeBrowser", "freContentSource",
-            "route.query.source === 'curseforge'", "Modrinth</button>", "CurseForge</button>"]),
+            "route.query.source === 'curseforge'", "Modrinth</button>", "CurseForge</button>",
+            "projectType === 'modpack'", ":content-type"]),
         ("Java instance CurseForge entry", java_instance_layout, ["fre-launch.cf.for-instance", "source: 'curseforge'", "query: { i: instance.id"]),
         ("CurseForge Rust API module", cf_mod, ["pub mod curseforge;"]),
         ("CurseForge Rust plugin", cf_main, [".plugin(api::curseforge::init())"]),
@@ -159,7 +160,8 @@ def verify(root):
     assert "api.curseforge.com" in cf_backend
     assert "https://api.curseforge.com" in cf_backend
     assert "npm install" not in cf_backend
-    for key in ("fre-launch.cf.source", "fre-launch.cf.api-key", "fre-launch.cf.install-error", "fre-launch.cf.for-instance"):
+    for key in ("fre-launch.cf.source", "fre-launch.cf.api-key", "fre-launch.cf.install-error",
+                "fre-launch.cf.for-instance", "fre-launch.cf.pack-intro", "fre-launch.cf.pack-search"):
         assert key in app_uk and key in app_en, f"CurseForge translation missing: {key}"
 
     # The new implementation does not invoke a foreign Minecraft launcher.
