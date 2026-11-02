@@ -73,12 +73,20 @@ $patchNames += @('feature_frontend_types.py','frontend-type-fixes.json','fre-que
 $patchNames += @('fre-compat.d.ts')
 $patchNames += @('feature_security_dependencies.py','security-dependencies.json','security-pnpm-lock.yaml')
 $patchNames += @('horizon_bootstrap.rs','horizon-setup-messages.json')
-# Own native Rust engine is an optional local binary. A cached generated tree
-# must be rebuilt when it becomes available or changes. It is never uploaded
-# to GitHub and no CI minutes are used by this script.
+# The open-source Rust engine can be bundled without proprietary Minecraft
+# resources. Players import resources from a legitimately owned installation.
+# Local builds may additionally contain prepared resources; they must be complete.
 $rustRuntimeFolder = Join-Path $projectRoot 'scripts\modrinth-fork\fre-rust-runtime'
-$rustRuntimeInputs = @('fre-rust-client.exe', 'resources\horizon-resources.json', 'BUILD-INFO.json')
+$rustRuntimeInputs = @('fre-rust-client.exe', 'research-lock.json', 'LICENSE.txt', 'BUILD-INFO.json')
 $rustRuntimeSignature = if (Test-Path -LiteralPath $rustRuntimeFolder -PathType Container) {
+    $resourcesFolder = Join-Path $rustRuntimeFolder 'resources'
+    if ((Test-Path -LiteralPath $resourcesFolder) -and
+        -not (Test-Path -LiteralPath (Join-Path $resourcesFolder 'horizon-resources.json') -PathType Leaf)) {
+        throw 'Native Rust resource folder is incomplete. Import a complete owned copy or remove the incomplete staging folder.'
+    }
+    if (Test-Path -LiteralPath $resourcesFolder -PathType Container) {
+        $rustRuntimeInputs += 'resources\horizon-resources.json'
+    }
     ($rustRuntimeInputs | ForEach-Object {
         $file = Join-Path $rustRuntimeFolder $_
         if (-not (Test-Path -LiteralPath $file -PathType Leaf)) {
