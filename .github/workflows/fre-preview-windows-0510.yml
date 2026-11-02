@@ -76,6 +76,8 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw 'Preflight i18n generation failed' }
             pnpm.cmd --filter '@modrinth/app-frontend' run tsc:check
             if ($LASTEXITCODE -ne 0) { throw 'Preflight Vue typecheck failed' }
+            pnpm.cmd --filter '@modrinth/app-frontend' exec vite build
+            if ($LASTEXITCODE -ne 0) { throw 'Preflight Vite production frontend build failed' }
             node "$env:GITHUB_WORKSPACE/scripts/modrinth-fork/test_frontend.cjs" $preflight
             if ($LASTEXITCODE -ne 0) { throw 'Preflight content/profile regression tests failed' }
           } finally { Pop-Location }
