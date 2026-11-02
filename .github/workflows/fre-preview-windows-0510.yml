@@ -189,7 +189,7 @@ jobs:
           Update-MpSignature -ErrorAction Stop
           Start-MpScan -ScanType CustomScan -ScanPath $installer.FullName -ErrorAction Stop
           if (!(Test-Path -LiteralPath $installer.FullName)) { throw 'Installer quarantined' }
-          $appExe = Get-ChildItem 'FRE-Modrinth-Source/target/release' -File -Filter '*.exe' | Select-Object -First 1
+          $appExe = Get-Item -LiteralPath 'FRE-Modrinth-Source/target/release/FRE LAUNCH.exe' -ErrorAction SilentlyContinue
           if (!$appExe) { throw 'Launcher executable missing' }
           Start-MpScan -ScanType CustomScan -ScanPath $appExe.FullName -ErrorAction Stop
           $rustExe = 'scripts/modrinth-fork/fre-rust-runtime/fre-rust-client.exe'
@@ -204,11 +204,11 @@ jobs:
           $folder = Join-Path $env:RUNNER_TEMP 'FRELaunch0510Preview'
           $installer = Start-Process -FilePath $env:PREVIEW_INSTALLER -ArgumentList @('/S',"/D=$folder") -Wait -PassThru
           if ($installer.ExitCode -ne 0) { throw "Preview installer failed: $($installer.ExitCode)" }
-          $executables = @(Get-ChildItem -LiteralPath $folder -Recurse -File -Filter '*.exe' |
-            Where-Object { $_.Name -notmatch 'unins|uninstall' })
-          if (!$executables.Count) { throw 'Installed preview launcher missing' }
-          $binary = $executables | Sort-Object Length -Descending | Select-Object -First 1
-          $app = Start-Process -FilePath $binary.FullName -PassThru
+          # The bundled native Rust game is also an EXE. Launch exactly FRE LAUNCH,
+          # never the largest arbitrary bundled program.
+          $executables = @(Get-ChildItem -LiteralPath $folder -Recurse -File -Filter 'FRE LAUNCH.exe')
+          if ($executables.Count -ne 1) { throw "Expected one installed FRE LAUNCH.exe, found $($executables.Count)" }
+          $app = Start-Process -FilePath $executables[0].FullName -PassThru
           Start-Sleep -Seconds 12
           $app.Refresh()
           if ($app.HasExited) { throw "Preview launcher exited unexpectedly: $($app.ExitCode)" }
