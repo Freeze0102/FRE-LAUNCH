@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { invoke } from '@tauri-apps/api/core'
+import { defineMessages, useVIntl } from '@modrinth/ui'
 import { computed, inject, onMounted, onUnmounted, ref, watch } from 'vue'
 
 type NativeProfile = { id: string; name: string; created: number }
@@ -32,6 +33,33 @@ const props = defineProps<{
   search: string
 }>()
 const emit = defineEmits<{ (event: 'count-change', count: number): void }>()
+const { formatMessage: t } = useVIntl()
+const m = defineMessages({
+  open: { id: 'fre-rust.grid.open', defaultMessage: 'Open {name}' },
+  start: { id: 'fre-rust.grid.start', defaultMessage: 'Play {name}' },
+  close: { id: 'fre-rust.grid.close', defaultMessage: 'Close' },
+  starting: { id: 'fre-rust.grid.starting', defaultMessage: 'Starting…' },
+  play: { id: 'fre-rust.grid.play', defaultMessage: 'Play' },
+  setup: { id: 'fre-rust.grid.setup', defaultMessage: 'Set up game' },
+  settings: { id: 'fre-rust.grid.settings', defaultMessage: 'Settings' },
+  openFolder: { id: 'fre-rust.grid.open-folder', defaultMessage: 'Open folder' },
+  files: { id: 'fre-rust.grid.files', defaultMessage: 'Instance files' },
+  searchFiles: { id: 'fre-rust.grid.search-files', defaultMessage: 'Search files…' },
+  refresh: { id: 'fre-rust.grid.refresh', defaultMessage: 'Refresh' },
+  reading: { id: 'fre-rust.grid.reading', defaultMessage: 'Reading files…' },
+  noFiles: { id: 'fre-rust.grid.no-files', defaultMessage: 'No files in this folder.' },
+  folder: { id: 'fre-rust.grid.folder', defaultMessage: 'Folder' },
+  nativeRequired: { id: 'fre-rust.grid.native-required', defaultMessage: 'Import your own Minecraft resources in Rust settings before playing.' },
+  gameRequired: { id: 'fre-rust.grid.game-required', defaultMessage: 'Your own installed Minecraft resources are required.' },
+  horizonRequired: { id: 'fre-rust.grid.horizon-required', defaultMessage: 'Prepare this Horizon version in settings before playing.' },
+  modsWarning: { id: 'fre-rust.grid.mods-warning', defaultMessage: 'Java JAR mods are not supported by the native Rust client. Each profile keeps its own worlds and files.' },
+  mods: { id: 'fre-rust.grid.mods', defaultMessage: 'Mods' },
+  resourcepacks: { id: 'fre-rust.grid.resourcepacks', defaultMessage: 'Resource packs' },
+  shaderpacks: { id: 'fre-rust.grid.shaderpacks', defaultMessage: 'Shaders' },
+  saves: { id: 'fre-rust.grid.saves', defaultMessage: 'Worlds' },
+  logs: { id: 'fre-rust.grid.logs', defaultMessage: 'Logs' },
+  root: { id: 'fre-rust.grid.root', defaultMessage: 'All files' },
+})
 const showRustWizard = inject<(id?: string) => void>('showFreRustWizard', () => {})
 const showHorizonWizard = inject<(id?: string) => void>('showHorizonWizard', () => {})
 
@@ -46,14 +74,7 @@ const category = ref<FileCategory>('mods')
 const files = ref<GameFile[]>([])
 const fileFilter = ref('')
 const filesLoading = ref(false)
-const fileCategories: { id: FileCategory; label: string }[] = [
-  { id: 'mods', label: 'Моди' },
-  { id: 'resourcepacks', label: 'Ресурс-паки' },
-  { id: 'shaderpacks', label: 'Шейдери' },
-  { id: 'saves', label: 'Світи' },
-  { id: 'logs', label: 'Журнали' },
-  { id: 'root', label: 'Усі файли' },
-]
+const fileCategories: FileCategory[] = ['mods', 'resourcepacks', 'shaderpacks', 'saves', 'logs', 'root']
 let requestId = 0
 let fileRequestId = 0
 const errorText = (value: unknown) => value instanceof Error ? value.message : String(value)
@@ -163,8 +184,8 @@ async function play(card: Card) {
   if (!card.ready) {
     selected.value = card
     error.value = card.kind === 'native'
-      ? runtime.value?.reason || 'Спочатку імпортуй власні файли Minecraft через налаштування Rust.'
-      : 'Спочатку підготуй версію гри в налаштуваннях Horizon.'
+      ? runtime.value?.reason || t(m.nativeRequired)
+      : t(m.horizonRequired)
     return
   }
   busy.value = card.key
@@ -247,7 +268,7 @@ onUnmounted(() => {
         :data-instance-id="card.key"
         role="button"
         tabindex="0"
-        :aria-label="'Відкрити ' + card.name"
+        :aria-label="t(m.open, { name: card.name })"
         class="group/card relative flex h-full min-w-0 cursor-pointer flex-col rounded-[22px] border border-solid border-surface-4 bg-bg-raised p-3 text-contrast transition-[border-color,filter,transform] duration-150 hover:border-surface-5 hover:brightness-110 focus-visible:outline-2 focus-visible:outline-brand"
         :class="props.compact ? 'flex-row items-center gap-3' : ''"
         @click.stop="openCard(card)"
@@ -261,7 +282,7 @@ onUnmounted(() => {
           <span class="select-none font-bold tracking-tight text-secondary" :class="props.compact ? 'text-xl' : 'text-6xl'">R</span>
           <button
             type="button"
-            :aria-label="'Запустити ' + card.name"
+            :aria-label="t(m.start, { name: card.name })"
             class="absolute inset-0 flex cursor-pointer items-center justify-center border-0 bg-black/40 text-white opacity-0 transition-opacity group-hover/card:opacity-100 focus-visible:opacity-100"
             @click.stop="play(card)"
           >
@@ -290,52 +311,52 @@ onUnmounted(() => {
             <h2 class="m-0 truncate text-xl font-bold">{{ selected.name }}</h2>
             <p class="m-0 mt-1 text-sm text-secondary">Minecraft · Rust {{ selected.version }}</p>
           </div>
-          <button type="button" class="rounded-lg bg-button-bg px-3 py-2" aria-label="Закрити" @click="closeCard">✕</button>
+          <button type="button" class="rounded-lg bg-button-bg px-3 py-2" :aria-label="t(m.close)" @click="closeCard">✕</button>
         </div>
         <div class="overflow-y-auto p-5">
           <div class="flex flex-wrap gap-2">
             <button type="button" class="rounded-lg border-0 bg-brand px-5 py-2 font-semibold text-white disabled:opacity-50"
               :disabled="!!busy" @click="play(selected)">
-              {{ busy === selected.key ? 'Запуск…' : selected.ready ? '▶ Грати' : 'Налаштувати запуск' }}
+              {{ busy === selected.key ? t(m.starting) : selected.ready ? '▶ ' + t(m.play) : t(m.setup) }}
             </button>
             <button type="button" class="rounded-lg bg-button-bg px-4 py-2 text-sm font-semibold" @click="manage(selected)">
-              Налаштування
+              {{ t(m.settings) }}
             </button>
             <button type="button" class="rounded-lg bg-button-bg px-4 py-2 text-sm font-semibold" @click="openExplorer">
-              Відкрити папку
+              {{ t(m.openFolder) }}
             </button>
           </div>
           <p v-if="!selected.ready" class="mt-3 text-sm text-secondary">
             {{ selected.kind === 'native'
-              ? runtime?.reason || 'Для гри Rust потрібні власні встановлені файли Minecraft.'
-              : 'Версію Horizon ще не підготовлено.' }}
+              ? runtime?.reason || t(m.gameRequired)
+              : t(m.horizonRequired) }}
           </p>
           <p v-if="error" role="alert" class="mt-3 text-sm text-red-400">{{ error }}</p>
           <div class="mt-5 border-t border-solid border-surface-4 pt-4">
-            <h3 class="m-0 mb-3 text-base font-semibold">Файли збірки</h3>
+            <h3 class="m-0 mb-3 text-base font-semibold">{{ t(m.files) }}</h3>
             <div class="flex flex-wrap gap-2">
-              <button v-for="item in fileCategories" :key="item.id" type="button"
+              <button v-for="item in fileCategories" :key="item" type="button"
                 class="cursor-pointer rounded-lg px-3 py-2 text-sm"
-                :class="category === item.id ? 'bg-brand text-white' : 'bg-button-bg text-secondary'"
-                :aria-pressed="category === item.id"
-                @click="loadFiles(item.id)">{{ item.label }}</button>
+                :class="category === item ? 'bg-brand text-white' : 'bg-button-bg text-secondary'"
+                :aria-pressed="category === item"
+                @click="loadFiles(item)">{{ t(m[item]) }}</button>
             </div>
             <div class="mt-3 flex gap-2">
               <input v-model="fileFilter" class="min-w-0 flex-1 rounded-lg bg-button-bg p-3 text-sm text-contrast"
-                aria-label="Пошук файлів" placeholder="Пошук файлів..." />
-              <button type="button" class="rounded-lg bg-button-bg px-3 text-sm" @click="loadFiles()">Оновити</button>
+                :aria-label="t(m.searchFiles)" :placeholder="t(m.searchFiles)" />
+              <button type="button" class="rounded-lg bg-button-bg px-3 text-sm" @click="loadFiles()">{{ t(m.refresh) }}</button>
             </div>
-            <p v-if="filesLoading" class="mt-3 text-sm text-secondary">Зчитування файлів…</p>
-            <p v-else-if="!filteredFiles.length" class="mt-3 text-sm text-secondary">Немає файлів у цій папці.</p>
+            <p v-if="filesLoading" class="mt-3 text-sm text-secondary">{{ t(m.reading) }}</p>
+            <p v-else-if="!filteredFiles.length" class="mt-3 text-sm text-secondary">{{ t(m.noFiles) }}</p>
             <div v-else class="mt-3 max-h-64 overflow-y-auto rounded-lg border border-solid border-surface-4">
               <div v-for="file in filteredFiles" :key="file.name"
                 class="flex items-center justify-between gap-3 border-b border-solid border-surface-4 px-3 py-2 text-sm">
                 <span class="min-w-0 truncate" :title="file.name">{{ file.isDirectory ? '📁' : '📄' }} {{ file.name }}</span>
-                <span class="shrink-0 text-xs text-secondary">{{ file.isDirectory ? 'Папка' : readableSize(file.bytes) }}</span>
+                <span class="shrink-0 text-xs text-secondary">{{ file.isDirectory ? t(m.folder) : readableSize(file.bytes) }}</span>
               </div>
             </div>
           </div>
-          <p class="mt-3 text-xs text-secondary">Java JAR-моди не сумісні з нативним Rust-клієнтом. Світи й файли кожного профілю залишаються окремими.</p>
+          <p class="mt-3 text-xs text-secondary">{{ t(m.modsWarning) }}</p>
         </div>
       </section>
     </div>
