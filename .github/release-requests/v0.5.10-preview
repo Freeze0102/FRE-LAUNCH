@@ -1,5 +1,5 @@
-One-shot FRE LAUNCH v0.5.10 Windows preview, retry #5 (2026-11-02).
-Source: main; Horizon and native Rust Vue callback syntax changed to plain JS, as required by App.vue.
-First: source patch validation, full pinned pnpm dependency installation, Vue TypeScript check and Java in-app content/Rust profile tests.
-Then: compile MIT Rust client, build unsigned Windows Tauri NSIS installer, run Microsoft Defender and installed-app smoke checks.
-Do not publish this unsigned preview as the signed v0.5.10 auto-update.
+One-shot FRE LAUNCH v0.5.10 Windows preview, retry #6 (2026-11-02).
+Source: main; Vue App.vue Horizon/Rust wizard callbacks are plain JavaScript, and the frontend regression harness now exports CurseForge searched state and tests correct Rust in-app file listing.
+Preflight: apply pinned patches, verify, pnpm install, Vue typecheck, and run native UI regression tests BEFORE Rust compilation.
+Then: compile MIT Rust engine; compile unsigned Windows NSIS; require Defender scan and 12-second installed-app smoke test.
+Never publish the unsigned preview as a signed automatic update.
