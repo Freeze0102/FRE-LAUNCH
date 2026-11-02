@@ -208,6 +208,7 @@ NEW = {
 "fre-launch.cf.instance":("Установити в збірку","Install to game instance"),
 "fre-launch.cf.select-instance":("Вибери збірку","Select a game instance"),
 "fre-launch.cf.search":("Пошук CurseForge","Search CurseForge"),
+"fre-launch.cf.for-instance":("Знайти моди CurseForge для цієї збірки", "Find CurseForge mods for this instance"),
 "fre-launch.cf.placeholder":("Знайти мод для Minecraft...","Find a Minecraft mod..."),
 "fre-launch.cf.search-button":("Знайти моди","Find mods"),
 "fre-launch.cf.searching":("Шукаємо...","Searching..."),
