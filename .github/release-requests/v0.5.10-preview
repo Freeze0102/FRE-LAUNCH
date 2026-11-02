@@ -1,3 +1,3 @@
-One-shot CI preview requested 2026-11-02, retry #2.
-Source: latest main, including FRE-MODRINTH-LOCAL.ps1 correction that accepts an MIT-only fre-rust-client.exe without proprietary Minecraft resources.
-Build an unsigned local-test NSIS installer, run regression tests, scan with Defender, smoke-test the installed app, and upload only as a temporary workflow artifact. Never publish as a signed v0.5.10 GitHub Release.
+One-shot FRE LAUNCH Windows preview requested 2026-11-02, retry #3.
+Source: latest main, with corrected Horizon Vue patch for optional instanceId and source patch preflight before Rust engine compilation.
+This is an UNSIGNED test Windows installer, not a signed auto-update. Build only if Python/Vue checks pass, Defender finds no threats, and the installed executable survives startup.
