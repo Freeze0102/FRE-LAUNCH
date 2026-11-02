@@ -114,7 +114,7 @@ onUnmounted(() => {
       <button
         type="button"
         class="cursor-pointer rounded-lg border border-solid border-surface-4 bg-button-bg px-4 py-2 text-sm font-semibold text-contrast"
-        @click="openHorizonWizard"
+        @click="openHorizonWizard()"
       >{{ t(messages.add) }}</button>
     </div>
     <p v-if="!profiles.length && !error" class="m-0 rounded-xl border border-solid border-surface-4 bg-bg-raised p-4 text-sm text-secondary">{{ t(messages.empty) }}</p>
