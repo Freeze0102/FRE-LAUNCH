@@ -1,0 +1,6 @@
+FRE LAUNCH signed Windows release request: v0.5.10
+Requested: 2026-11-02
+Source: latest main commit, including in-app Java Modrinth/CurseForge catalog and Horizon terminal-free launch.
+Build: Vue/Tauri native Windows installer, updater signature, regression tests, Defender scan, and installed-launcher smoke test.
+Publish: only if the existing FRE_LAUNCH_SECURITY_APPROVED repository variable is true AND all checks pass.
+Do not upload, substitute, or reuse old binaries; never publish the flagged legacy v0.5.5 installer.
