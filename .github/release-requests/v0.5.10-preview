@@ -1,5 +1,5 @@
-One-shot FRE LAUNCH v0.5.10 Windows preview, retry #6 (2026-11-02).
-Source: main; Vue App.vue Horizon/Rust wizard callbacks are plain JavaScript, and the frontend regression harness now exports CurseForge searched state and tests correct Rust in-app file listing.
-Preflight: apply pinned patches, verify, pnpm install, Vue typecheck, and run native UI regression tests BEFORE Rust compilation.
-Then: compile MIT Rust engine; compile unsigned Windows NSIS; require Defender scan and 12-second installed-app smoke test.
-Never publish the unsigned preview as a signed automatic update.
+FRE LAUNCH v0.5.10 Windows preview: one controlled retry after preflight and workflow fixes.
+Date: 2026-11-02.
+Confirmed from previous run 41468386731: 18/18 frontend tests and Vue/TS passed; Rust client compiled. The failure was an unsupported Tauri 2.5.0 --no-sign option.
+This revision uses the supported createUpdaterArtifacts:false config override and only valid CLI options. Preflight now checks Vue, Vite production build, all frontend tests and Tauri build help BEFORE compiling the native engine. A pinned-engine cache is saved immediately after a successful engine build and checked by SHA-256, source commit and license on reuse.
+Keep signed auto-update unchanged. Only upload an unsigned NSIS preview if Windows build, Microsoft Defender scans and clean-install launcher smoke test succeed.
