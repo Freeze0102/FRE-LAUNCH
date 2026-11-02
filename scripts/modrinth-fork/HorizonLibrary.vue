@@ -20,6 +20,7 @@ const messages = defineMessages({
   manage: { id: 'fre-launch.rust.library.manage', defaultMessage: 'Manage' },
   add: { id: 'fre-launch.rust.library.add', defaultMessage: 'New Rust profile' },
   needsPrepare: { id: 'fre-launch.rust.library.needs-prepare', defaultMessage: 'Installation or resources required' },
+  empty: { id: 'fre-launch.rust.library.empty', defaultMessage: 'No Horizon profiles found. Open the manager to add one.' },
   ready: { id: 'fre-launch.rust.library.ready', defaultMessage: 'Ready to play' },
   error: { id: 'fre-launch.rust.library.error', defaultMessage: 'Horizon: {reason}' },
 })
@@ -91,7 +92,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <section v-if="profiles.length" class="flex flex-col gap-3">
+  <section v-if="profiles.length || executable || error" class="flex flex-col gap-3">
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div>
         <h2 class="m-0 text-2xl font-semibold text-contrast">{{ t(messages.title) }}</h2>
@@ -103,7 +104,8 @@ onUnmounted(() => {
         @click="openHorizonWizard"
       >{{ t(messages.add) }}</button>
     </div>
-    <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+    <p v-if="!profiles.length && !error" class="m-0 rounded-xl border border-solid border-surface-4 bg-bg-raised p-4 text-sm text-secondary">{{ t(messages.empty) }}</p>
+    <div v-if="profiles.length" class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
       <article
         v-for="profile in profiles"
         :key="profile.id"
