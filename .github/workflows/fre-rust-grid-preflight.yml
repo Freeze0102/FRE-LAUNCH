@@ -1,0 +1,60 @@
+name: FRE LAUNCH unified Rust library preflight (no Windows engine build)
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/fre-rust-grid-preflight.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    runs-on: windows-latest
+    timeout-minutes: 18
+    steps:
+      - name: Checkout pinned upstream and custom patches
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - name: Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Install locked frontend tooling
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          npm.cmd install -g pnpm@12.11.2
+          if ($LASTEXITCODE -ne 0) { throw 'pnpm installation failed' }
+          python -m pip install 'Pillow>=11,<13'
+          if ($LASTEXITCODE -ne 0) { throw 'Pillow installation failed' }
+      - name: Apply patches, verify unified main library and run actual Vue tests
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $source = Join-Path $env:RUNNER_TEMP 'FRE-Rust-Grid-Preflight'
+          Copy-Item -LiteralPath 'vendor/modrinth' -Destination $source -Recurse -Force
+          python scripts/modrinth-fork/prepare.py $source --upstream-sha 4ccf4d51804627cd0687ce7dfd5004f20c267acc
+          if ($LASTEXITCODE -ne 0) { throw 'Rust main-grid source patch failed' }
+          python scripts/modrinth-fork/verify.py $source
+          if ($LASTEXITCODE -ne 0) { throw 'Rust main-grid integration validation failed' }
+          Push-Location $source
+          try {
+            pnpm.cmd --filter '@modrinth/app...' install --frozen-lockfile
+            if ($LASTEXITCODE -ne 0) { throw 'Locked dependencies failed' }
+            pnpm.cmd -w i18n:coverage
+            if ($LASTEXITCODE -ne 0) { throw 'i18n generation failed' }
+            pnpm.cmd --filter '@modrinth/app-frontend' run tsc:check
+            if ($LASTEXITCODE -ne 0) { throw 'Vue TypeScript check failed' }
+            pnpm.cmd --filter '@modrinth/app-frontend' exec vite build
+            if ($LASTEXITCODE -ne 0) { throw 'Production frontend bundle failed' }
+            node "$env:GITHUB_WORKSPACE/scripts/modrinth-fork/test_frontend.cjs" $source
+            if ($LASTEXITCODE -ne 0) { throw 'Rust and Java frontend regression tests failed' }
+          } finally { Pop-Location }
+          Write-Host 'Unified Rust card preflight SUCCESS. No Rust engine or Windows installer compiled.'
