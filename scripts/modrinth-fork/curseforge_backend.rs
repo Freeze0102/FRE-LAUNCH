@@ -8,6 +8,7 @@ use tauri_plugin_http::reqwest::{self, Client};
 
 const MINECRAFT_GAME_ID: &str = "432";
 const MINECRAFT_MOD_CLASS_ID: &str = "6";
+const MINECRAFT_MODPACK_CLASS_ID: &str = "4471";
 const MAX_MOD_BYTES: usize = 128 * 1024 * 1024;
 static INSTALL: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
@@ -119,13 +120,23 @@ fn loader_type(loader: &str) -> Option<&'static str> {
     }
 }
 
+fn category_id(content_type: Option<&str>) -> Result<&'static str, String> {
+    match content_type.unwrap_or("mod") {
+        "mod" => Ok(MINECRAFT_MOD_CLASS_ID),
+        "modpack" => Ok(MINECRAFT_MODPACK_CLASS_ID),
+        _ => Err("Unsupported CurseForge content category.".into()),
+    }
+}
+
 #[tauri::command]
 async fn cf_search(
     query: String,
     game_version: Option<String>,
     mod_loader: Option<String>,
     api_key: Option<String>,
+    content_type: Option<String>,
 ) -> Result<Vec<CurseForgeMod>, String> {
+    let class_id = category_id(content_type.as_deref())?;
     let key = validated_api_key(api_key)?;
     let query = query.trim();
     if query.chars().count() > 100 {
@@ -133,7 +144,7 @@ async fn cf_search(
     }
     let mut params = vec![
         ("gameId", MINECRAFT_GAME_ID.to_string()),
-        ("classId", MINECRAFT_MOD_CLASS_ID.to_string()),
+        ("classId", class_id.to_string()),
         ("pageSize", "24".to_string()),
         ("sortField", "2".to_string()),
     ];
@@ -335,6 +346,13 @@ fn download_url(download: &str) -> Result<reqwest::Url, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn category_mapping_is_explicit() {
+        assert_eq!(category_id(None).unwrap(), "6");
+        assert_eq!(category_id(Some("mod")).unwrap(), "6");
+        assert_eq!(category_id(Some("modpack")).unwrap(), "4471");
+        assert!(category_id(Some("unknown")).is_err());
+    }
     #[test]
     fn loader_mapping() {
         assert_eq!(loader_type("fabric"), Some("4"));
