@@ -17,7 +17,7 @@ pub fn init<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
             horizon_instances, horizon_create, horizon_play, horizon_logs,
             horizon_versions, horizon_install_version, horizon_set_version, horizon_prepare,
             horizon_install_launcher, horizon_detect_launcher, horizon_status, horizon_open_launcher,
-            horizon_direct_play,
+            horizon_direct_play, horizon_open_folder,
         ])
         .build()
 }
@@ -102,6 +102,52 @@ async fn horizon_status(exe_path: String) -> Result<HorizonStatus, String> {
     let versions = run_cli(&exe, &["versions", "--installed", "--json"], QUICK_TIMEOUT).await?;
     let detail = run_cli(&exe, &["versions", "--installed"], QUICK_TIMEOUT).await?;
     parse_status(&instances, &versions, &detail)
+}
+
+// Return the selected Horizon instance's real game folder, never a Java
+// instance's mods directory. Horizon itself supplies its source of truth.
+#[tauri::command]
+async fn horizon_open_folder(
+    exe_path: String,
+    name: String,
+    folder: String,
+) -> Result<(), String> {
+    let exe = validate_launcher(&exe_path)?;
+    validate_name(&name)?;
+    if !matches!(folder.as_str(), "root" | "saves" | "mods" | "resourcepacks" | "shaderpacks" | "logs") {
+        return Err("Unsupported Horizon game folder.".into());
+    }
+    let text = run_cli(&exe, &["instance", "list", "--json"], QUICK_TIMEOUT).await?;
+    let entries: Vec<serde_json::Value> = serde_json::from_str(&text)
+        .map_err(|_| "Horizon instance listing is invalid.")?;
+    let entry = entries.iter().find(|value| value["id"].as_str() == Some(&name))
+        .ok_or("The Horizon instance no longer exists.")?;
+    if !matches!(entry["kind"].as_str(), Some("own" | "default")) || !entry["java"].is_null() {
+        return Err("This is not a native Horizon game instance.".into());
+    }
+    let home = PathBuf::from(entry["home"].as_str().ok_or("Horizon did not return an instance folder.")?);
+    let home = home.canonicalize().map_err(|e| e.to_string())?;
+    if !home.is_dir() { return Err("Horizon game folder is unavailable.".into()); }
+    let child = if folder == "root" { home.clone() } else { home.join(folder) };
+    let target = child.canonicalize().map_err(|e| e.to_string())?;
+    if !target.starts_with(&home) || !target.is_dir() {
+        return Err("The selected folder is outside the Horizon game directory or missing.".into());
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        std::process::Command::new("explorer.exe")
+            .arg(&target)
+            .creation_flags(0x08000000)
+            .spawn()
+            .map_err(|e| format!("Cannot open Horizon folder: {e}"))?;
+        Ok(())
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = target;
+        Err("Opening Horizon folders is currently supported on Windows.".into())
+    }
 }
 
 fn validate_launcher(path: &str) -> Result<PathBuf, String> {
