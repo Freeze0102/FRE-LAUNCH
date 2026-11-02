@@ -269,6 +269,15 @@ def verify(root):
     assert '<HorizonLibrary' not in rust_index and '<FreRustLibrary' not in rust_index, (
         "Do not render separate Horizon or Rust libraries"
     )
+    for key in ('open', 'start', 'close', 'play', 'setup', 'settings',
+                'open-folder', 'files', 'search-files', 'refresh',
+                'reading', 'no-files', 'folder', 'native-required',
+                'game-required', 'horizon-required', 'mods-warning',
+                'mods', 'resourcepacks', 'shaderpacks', 'saves', 'logs', 'root'):
+        translation = 'fre-rust.grid.' + key
+        assert translation in app_uk and translation in app_en, (
+            f"Rust instance UI not translated into both UA and EN: {translation}"
+        )
     assert '<WelcomeScreen v-if=' not in rust_index, "Rust-first users must see the library before creating a Java profile"
     assert 'plugin:fre-horizon|horizon_open_folder' in legacy_library
     assert 'v-if="profiles.length || executable || error"' in legacy_library, "Legacy Horizon component preserved for existing users"
