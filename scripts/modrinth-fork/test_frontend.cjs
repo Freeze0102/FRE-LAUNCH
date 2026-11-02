@@ -27,7 +27,7 @@ function component(file, invoke, instances = [], options = {}) {
     '@tauri-apps/api/core': { invoke },
     '@tauri-apps/api/event': { listen: options.listen || (async () => () => {}) },
     '@tauri-apps/plugin-opener': { openUrl: async () => {} },
-    '@tauri-apps/plugin-dialog': { open: async () => null },
+    '@tauri-apps/plugin-dialog': { open: options.open || (async () => null) },
     '@/helpers/instance': { list: async () => instances },
     '@modrinth/ui': { defineMessages: x => x, useVIntl: () => ({ formatMessage: (m, args = {}) =>
       m.defaultMessage.replace(/\{(\w+)\}/g, (_, k) => String(args[k])) }) },
@@ -35,13 +35,23 @@ function component(file, invoke, instances = [], options = {}) {
   }
   const names = file === 'CurseForgeBrowser.vue'
     ? 'instanceId,searchText,apiKey,results,loading,notice,error,installing,doSearch,install'
-    : 'minecraftPath,executable,instanceName,launchName,pending,error,feedback,status,prepared,canPlay,activeVersion,releaseTag,downloadProgress,manageHorizon,createInstance,playInstance,downloadLauncher,show,hide,visible'
-  const setup = new Function('require', 'defineProps', 'defineExpose', 'localStorage', 'exports',
+    : file === 'FreRustPanel.vue'
+      ? 'source,name,selectedId,profiles,runtime,pending,error,notice,chooseSourceFolder,importResources,create,refresh,show,hide,visible'
+      : file === 'FreRustLibrary.vue'
+        ? 'profiles,runtime,error,refresh,play,openRustWizard'
+        : 'minecraftPath,executable,instanceName,launchName,pending,error,feedback,status,prepared,canPlay,activeVersion,releaseTag,downloadProgress,manageHorizon,createInstance,playInstance,downloadLauncher,show,hide,visible'
+  const setup = new Function('require', 'defineProps', 'defineExpose', 'localStorage', 'window', 'Event', 'exports',
     `${output}\nreturn {${names}}`)
+  const listeners = new Map()
+  const browser = {
+    addEventListener: (type, callback) => listeners.set(type, callback),
+    removeEventListener: type => listeners.delete(type),
+    dispatchEvent: event => { listeners.get(event.type)?.(event); return true },
+  }
   const state = setup(name => {
     assert.ok(name in mocks, `Unexpected dependency: ${name}`)
     return mocks[name]
-  }, () => ({}), () => {}, { getItem: () => null, setItem: () => {} }, {})
+  }, () => ({}), () => {}, { getItem: () => null, setItem: () => {} }, browser, Event, {})
   return { state, mount: async () => { for (const f of mounted) await f() },
     unmount: () => { for (const f of unmounted) f() } }
 }
@@ -98,6 +108,67 @@ test('CurseForge refuses unavailable distribution and keeps install destination 
   await install
   assert.equal(calls[0].args.instanceId, 'a')
   assert.match(c.state.notice.value, /^Fabric:/)
+})
+
+test('Rust library stays accessible when no profile exists yet', async () => {
+  const source = fs.readFileSync(path.join(__dirname, 'FreRustLibrary.vue'), 'utf8')
+  assert.match(source, /<section class="flex flex-col gap-3"/)
+  assert.match(source, /v-if="!profiles.length && !error"/)
+  const c = component('FreRustLibrary.vue', async command => {
+    if (command.endsWith('|rust_profiles')) return []
+    if (command.endsWith('|rust_runtime')) return { installed: true, prepared: false, version: '26.3', reason: 'Missing assets' }
+    throw new Error(command)
+  })
+  await c.state.refresh()
+  assert.deepEqual(c.state.profiles.value, [])
+  assert.equal(c.state.error.value, '')
+})
+
+test('Rust profile creation survives refresh and becomes visible in library', async () => {
+  const profile = { id: '12345', name: 'Survival Rust', created: 1 }
+  let created = false
+  const calls = []
+  const invoke = async (command, args) => {
+    calls.push({ command, args })
+    if (command.endsWith('|rust_create_profile')) { created = true; return profile }
+    if (command.endsWith('|rust_profiles')) return created ? [profile] : []
+    if (command.endsWith('|rust_runtime')) return { installed: true, prepared: true, version: '26.3', reason: null }
+    throw new Error(command)
+  }
+  const panel = component('FreRustPanel.vue', invoke)
+  const library = component('FreRustLibrary.vue', invoke)
+  await library.mount()
+  await panel.mount()
+  panel.state.name.value = profile.name
+  await panel.state.create()
+  await library.state.refresh()
+  assert.equal(panel.state.selectedId.value, profile.id)
+  assert.equal(library.state.profiles.value[0].name, profile.name)
+  assert.ok(calls.some(c => c.command === 'plugin:fre-rust|rust_create_profile' && c.args.name === profile.name))
+  library.unmount()
+})
+
+test('Rust resource folder picker passes selected directory to import command', async () => {
+  const chosen = 'D:\\Minecraft Resources'
+  const calls = []
+  const c = component('FreRustPanel.vue', async (command, args) => {
+    calls.push({ command, args })
+    if (command.endsWith('|rust_profiles')) return []
+    if (command.endsWith('|rust_runtime')) return { installed: true, prepared: false, version: '26.3', reason: null }
+    if (command.endsWith('|rust_import_resources')) return 'Imported files'
+    throw new Error(command)
+  }, [], { open: async opts => {
+    assert.equal(opts.directory, true)
+    assert.equal(opts.multiple, false)
+    return chosen
+  } })
+  await c.state.refresh()
+  await c.state.chooseSourceFolder()
+  assert.equal(c.state.source.value, chosen)
+  await c.state.importResources()
+  assert.ok(calls.some(({ command, args }) =>
+    command === 'plugin:fre-rust|rust_import_resources' && args.source === chosen))
+  assert.equal(c.state.pending.value, null)
 })
 
 test('Horizon forwards the optional Minecraft folder using the official prepare flag input', async () => {
