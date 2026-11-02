@@ -190,7 +190,7 @@ def verify(root):
             "async fn rust_import_resources", "async fn rust_launch", "async fn rust_profiles", "async fn rust_runtime",
             "async fn rust_logs", '"fre-rust-client.exe"', 'Command::new(client)',
             '"--resources"', '"--home"', '"--game-dir"', '"--session-stdin"',
-            "Credentials::get_default_credential", "online_profile_fresh",
+            "theseus::minecraft_auth::fre_rust_default_credentials", "online_profile_fresh",
             "verify_native_client", "Sha256::new", "RUNNING_PROFILES",
             "profile_id_valid", "read_profile", "safe_game_folder", "rust_open_folder", "rust_list_files", "list_game_files", "explorer.exe",
         ]),
@@ -216,6 +216,14 @@ def verify(root):
     ):
         for marker in markers:
             assert marker in source, f"Standalone Rust Minecraft integration missing: {marker}"
+    # Public-API boundary: Tauri cannot access Theseus's private state
+    # module or pool. Keep the account refresh inside the Theseus auth API.
+    auth_api = (root / "packages/app-lib/src/api/minecraft_auth.rs").read_text(encoding="utf-8")
+    assert "pub async fn fre_rust_default_credentials() -> crate::Result<Option<Credentials>>" in auth_api
+    assert "Credentials::get_default_credential(&state.pool).await" in auth_api
+    assert "theseus::state::" not in rust_backend and "state.pool" not in rust_backend
+    assert "use theseus::{State" not in rust_backend
+    assert rust_backend.count("theseus::minecraft_auth::fre_rust_default_credentials()") == 2
     for key in (
         "fre-rust.setup.title", "fre-rust.setup.create", "fre-rust.setup.error",
         "fre-rust.setup.import", "fre-rust.setup.source", "fre-rust.setup.browse",
