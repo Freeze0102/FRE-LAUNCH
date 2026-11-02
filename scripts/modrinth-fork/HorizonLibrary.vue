@@ -12,7 +12,7 @@ type RustStatus = {
 }
 const { formatMessage: t } = useVIntl()
 const messages = defineMessages({
-  title: { id: 'fre-launch.rust.library.title', defaultMessage: 'Minecraft on Rust' },
+  title: { id: 'fre-launch.rust.library.title', defaultMessage: 'Horizon — existing profiles' },
   subtitle: { id: 'fre-launch.rust.library.subtitle', defaultMessage: 'Horizon profiles are separate game installations with their own worlds, options and game files.' },
   version: { id: 'fre-launch.rust.library.version', defaultMessage: 'Version {version}' },
   play: { id: 'fre-launch.rust.library.play', defaultMessage: 'Play' },
