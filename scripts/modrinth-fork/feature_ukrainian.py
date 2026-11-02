@@ -327,6 +327,7 @@ NEW.update({
 "fre-launch.rust.library.manage":("Налаштувати","Manage"),
 "fre-launch.rust.library.add":("Нова Rust-збірка","New Rust profile"),
 "fre-launch.rust.library.needs-prepare":("Потрібно встановити гру або підготувати ресурси","Installation or resources required"),
+"fre-launch.rust.library.empty":("Збірок Horizon не знайдено. Відкрий налаштування, щоб додати збірку.", "No Horizon profiles found. Open the manager to add one."),
 "fre-launch.rust.library.ready":("Готово до запуску","Ready to play"),
 "fre-launch.rust.library.error":("Horizon: {reason}","Horizon: {reason}"),
 })
