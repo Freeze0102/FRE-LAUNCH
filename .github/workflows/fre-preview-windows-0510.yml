@@ -66,6 +66,19 @@ jobs:
           python scripts/modrinth-fork/verify.py $preflight
           if ($LASTEXITCODE -ne 0) { throw 'FRE LAUNCH source verification preflight failed' }
           Write-Host 'All Vue/Rust integration patches applied to the pinned Modrinth source.'
+          # Catch Vue/TypeScript regressions here, BEFORE compiling the 20-minute
+          # native engine. This is the same full pinned source plus FRE patches.
+          Push-Location $preflight
+          try {
+            pnpm.cmd --filter '@modrinth/app...' install --frozen-lockfile
+            if ($LASTEXITCODE -ne 0) { throw 'Preflight workspace installation failed' }
+            pnpm.cmd -w i18n:coverage
+            if ($LASTEXITCODE -ne 0) { throw 'Preflight i18n generation failed' }
+            pnpm.cmd --filter '@modrinth/app-frontend' run tsc:check
+            if ($LASTEXITCODE -ne 0) { throw 'Preflight Vue typecheck failed' }
+            node "$env:GITHUB_WORKSPACE/scripts/modrinth-fork/test_frontend.cjs" $preflight
+            if ($LASTEXITCODE -ne 0) { throw 'Preflight content/profile regression tests failed' }
+          } finally { Pop-Location }
 
       - name: Build MIT-only native game engine
         shell: pwsh
