@@ -16,10 +16,12 @@ type CurseForgeMod = {
   isAvailable?: boolean
 }
 
-const props = defineProps<{ instanceId?: string }>()
+const props = defineProps<{ instanceId?: string; contentType?: 'mod' | 'modpack' }>()
 const { formatMessage: t } = useVIntl()
 const m = defineMessages({
   intro: { id: 'fre-launch.cf.intro', defaultMessage: 'Mods from CurseForge can be installed into the same game instance as Modrinth mods.' },
+  packIntro: { id: 'fre-launch.cf.pack-intro', defaultMessage: 'Find CurseForge modpacks and open their project pages. Installing CurseForge ZIP packs is not available yet.' },
+  packSearch: { id: 'fre-launch.cf.pack-search', defaultMessage: 'Find modpacks' },
   apiKey: { id: 'fre-launch.cf.api-key', defaultMessage: 'Approved CurseForge API key (not saved)' },
   keyHelp: { id: 'fre-launch.cf.key-help', defaultMessage: 'CurseForge requires an approved third-party API key. Without one you can open projects in the browser. The key stays in this session only.' },
   helpLink: { id: 'fre-launch.cf.key-link', defaultMessage: 'How to request access' },
@@ -56,6 +58,7 @@ const notice = ref('')
 const error = ref('')
 let searchSequence = 0
 
+const isModpack = computed(() => props.contentType === 'modpack')
 const selected = computed(() => instances.value.find((i) => i.id === instanceId.value))
 const gameVersion = computed(() => selected.value?.game_version ?? '')
 const loader = computed(() => selected.value?.loader ?? '')
@@ -76,6 +79,7 @@ onUnmounted(() => { searchSequence++ })
 
 onMounted(async () => {
   try {
+    if (isModpack.value) return
     const all = await listInstances()
     instances.value = all
       .filter((i) => !i.quarantined && !i.shared_instance && ['fabric', 'forge', 'neoforge', 'quilt'].includes(String(i.loader).toLowerCase()))
@@ -101,8 +105,9 @@ async function doSearch() {
   try {
     const found = await invoke<CurseForgeMod[]>('plugin:fre-curseforge|cf_search', {
       query: searchText.value.trim(),
-      gameVersion: isModded.value ? gameVersion.value : null,
-      modLoader: isModded.value ? loader.value : null,
+      gameVersion: !isModpack.value && isModded.value ? gameVersion.value : null,
+      modLoader: !isModpack.value && isModded.value ? loader.value : null,
+      contentType: isModpack.value ? 'modpack' : 'mod',
       apiKey: apiKey.value.trim() || null,
     })
     if (sequence !== searchSequence) return
@@ -118,7 +123,7 @@ async function doSearch() {
 }
 
 async function install(mod: CurseForgeMod) {
-  if (!selected.value || !isModded.value || installing.value !== null
+  if (isModpack.value || !selected.value || !isModded.value || installing.value !== null
     || mod.isAvailable === false || mod.allowModDistribution !== true) return
   const target = selected.value
   installing.value = mod.id
@@ -140,10 +145,10 @@ async function install(mod: CurseForgeMod) {
 
 function openProject(mod: CurseForgeMod) {
   if (!/^[a-z0-9-]+$/.test(mod.slug)) return
-  void openUrl('https://www.curseforge.com/minecraft/mc-mods/' + mod.slug)
+  void openUrl('https://www.curseforge.com/minecraft/' + (isModpack.value ? 'modpacks/' : 'mc-mods/') + mod.slug)
 }
 function browseWithoutKey() {
-  void openUrl('https://www.curseforge.com/minecraft/search?search=' + encodeURIComponent(searchText.value.trim()))
+  void openUrl('https://www.curseforge.com/minecraft/' + (isModpack.value ? 'modpacks' : 'mc-mods') + '?search=' + encodeURIComponent(searchText.value.trim()))
 }
 function openKeyHelp() {
   void openUrl('https://support.curseforge.com/support/solutions/articles/9000208346-about-the-curseforge-api-and-how-to-apply-for-a-key')
@@ -156,12 +161,12 @@ function openKeyHelp() {
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 class="m-0 text-xl font-semibold text-contrast">CurseForge</h2>
-          <p class="mt-2 mb-0 text-sm text-secondary">{{ t(m.intro) }}</p>
+          <p class="mt-2 mb-0 text-sm text-secondary">{{ t(isModpack ? m.packIntro : m.intro) }}</p>
         </div>
         <span class="rounded-lg border border-solid border-surface-5 px-3 py-1 text-xs text-secondary">CurseForge API</span>
       </div>
 
-      <label class="mt-4 flex flex-col gap-2 text-sm text-secondary">
+      <label v-if="!isModpack" class="mt-4 flex flex-col gap-2 text-sm text-secondary">
         {{ t(m.instance) }}
         <select v-model="instanceId" :disabled="installing !== null" class="min-h-10 w-full rounded-lg bg-button-bg p-2 text-contrast">
           <option value="">{{ t(m.selectInstance) }}</option>
@@ -197,20 +202,21 @@ function openKeyHelp() {
           maxlength="100"
         />
         <button type="submit" class="rounded-lg border-0 bg-brand px-5 py-2 font-semibold text-white cursor-pointer disabled:opacity-50" :disabled="loading">
-          {{ loading ? t(m.searching) : t(m.searchButton) }}
+          {{ loading ? t(m.searching) : t(isModpack ? m.packSearch : m.searchButton) }}
         </button>
       </form>
       <button class="mt-3 cursor-pointer border-0 bg-transparent p-0 text-sm text-brand hover:underline" @click="browseWithoutKey">
         {{ t(m.browseLink) }}
       </button>
 
-      <p v-if="isModded" class="mt-3 mb-0 text-sm text-secondary">{{ t(m.compatible) }}</p>
+      <p v-if="isModpack" class="mt-3 mb-0 text-sm text-secondary">{{ t(m.packIntro) }}</p>
+      <p v-else-if="isModded" class="mt-3 mb-0 text-sm text-secondary">{{ t(m.compatible) }}</p>
       <p v-else class="mt-3 mb-0 text-sm text-secondary">{{ t(m.noInstance) }}</p>
     </div>
 
     <p v-if="error" role="alert" class="rounded-lg border border-solid border-red-500/50 p-3 text-sm text-red-400">{{ error }}</p>
     <p v-if="notice" role="status" class="rounded-lg border border-solid border-surface-4 p-3 text-sm text-brand">{{ notice }}</p>
-    <p class="text-xs text-secondary">{{ t(m.warning) }}</p>
+    <p v-if="!isModpack" class="text-xs text-secondary">{{ t(m.warning) }}</p>
 
     <div v-if="searched" class="space-y-3">
       <h3 class="m-0 font-semibold text-contrast">{{ t(m.results) }} · {{ results.length }}</h3>
@@ -236,6 +242,7 @@ function openKeyHelp() {
             {{ t(m.openWebsite) }}
           </button>
           <button
+            v-if="!isModpack"
             class="rounded-lg border-0 bg-brand px-3 py-2 text-sm font-semibold text-white cursor-pointer disabled:opacity-40"
             :disabled="!isModded || mod.isAvailable === false || mod.allowModDistribution !== true || installing !== null"
             @click="install(mod)"
