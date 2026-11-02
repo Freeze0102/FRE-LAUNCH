@@ -16,10 +16,12 @@ const m = defineMessages({
   play: { id: 'fre-rust.library.play', defaultMessage: 'Play' },
   playing: { id: 'fre-rust.library.playing', defaultMessage: 'Starting...' },
   manage: { id: 'fre-rust.library.manage', defaultMessage: 'Manage' },
+  files: { id: 'fre-rust.library.files', defaultMessage: 'Files' },
+  modsInfo: { id: 'fre-rust.library.mods-info', defaultMessage: 'Horizon accepts native Rust mods, not CurseForge Java jars.' },
   error: { id: 'fre-rust.library.error', defaultMessage: 'Rust game: {reason}' },
 })
 
-const openRustWizard = inject<() => void>('showFreRustWizard', () => {})
+const openRustWizard = inject<(profileId?: string) => void>('showFreRustWizard', () => {})
 const profiles = ref<Profile[]>([])
 const runtime = ref<Runtime | null>(null)
 const loading = ref<string | null>(null)
@@ -57,6 +59,14 @@ async function play(profile: Profile) {
   }
 }
 
+async function openFiles(profile: Profile) {
+  error.value = ''
+  try {
+    await invoke<void>('plugin:fre-rust|rust_open_folder', { profileId: profile.id, folder: 'root' })
+  } catch (err) {
+    error.value = t(m.error, { reason: reason(err) })
+  }
+}
 const onRefresh = () => { void refresh() }
 onMounted(() => {
   window.addEventListener('fre-rust-library-refresh', onRefresh)
@@ -75,8 +85,8 @@ onUnmounted(() => {
       <button type="button" class="cursor-pointer rounded-lg bg-button-bg px-4 py-2 text-sm font-semibold text-contrast" @click="openRustWizard">{{ t(m.newProfile) }}</button>
     </div>
     <p v-if="!profiles.length && !error" class="m-0 rounded-xl border border-solid border-surface-4 bg-bg-raised p-4 text-sm text-secondary">{{ t(m.empty) }}</p>
-    <div v-if="profiles.length" class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-      <article v-for="profile in profiles" :key="profile.id" class="flex min-h-36 flex-col justify-between gap-3 rounded-xl border border-solid border-surface-4 bg-bg-raised p-4">
+    <div v-if="profiles.length" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <article v-for="profile in profiles" :key="profile.id" class="flex min-h-44 flex-col justify-between gap-3 rounded-xl border border-solid border-surface-4 bg-bg-raised p-4 transition-colors hover:border-surface-5">
         <div class="flex items-center gap-3">
           <div class="flex size-12 items-center justify-center rounded-lg bg-button-bg text-xl font-semibold text-brand">R</div>
           <div class="min-w-0">
@@ -89,10 +99,12 @@ onUnmounted(() => {
           <button type="button" class="flex-1 cursor-pointer rounded-lg border-0 bg-brand px-4 py-2 text-sm font-semibold text-white disabled:opacity-40" :disabled="!playable || !!loading" @click="play(profile)">
             {{ loading === profile.id ? t(m.playing) : t(m.play) }}
           </button>
-          <button type="button" class="cursor-pointer rounded-lg bg-button-bg px-4 py-2 text-sm text-contrast" @click="openRustWizard">{{ t(m.manage) }}</button>
+          <button type="button" class="cursor-pointer rounded-lg bg-button-bg px-3 py-2 text-sm text-contrast" @click="openFiles(profile)">{{ t(m.files) }}</button>
+          <button type="button" class="cursor-pointer rounded-lg bg-button-bg px-3 py-2 text-sm text-contrast" @click="openRustWizard(profile.id)">{{ t(m.manage) }}</button>
         </div>
       </article>
     </div>
+    <p class="m-0 text-xs text-secondary">{{ t(m.modsInfo) }}</p>
     <p v-if="error" role="alert" class="text-sm text-red-400">{{ error }}</p>
   </section>
 </template>
