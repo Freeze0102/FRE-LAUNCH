@@ -120,7 +120,7 @@ async fn horizon_open_folder(
     let text = run_cli(&exe, &["instance", "list", "--json"], QUICK_TIMEOUT).await?;
     let entries: Vec<serde_json::Value> = serde_json::from_str(&text)
         .map_err(|_| "Horizon instance listing is invalid.")?;
-    let entry = entries.iter().find(|value| value["id"].as_str() == Some(&name))
+    let entry = entries.iter().find(|value| value["id"].as_str() == Some(name.as_str()))
         .ok_or("The Horizon instance no longer exists.")?;
     if !matches!(entry["kind"].as_str(), Some("own" | "default")) || !entry["java"].is_null() {
         return Err("This is not a native Horizon game instance.".into());
