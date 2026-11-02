@@ -39,6 +39,15 @@ struct RustRuntime {
     reason: Option<String>,
 }
 
+// Only filenames and basic metadata, never arbitrary file contents.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RustGameFile {
+    name: String,
+    bytes: u64,
+    is_directory: bool,
+}
+
 pub fn init<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
     tauri::plugin::Builder::new("fre-rust")
         .invoke_handler(tauri::generate_handler![
@@ -49,6 +58,7 @@ pub fn init<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
             rust_launch,
             rust_logs,
             rust_open_folder,
+            rust_list_files,
         ])
         .build()
 }
@@ -502,6 +512,42 @@ fn safe_game_folder(dir: &Path, folder: &str) -> Result<PathBuf, String> {
     Ok(resolved)
 }
 
+// Restrict listing to known profile subfolders and never follow links.
+// Rust native mods are not Java JARs; this provides file management only.
+fn list_game_files(dir: &Path, folder: &str) -> Result<Vec<RustGameFile>, String> {
+    let target = safe_game_folder(dir, folder)?;
+    let mut entries = Vec::new();
+    for entry in fs::read_dir(target).map_err(|e| format!("Cannot read game folder: {e}"))? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let kind = entry.file_type().map_err(|e| e.to_string())?;
+        if kind.is_symlink() || !(kind.is_file() || kind.is_dir()) {
+            continue;
+        }
+        if entries.len() >= 500 {
+            return Err("Folder has more than 500 entries. Open it in Windows Explorer.".into());
+        }
+        let name = entry.file_name().to_string_lossy().into_owned();
+        let bytes = if kind.is_file() {
+            entry.metadata().map_err(|e| e.to_string())?.len()
+        } else { 0 };
+        entries.push(RustGameFile { name, bytes, is_directory: kind.is_dir() });
+    }
+    entries.sort_by(|a, b| b.is_directory.cmp(&a.is_directory)
+        .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase())));
+    Ok(entries)
+}
+
+#[tauri::command]
+async fn rust_list_files<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    profile_id: String,
+    folder: String,
+) -> Result<Vec<RustGameFile>, String> {
+    let dir = profile_dir(&base(&app)?, &profile_id)?;
+    read_profile(&dir, &profile_id).ok_or("Rust profile does not exist.")?;
+    list_game_files(&dir, &folder)
+}
+
 #[tauri::command]
 async fn rust_open_folder<R: tauri::Runtime>(
     app: tauri::AppHandle<R>,
@@ -560,6 +606,22 @@ mod tests {
         assert!(safe_game_folder(&root, "../saves").is_err());
         assert!(safe_game_folder(&root, "missing").is_err());
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn lists_only_allowed_local_files_without_following_links() {
+        let root = tempfile::tempdir().unwrap();
+        let dir = root.path();
+        fs::create_dir_all(dir.join("mods")).unwrap();
+        fs::write(dir.join("mods").join("native-mod.bin"), b"test").unwrap();
+        fs::create_dir_all(dir.join("mods").join("subfolder")).unwrap();
+        let items = list_game_files(dir, "mods").unwrap();
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].name, "subfolder");
+        assert!(items[0].is_directory);
+        assert_eq!(items[1].bytes, 4);
+        assert!(list_game_files(dir, "../mods").is_err());
+        assert!(list_game_files(dir, "missing").is_err());
     }
 
     #[test]
