@@ -128,9 +128,9 @@ def apply(root: Path):
         "const creationIconTarget = ref('creation-flow')",
         """const creationIconTarget = ref('creation-flow')
 
-function showHorizonWizard() {
+function showHorizonWizard(instanceId?: string) {
     installationModal.value?.hide()
-    horizonWizard.value?.show()
+    horizonWizard.value?.show(instanceId)
 }""")
     exactly(app,
         '\t\t\tref="installationModal"\n\t\t\ttype="instance"',
