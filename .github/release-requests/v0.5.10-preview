@@ -1,5 +1,7 @@
-FRE LAUNCH v0.5.10 unsigned Windows preview — controlled verification build.
-2026-11-02. Main contains a Rust build validated through Windows Tauri NSIS creation in run 41481683124. Source patches, 18/18 regression tests, Vue TypeScript/Vite production and Rust build passed.
-The remaining failure was the Windows Defender PowerShell Start-MpScan invocation (scanner error, not a detection). The new supported Microsoft MpCmdRun.exe custom scanner passed a *separate inexpensive hosted Windows probe* in run 41486604638.
-Before compiling: benign signed Windows EXE scan, Vue/Vite/test regression and Tauri CLI preflight. Save SHA-256-manifested compiled installer, launcher and Rust game EXE in the CI build cache before running scans so a scanner/smoke-test failure does not waste another full compile. Scan all three files with Defender, require clean-install launcher smoke test, upload unsigned preview artifact only on success.
-Never publish this as a signed automatic update and never skip malware detection controls.
+FRE LAUNCH v0.5.10 unsigned Windows preview: unified Rust library cards.
+Verified BEFORE this full build:
+- Dedicated Windows frontend preflight run 41495245345 SUCCESS (22/22 tests, source integration, Vite production, TypeScript).
+- Follow-up UA/EN localization preflight run 41496005130 SUCCESS (same real pinned source and regression tests).
+- Previously working Windows preview 41486855288 built NSIS, passed Microsoft Defender and clean-install startup.
+New main branch changes remove separate Horizon/Rust sections and render saved native Rust and valid existing Horizon profiles as ordinary in-grid instance cards. A card opens Rust-specific Files, settings, or Play, never runs through Java's loader; missing Horizon binary no longer creates a phantom global error. Own Minecraft resources are still required before the native client may launch.
+Require preflight, clean Microsoft Defender scans, verified artifacts, NSIS smoke test. Save compiled binaries in CI cache before AV/smoke. This is not an authorized signed v0.5.10 automatic update.
