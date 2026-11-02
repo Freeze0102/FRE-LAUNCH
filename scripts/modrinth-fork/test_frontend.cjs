@@ -34,11 +34,11 @@ function component(file, invoke, instances = [], options = {}) {
     vue: { ...vue, onMounted: f => mounted.push(f), onUnmounted: f => unmounted.push(f) },
   }
   const names = file === 'CurseForgeBrowser.vue'
-    ? 'instanceId,searchText,apiKey,results,loading,notice,error,installing,doSearch,install'
+    ? 'instanceId,searchText,apiKey,results,searched,loading,notice,error,installing,doSearch,install'
     : file === 'FreRustPanel.vue'
       ? 'source,name,selectedId,profiles,runtime,pending,error,notice,chooseSourceFolder,importResources,openProfileFiles,create,refresh,show,hide,visible'
       : file === 'FreRustLibrary.vue'
-        ? 'profiles,runtime,error,refresh,play,openFiles,openRustWizard,loadFiles,closeFiles,fileEntries,fileCategory,fileProfile'
+        ? 'profiles,runtime,error,refresh,play,openFiles,openFolder,openRustWizard,loadFiles,closeFiles,fileEntries,fileCategory,fileProfile'
         : file === 'HorizonLibrary.vue'
           ? 'profiles,status,executable,error,refresh,openFiles,openHorizonWizard,refreshFiles,closeFiles,openExplorer,fileEntries,fileCategory,fileProfile'
           : 'minecraftPath,executable,instanceName,launchName,pending,error,feedback,status,prepared,canPlay,activeVersion,releaseTag,downloadProgress,manageHorizon,createInstance,playInstance,downloadLauncher,show,hide,visible'
@@ -223,12 +223,15 @@ test('Native Rust Files uses the chosen profile ID, never the active Java instan
     calls.push({ command, args })
     if (command.endsWith('|rust_profiles')) return [profile]
     if (command.endsWith('|rust_runtime')) return { installed: true, prepared: true, version: '26.3', reason: null }
+    if (command.endsWith('|rust_list_files')) return []
     if (command.endsWith('|rust_open_folder')) return undefined
     throw new Error(command)
   })
   await c.state.refresh()
   await c.state.openFiles(profile)
-  assert.deepEqual(calls.at(-1), { command: 'plugin:fre-rust|rust_open_folder', args: { profileId: profile.id, folder: 'root' } })
+  assert.deepEqual(calls.at(-1), { command: 'plugin:fre-rust|rust_list_files', args: { profileId: profile.id, folder: 'mods' } })
+  await c.state.openFolder()
+  assert.deepEqual(calls.at(-1), { command: 'plugin:fre-rust|rust_open_folder', args: { profileId: profile.id, folder: 'mods' } })
 })
 
 test('Native Rust manager folder shortcut targets the selected profile', async () => {
