@@ -326,6 +326,7 @@ NEW.update({
 "fre-launch.rust.library.play":("Грати","Play"),
 "fre-launch.rust.library.playing":("Запускаємо…","Starting..."),
 "fre-launch.rust.library.manage":("Налаштувати","Manage"),
+"fre-launch.rust.library.files":("Файли","Files"),
 "fre-launch.rust.library.add":("Нова Rust-збірка","New Rust profile"),
 "fre-launch.rust.library.needs-prepare":("Потрібно встановити гру або підготувати ресурси","Installation or resources required"),
 "fre-launch.rust.library.empty":("Збірок Horizon не знайдено. Відкрий налаштування, щоб додати збірку.", "No Horizon profiles found. Open the manager to add one."),
@@ -356,6 +357,11 @@ NEW.update({
 "fre-rust.setup.import-help":("Обери підготовану папку з horizon-resources.json. Твої файли та світи не переміщуються й не видаляються.", "Import a prepared resource folder containing horizon-resources.json. Your original files and worlds are not moved or deleted."),
 "fre-rust.setup.none":("Rust-збірок ще немає.", "No Rust profiles yet."),
 "fre-rust.setup.logs":("Показати лог гри", "Show game log"),
+"fre-rust.setup.files":("Файли", "Files"),
+"fre-rust.setup.worlds":("Світи", "Worlds"),
+"fre-rust.setup.mods":("Нативні моди", "Native mods"),
+"fre-rust.setup.resourcepacks":("Ресурс-паки", "Resource packs"),
+"fre-rust.setup.shaderpacks":("Шейдери", "Shader packs"),
 "fre-rust.setup.error":("Помилка: {reason}", "Error: {reason}"),
 "fre-rust.library.title":("Minecraft на Rust", "Minecraft on Rust"),
 "fre-rust.library.new":("Створити Rust-збірку", "Create Rust profile"),
@@ -365,6 +371,8 @@ NEW.update({
 "fre-rust.library.play":("Грати", "Play"),
 "fre-rust.library.playing":("Запускаємо…", "Starting..."),
 "fre-rust.library.manage":("Налаштувати", "Manage"),
+"fre-rust.library.files":("Файли", "Files"),
+"fre-rust.library.mods-info":("Rust-гра використовує нативні моди Horizon; Java-моди CurseForge (.jar) не підтримуються.", "Rust Minecraft uses native Horizon mods; CurseForge Java .jar mods are not supported."),
 "fre-rust.library.error":("Rust-гра: {reason}", "Rust game: {reason}"),
 })
 
