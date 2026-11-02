@@ -348,6 +348,7 @@ NEW.update({
 "fre-rust.setup.not-ready":("Ресурси Minecraft не підготовлені", "Minecraft resources not prepared"),
 "fre-rust.setup.details":("Rust-клієнт входить до складу FRE LAUNCH. Підготовані файли гри імпортуються з власної Minecraft Java Edition. Приватні ресурси не входять до публічних оновлень.", "The Rust engine is part of FRE LAUNCH. Import the prepared game resources from your own Minecraft Java Edition installation; private resources are never included in public updates."),
 "fre-rust.setup.source":("Папка підготованих ресурсів (необов'язково — залиш порожнім для автопошуку)", "Prepared game resources folder (optional; leave blank for automatic detection)"),
+"fre-rust.setup.browse":("Вибрати папку", "Choose folder"),
 "fre-rust.setup.import":("Імпортувати ресурси Minecraft", "Import Minecraft resources"),
 "fre-rust.setup.importing":("Імпортуємо ресурси гри…", "Importing game resources..."),
 "fre-rust.setup.import-help":("Обери підготовану папку з horizon-resources.json. Твої файли та світи не переміщуються й не видаляються.", "Import a prepared resource folder containing horizon-resources.json. Your original files and worlds are not moved or deleted."),
