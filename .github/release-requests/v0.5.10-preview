@@ -1,0 +1,2 @@
+One-shot CI preview requested 2026-11-02 for the latest main source.
+No updater signing key is available in GitHub Actions. Build an unsigned local-test NSIS installer, run regression tests, scan with Defender, smoke-test the installed app, and upload only as a temporary workflow artifact. Never publish as a signed v0.5.10 GitHub Release.
