@@ -33,7 +33,9 @@ function component(file, invoke, instances = [], options = {}) {
       m.defaultMessage.replace(/\{(\w+)\}/g, (_, k) => String(args[k])) }) },
     vue: { ...vue, onMounted: f => mounted.push(f), onUnmounted: f => unmounted.push(f) },
   }
-  const names = file === 'CurseForgeBrowser.vue'
+  const names = file === 'RustInstanceGrid.vue'
+    ? 'cards,nativeProfiles,runtime,horizonStatus,error,refresh,openCard,closeCard,play,loadFiles,openExplorer,selected,files,cardStyle,manage'
+    : file === 'CurseForgeBrowser.vue'
     ? 'instanceId,searchText,apiKey,results,searched,loading,notice,error,installing,doSearch,install'
     : file === 'FreRustPanel.vue'
       ? 'source,name,selectedId,profiles,runtime,pending,error,notice,chooseSourceFolder,importResources,openProfileFiles,create,refresh,show,hide,visible'
@@ -42,7 +44,7 @@ function component(file, invoke, instances = [], options = {}) {
         : file === 'HorizonLibrary.vue'
           ? 'profiles,status,executable,error,refresh,openFiles,openHorizonWizard,refreshFiles,closeFiles,openExplorer,fileEntries,fileCategory,fileProfile'
           : 'minecraftPath,executable,instanceName,launchName,pending,error,feedback,status,prepared,canPlay,activeVersion,releaseTag,downloadProgress,manageHorizon,createInstance,playInstance,downloadLauncher,show,hide,visible'
-  const setup = new Function('require', 'defineProps', 'defineExpose', 'localStorage', 'window', 'Event', 'exports',
+  const setup = new Function('require', 'defineProps', 'defineExpose', 'defineEmits', 'localStorage', 'window', 'Event', 'exports',
     `${output}\nreturn {${names}}`)
   const listeners = new Map()
   const browser = {
@@ -53,7 +55,7 @@ function component(file, invoke, instances = [], options = {}) {
   const state = setup(name => {
     assert.ok(name in mocks, `Unexpected dependency: ${name}`)
     return mocks[name]
-  }, () => options.props || ({}), () => {}, { getItem: () => null, setItem: () => {} }, browser, Event, {})
+  }, () => options.props || ({}), () => {}, () => (event, count) => options.emit?.(event, count), { getItem: () => null, setItem: () => {} }, browser, Event, {})
   return { state, mount: async () => { for (const f of mounted) await f() },
     unmount: () => { for (const f of unmounted) f() } }
 }
@@ -395,4 +397,87 @@ test('Leaving an instance catalog resets context without stale breadcrumb handle
   assert.equal(instanceHideInstalled.value, false)
   assert.deepEqual(newlyInstalled.value, [])
   assert.equal(refreshed, 1)
+})
+
+
+test('Native Rust profiles are library tiles, not another library section', async () => {
+  const profile = { id: '12345678', name: 'Survival Rust', created: 1 }
+  const emitted = []
+  const c = component('RustInstanceGrid.vue', async (command) => {
+    if (command.endsWith('|rust_profiles')) return [profile]
+    if (command.endsWith('|rust_runtime')) return { installed: true, prepared: true, version: '26.3', reason: null }
+    if (command.endsWith('|horizon_detect_launcher')) return null
+    throw Error('Unexpected command ' + command)
+  }, [], { props: { startIndex: 1, columnCount: 4, cardWidth: 140, cardHeight: 180, gap: 12, compact: false, search: '' },
+    emit: (event, count) => emitted.push({ event, count }) })
+  await c.state.refresh()
+  assert.equal(c.state.cards.value.length, 1)
+  assert.deepEqual(c.state.cards.value.map(x => [x.kind, x.name, x.ready]), [['native', 'Survival Rust', true]])
+  assert.deepEqual(c.state.cardStyle(0), { position: 'absolute', width: '140px', left: '152px', top: '0px', height: '180px' })
+  assert.ok(emitted.some(e => e.event === 'count-change' && e.count === 1))
+  const file = fs.readFileSync(path.join(__dirname, 'RustInstanceGrid.vue'), 'utf8')
+  assert.match(file, /data-library-instance-card/)
+  assert.match(file, /@click\.stop="openCard\(card\)"/)
+  assert.doesNotMatch(file, /Horizon — existing profiles|Minecraft on Rust<\/h2>/)
+})
+
+test('Missing Horizon executable does not hide native Rust or display a false global error', async () => {
+  const c = component('RustInstanceGrid.vue', async (command) => {
+    if (command.endsWith('|rust_profiles')) return [{ id: '22', name: 'My Rust', created: 0 }]
+    if (command.endsWith('|rust_runtime')) return { installed: true, prepared: false, version: '26.3', reason: 'Import owned game resources' }
+    if (command.endsWith('|horizon_detect_launcher')) throw Error('os error 3')
+    throw Error('Unexpected command ' + command)
+  }, [], { props: { startIndex: 0, columnCount: 1, cardWidth: 140, cardHeight: 180, gap: 12, compact: false, search: '' } })
+  await c.state.refresh()
+  assert.equal(c.state.cards.value.length, 1)
+  assert.equal(c.state.cards.value[0].ready, false)
+  assert.equal(c.state.error.value, '')
+  await c.state.play(c.state.cards.value[0])
+  assert.match(c.state.error.value, /Import owned game resources/)
+})
+
+test('Rust profile Files and Launch always use selected Rust ID, never Java instance', async () => {
+  const calls = []
+  const c = component('RustInstanceGrid.vue', async (command, args) => {
+    calls.push({ command, args })
+    if (command.endsWith('|rust_profiles')) return [{ id: '77', name: 'Rust', created: 0 }]
+    if (command.endsWith('|rust_runtime')) return { installed: true, prepared: true, version: '26.3', reason: null }
+    if (command.endsWith('|horizon_detect_launcher')) return null
+    if (command.endsWith('|rust_list_files')) return []
+    if (command.endsWith('|rust_launch')) return 'started'
+    if (command.endsWith('|rust_open_folder')) return
+    throw Error('Unexpected command ' + command)
+  }, [], { props: { startIndex: 0, columnCount: 1, cardWidth: 140, cardHeight: 180, gap: 12, compact: false, search: '' } })
+  await c.state.refresh()
+  const profile = c.state.cards.value[0]
+  c.state.openCard(profile)
+  await c.state.loadFiles('mods')
+  await c.state.openExplorer()
+  await c.state.play(profile)
+  assert.ok(calls.some(x => x.command === 'plugin:fre-rust|rust_list_files' && x.args.profileId === '77' && x.args.folder === 'mods'))
+  assert.ok(calls.some(x => x.command === 'plugin:fre-rust|rust_open_folder' && x.args.profileId === '77'))
+  assert.ok(calls.some(x => x.command === 'plugin:fre-rust|rust_launch' && x.args.profileId === '77'))
+})
+
+test('Existing Horizon profile becomes a Rust tile with direct Play and no new launcher library', async () => {
+  const calls = []
+  const c = component('RustInstanceGrid.vue', async (command, args) => {
+    calls.push({ command, args })
+    if (command.endsWith('|rust_profiles')) return []
+    if (command.endsWith('|rust_runtime')) return { installed: true, prepared: false, version: '26.3', reason: 'Not prepared' }
+    if (command.endsWith('|horizon_detect_launcher')) return 'C:\\Horizon\\horizon.exe'
+    if (command.endsWith('|horizon_status')) return {
+      instances: [{ id: 'survival', name: 'Horizon survival', version: '26.3', selected: true }],
+      installedVersions: ['26.3'], preparedVersions: ['26.3'], selectedVersion: '26.3',
+    }
+    if (command.endsWith('|horizon_direct_play')) return 'started'
+    throw Error('Unexpected command ' + command)
+  }, [], { props: { startIndex: 1, columnCount: 3, cardWidth: 140, cardHeight: 180, gap: 12, compact: false, search: '' } })
+  await c.state.refresh()
+  assert.equal(c.state.cards.value.length, 1)
+  assert.equal(c.state.cards.value[0].kind, 'horizon')
+  assert.equal(c.state.cards.value[0].ready, true)
+  await c.state.play(c.state.cards.value[0])
+  assert.ok(calls.some(x => x.command === 'plugin:fre-horizon|horizon_direct_play'
+    && x.args.name === 'survival' && x.args.exePath === 'C:\\Horizon\\horizon.exe'))
 })
