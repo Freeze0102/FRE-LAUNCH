@@ -1,5 +1,5 @@
-FRE LAUNCH v0.5.10 preview: single retry after confirmed Windows Rust E0603/E0616 failure in run 41474155926.
-All 18 frontend regression tests, source patching, Vite/TS production build and native open-source Rust engine already passed in that run.
-Fix: native fre_rust.rs no longer uses private theseus::state::Credentials or State.pool. A minimal refreshed-account accessor lives in the public theseus::minecraft_auth API, added during pinned source preparation, with explicit regression assertions.
-Verified new patch against exact pinned Modrinth Theseus source 4ccf4d51804627cd0687ce7dfd5004f20c267acc. Do not create another branch. Cache and validate existing MIT game engine and only upload a preview after NSIS build, Microsoft Defender scans and installed-app smoke test.
-This is NOT a signed automatic v0.5.10 release. Do not bypass the missing original Tauri updater signing key.
+FRE LAUNCH v0.5.10 unsigned Windows preview — controlled verification build.
+2026-11-02. Main contains a Rust build validated through Windows Tauri NSIS creation in run 41481683124. Source patches, 18/18 regression tests, Vue TypeScript/Vite production and Rust build passed.
+The remaining failure was the Windows Defender PowerShell Start-MpScan invocation (scanner error, not a detection). The new supported Microsoft MpCmdRun.exe custom scanner passed a *separate inexpensive hosted Windows probe* in run 41486604638.
+Before compiling: benign signed Windows EXE scan, Vue/Vite/test regression and Tauri CLI preflight. Save SHA-256-manifested compiled installer, launcher and Rust game EXE in the CI build cache before running scans so a scanner/smoke-test failure does not waste another full compile. Scan all three files with Defender, require clean-install launcher smoke test, upload unsigned preview artifact only on success.
+Never publish this as a signed automatic update and never skip malware detection controls.
