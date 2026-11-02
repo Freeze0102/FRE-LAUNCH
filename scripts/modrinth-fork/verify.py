@@ -145,8 +145,8 @@ def verify(root):
             "sync_content_files", "cf_search", "cf_install", "loader_type", "MINECRAFT_MODPACK_CLASS_ID", "category_id"]),
         ("CurseForge browser", cf_frontend, ["plugin:fre-curseforge|cf_search",
             "plugin:fre-curseforge|cf_install", "instanceId", "apiKey", "contentType", "isModpack", "v-if=\"!isModpack\"",
-            "useApiSearch = ref(false)", "curseForgeWebsiteSearchUrl()", "openUrl(curseForgeWebsiteSearchUrl())",
-            "class=", "&search=", "importDownloadedMod", "add_project_from_path"]),
+            "async function doSearch()", "const sequence = ++searchSequence",
+            "class=", "results.value = found"]),
         ("Browse source selector", cf_browse, ["CurseForgeBrowser", "freContentSource",
             "route.query.source === 'curseforge'", "Modrinth</button>", "CurseForge</button>",
             "projectType === 'modpack'", ":content-type"]),
@@ -159,6 +159,9 @@ def verify(root):
         for snippet in snippets:
             assert snippet in source, f"{label}: missing {snippet}"
     assert "CurseForge" in cf_frontend
+    assert "openUrl(" not in cf_frontend, "The in-app catalog must not redirect search to a website"
+    assert "curseForgeWebsiteSearchUrl" not in cf_frontend, "Website fallback is no longer supported"
+    assert "browseWithoutKey" not in cf_frontend, "Searching inside the launcher must remain in-app"
     assert "api.curseforge.com" in cf_backend
     assert "https://api.curseforge.com" in cf_backend
     assert "npm install" not in cf_backend
@@ -189,7 +192,7 @@ def verify(root):
             '"--resources"', '"--home"', '"--game-dir"', '"--session-stdin"',
             "Credentials::get_default_credential", "online_profile_fresh",
             "verify_native_client", "Sha256::new", "RUNNING_PROFILES",
-            "profile_id_valid", "read_profile", "safe_game_folder", "rust_open_folder", "explorer.exe",
+            "profile_id_valid", "read_profile", "safe_game_folder", "rust_open_folder", "rust_list_files", "list_game_files", "explorer.exe",
         ]),
         (rust_panel, [
             "plugin:fre-rust|rust_import_resources", "plugin:fre-rust|rust_create_profile", "plugin:fre-rust|rust_launch",
@@ -198,7 +201,7 @@ def verify(root):
         ]),
         (rust_library, [
             "plugin:fre-rust|rust_profiles", "plugin:fre-rust|rust_launch",
-            "showFreRustWizard", "fre-rust-library-refresh", "fre-rust.library.empty", "openFiles", "rust_open_folder",
+            "showFreRustWizard", "fre-rust-library-refresh", "fre-rust.library.empty", "openFiles", "rust_list_files", "rust_open_folder",
         ]),
         (rust_index, ["import FreRustLibrary", "<FreRustLibrary", "import HorizonLibrary", "<HorizonLibrary",
             "#freRustProfiles", "<LibrarySection :instances=\"instances\">"]),
@@ -209,7 +212,7 @@ def verify(root):
         (rust_stage, ["Minecraft (Rust)", "ctx.onHorizon?.()"]),
         (rust_main, [".plugin(api::fre_rust::init())", ".plugin(api::horizon::init())"]),
         (rust_build, ['"fre-rust"', '"fre-horizon"', '"rust_create_profile"', '"rust_launch"',
-            '"rust_open_folder"', '"horizon_open_folder"']),
+            '"rust_open_folder"', '"rust_list_files"', '"horizon_open_folder"', '"horizon_list_files"']),
     ):
         for marker in markers:
             assert marker in source, f"Standalone Rust Minecraft integration missing: {marker}"
@@ -297,8 +300,11 @@ def verify(root):
     assert (root / 'apps/app/src/api/fre_rust.rs').is_file()
     assert 'rust_launch' in (root / 'apps/app/build.rs').read_text()
     assert 'horizon_install_launcher' in (root / 'apps/app/build.rs').read_text(), 'Horizon compatibility must survive an update'
-    assert 'horizon_open_folder' in (root / 'apps/app/src/api/horizon.rs').read_text()
+    horizon_api = (root / 'apps/app/src/api/horizon.rs').read_text()
+    assert 'horizon_open_folder' in horizon_api and 'horizon_list_files' in horizon_api
+    assert '0x00000008 | 0x00000200' in horizon_api, 'Horizon client must detach from terminal and Ctrl+C'
     assert 'rust_open_folder' in (root / 'apps/app/src/api/fre_rust.rs').read_text()
+    assert 'rust_list_files' in (root / 'apps/app/src/api/fre_rust.rs').read_text()
     from feature_security_dependencies import workspace_overrides
     security = json.loads((Path(__file__).parent / 'security-dependencies.json').read_text())
     lock = (root / 'pnpm-lock.yaml').read_text(encoding='utf-8')
