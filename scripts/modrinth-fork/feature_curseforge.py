@@ -107,7 +107,8 @@ def apply(root: Path):
             '<Teleport v-if="browseRouteActive && (projectType !== \'mod\' || freContentSource === \'modrinth\')" to="#sidebar-teleport-target">')
     exactly(browse,
             "const freContentSource = ref<'modrinth' | 'curseforge'>(route.query.source === 'curseforge' ? 'curseforge' : 'modrinth')",
-            '''const sourceMessages = defineMessages({
+            '''const freContentSource = ref<'modrinth' | 'curseforge'>(route.query.source === 'curseforge' ? 'curseforge' : 'modrinth')
+const sourceMessages = defineMessages({
     sourceLabel: { id: 'fre-launch.cf.source', defaultMessage: 'Mod source' },
 })''')
 
