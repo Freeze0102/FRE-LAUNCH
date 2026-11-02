@@ -174,6 +174,8 @@ def verify(root):
     rust_backend=(root/"apps/app/src/api/fre_rust.rs").read_text(encoding="utf-8")
     rust_panel=(root/"apps/app-frontend/src/components/ui/FreRustPanel.vue").read_text(encoding="utf-8")
     rust_library=(root/"apps/app-frontend/src/components/ui/FreRustLibrary.vue").read_text(encoding="utf-8")
+    unified_rust=(root/"apps/app-frontend/src/components/ui/library/instance-group/RustInstanceGrid.vue").read_text(encoding="utf-8")
+    unified_group=(root/"apps/app-frontend/src/components/ui/library/instance-group/index.vue").read_text(encoding="utf-8")
     rust_stage=(root/"packages/ui/src/components/flows/creation-flow-modal/components/SetupTypeStage.vue").read_text(encoding="utf-8")
     rust_index=(root/"apps/app-frontend/src/pages/Index.vue").read_text(encoding="utf-8")
     rust_main=(root/"apps/app/src/main.rs").read_text(encoding="utf-8")
@@ -203,8 +205,7 @@ def verify(root):
             "plugin:fre-rust|rust_profiles", "plugin:fre-rust|rust_launch",
             "showFreRustWizard", "fre-rust-library-refresh", "fre-rust.library.empty", "openFiles", "rust_list_files", "rust_open_folder",
         ]),
-        (rust_index, ["import FreRustLibrary", "<FreRustLibrary", "import HorizonLibrary", "<HorizonLibrary",
-            "#freRustProfiles", "<LibrarySection :instances=\"instances\">"]),
+        (rust_index, ["<LibrarySection :instances=\"instances\" />"]),
         (rust_app, [
             "import FreRustPanel", "<FreRustPanel", "showFreRustWizard",
             "provide('showFreRustWizard', showFreRustWizard)",
@@ -251,11 +252,26 @@ def verify(root):
     assert (root/"apps/app/src/api/horizon.rs").exists()
     assert (root/"apps/app-frontend/src/components/ui/HorizonRustPanel.vue").exists()
     legacy_library = (root/"apps/app-frontend/src/components/ui/HorizonLibrary.vue").read_text(encoding="utf-8")
-    library_shell = (root/"apps/app-frontend/src/components/ui/library/index.vue").read_text(encoding="utf-8")
-    assert '<slot name="freRustProfiles" />' in library_shell, "Rust cards must be inside the Java library surface"
+    # Same virtualized grid and card positions: Rust cards follow Java cards
+    # inside the ungrouped library, not in a second section below the list.
+    for marker in ('<RustInstanceGrid', ':start-index="instanceGroup.instances.length"',
+                   '@count-change="rustCardCount = $event"',
+                   'props.instanceGroup.instances.length + (isUngrouped.value ? rustCardCount.value : 0)',
+                   'class="relative" :style="{ height:', 'v-if="isUngrouped"'):
+        assert marker in unified_group, f"Rust card grid is not integrated: {marker}"
+    for marker in ('plugin:fre-rust|rust_profiles', 'plugin:fre-horizon|horizon_detect_launcher',
+                   'plugin:fre-rust|rust_launch', 'plugin:fre-horizon|horizon_direct_play',
+                   'plugin:fre-rust|rust_list_files', 'plugin:fre-horizon|horizon_list_files',
+                   'plugin:fre-rust|rust_open_folder', 'plugin:fre-horizon|horizon_open_folder',
+                   'showFreRustWizard', 'showHorizonWizard', 'data-library-instance-card',
+                   'role="dialog"', 'Rust {{ card.version }}'):
+        assert marker in unified_rust, f"Rust library profile operation missing: {marker}"
+    assert '<HorizonLibrary' not in rust_index and '<FreRustLibrary' not in rust_index, (
+        "Do not render separate Horizon or Rust libraries"
+    )
     assert '<WelcomeScreen v-if=' not in rust_index, "Rust-first users must see the library before creating a Java profile"
     assert 'plugin:fre-horizon|horizon_open_folder' in legacy_library
-    assert 'v-if="profiles.length || executable || error"' in legacy_library, "Missing Horizon profiles/errors must be visible"
+    assert 'v-if="profiles.length || executable || error"' in legacy_library, "Legacy Horizon component preserved for existing users"
     assert 'fre-launch.rust.library.empty' in legacy_library
     assert 'v-if="profiles.length > 0"' not in rust_library, "Native Rust library must expose Create before first profile"
     assert "horizon-launcher.exe" not in rust_backend
