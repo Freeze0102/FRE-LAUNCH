@@ -79,8 +79,26 @@ jobs:
             node "$env:GITHUB_WORKSPACE/scripts/modrinth-fork/test_frontend.cjs" $preflight
             if ($LASTEXITCODE -ne 0) { throw 'Preflight content/profile regression tests failed' }
           } finally { Pop-Location }
+          # Verify the actual pinned Tauri 2.5 CLI options before costly Rust compilation.
+          Push-Location $preflight
+          try {
+            $buildHelp = (& pnpm.cmd --filter '@modrinth/app' tauri build --help | Out-String)
+            if ($LASTEXITCODE -ne 0) { throw 'Failed to inspect installed Tauri build options' }
+            foreach ($requiredFlag in @('--ci', '--bundles', '--config')) {
+              if (!$buildHelp.Contains($requiredFlag)) { throw "Unsupported Tauri option: $requiredFlag" }
+            }
+          } finally { Pop-Location }
+          Write-Host 'Full Vue typecheck, 18 regression tests and Tauri option preflight passed.'
+
+      - name: Restore pinned native Rust engine if previously compiled
+        id: rust-engine-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: scripts/modrinth-fork/fre-rust-runtime
+          key: frelaunch-windows-x64-rust-975c07d9151847e6af13afc4b5ab37b6bbe78ef5-v1
 
       - name: Build MIT-only native game engine
+        if: steps.rust-engine-cache.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -89,6 +107,33 @@ jobs:
           if (Test-Path 'scripts/modrinth-fork/fre-rust-runtime/resources') {
             throw 'Proprietary Minecraft assets must never be uploaded'
           }
+
+      - name: Cache compiled native engine before launcher compilation
+        if: steps.rust-engine-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: scripts/modrinth-fork/fre-rust-runtime
+          key: frelaunch-windows-x64-rust-975c07d9151847e6af13afc4b5ab37b6bbe78ef5-v1
+
+      - name: Verify fresh or cached native engine digest and license
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $runtime = 'scripts/modrinth-fork/fre-rust-runtime'
+          $info = Get-Content -LiteralPath "$runtime/BUILD-INFO.json" -Raw | ConvertFrom-Json
+          if ($info.source_commit -ne '975c07d9151847e6af13afc4b5ab37b6bbe78ef5' -or $info.engine_license -ne 'MIT') {
+            throw 'Unexpected native engine revision or license'
+          }
+          foreach ($file in @('fre-rust-client.exe', 'BUILD-INFO.json', 'LICENSE.txt', 'research-lock.json')) {
+            if (!(Test-Path -LiteralPath (Join-Path $runtime $file) -PathType Leaf)) {
+              throw "Native Rust engine missing $file"
+            }
+          }
+          $digest = (Get-FileHash -LiteralPath "$runtime/fre-rust-client.exe" -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($digest -ne $info.game_exe_sha256.ToLowerInvariant()) {
+            throw 'Native Rust executable does not match verified build metadata'
+          }
+          if (Test-Path -LiteralPath "$runtime/resources") { throw 'Public builds must not contain proprietary Minecraft resources' }
 
       - name: Prepare and verify source without signing keys
         shell: pwsh
@@ -114,12 +159,16 @@ jobs:
           $ErrorActionPreference = 'Stop'
           Push-Location FRE-Modrinth-Source
           try {
-            # This is a local preview only. Never substitute a new key for the
-            # already installed v0.5.9 updater's missing original key.
+            # Preview is a standalone unsigned installer, never a signed updater.
+            # The pinned Tauri 2.5 CLI has no --no-sign flag; use this override.
             $env:TAURI_SIGNING_PRIVATE_KEY = $null
             $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = $null
-            Set-Content -LiteralPath 'apps/app/tauri.preview.conf.json' -Value '{"bundle":{"createUpdaterArtifacts":false}}' -Encoding utf8
-            pnpm.cmd --filter '@modrinth/app' tauri build --ci --bundles nsis --no-sign --config tauri.preview.conf.json
+            $configFile = 'apps/app/tauri.preview.conf.json'
+            Set-Content -LiteralPath $configFile -Value '{"bundle":{"createUpdaterArtifacts":false}}' -Encoding utf8
+            if ((Get-Content -LiteralPath $configFile -Raw | ConvertFrom-Json).bundle.createUpdaterArtifacts -ne $false) {
+              throw 'Preview config must disable signed updater artifacts'
+            }
+            pnpm.cmd --filter '@modrinth/app' tauri build --ci --bundles nsis --config tauri.preview.conf.json
             if ($LASTEXITCODE -ne 0) { throw 'Unsigned preview installer build failed' }
           } finally { Pop-Location }
 
