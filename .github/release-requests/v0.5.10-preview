@@ -1,3 +1,4 @@
-One-shot FRE LAUNCH Windows preview requested 2026-11-02, retry #3.
-Source: latest main, with corrected Horizon Vue patch for optional instanceId and source patch preflight before Rust engine compilation.
-This is an UNSIGNED test Windows installer, not a signed auto-update. Build only if Python/Vue checks pass, Defender finds no threats, and the installed executable survives startup.
+One-shot FRE LAUNCH v0.5.10 Windows preview, retry #4 (2026-11-02).
+Source: main with Horizon wizard patch and platform-independent UTF-8 source verifier.
+First run source customization and static verification, then compile the MIT Rust engine, compile Vue/Tauri, scan in Microsoft Defender, and smoke-test installation.
+Upload an UNSIGNED preview artifact only after all checks succeed; never publish it into the signed auto-update channel.
