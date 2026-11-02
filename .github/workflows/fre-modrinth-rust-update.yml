@@ -1,6 +1,12 @@
 name: FRE LAUNCH Vue Rust Windows Update
 
 on:
+  # Explicit one-time release request from main; does not build on every push.
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/release-requests/v0.5.10'
   workflow_dispatch:
     inputs:
       publish:
@@ -94,6 +100,12 @@ jobs:
           ./FRE-MODRINTH-LOCAL.ps1 -BuildWindows
           if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { throw 'Vue/Tauri FRE LAUNCH build failed' }
 
+      - name: Run Vue in-app content and Rust profile regression tests
+        shell: pwsh
+        run: |
+          node scripts/modrinth-fork/test_frontend.cjs FRE-Modrinth-Source
+          if ($LASTEXITCODE -ne 0) { throw 'In-app content or Rust profile regression tests failed' }
+
       - name: Verify compiled Windows installers and Defender status
         shell: pwsh
         run: |
@@ -144,7 +156,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $version = (Get-Content 'update-channel.json' -Raw | ConvertFrom-Json).version
-          $notes = "FRE LAUNCH $version — Vue/Tauri Modrinth fork with native Rust Minecraft engine, separate Rust profiles, signed updater, Ukrainian localization, and optional local import of legitimately owned Minecraft resources. Source: $env:GITHUB_SHA. This release does not contain proprietary Minecraft assets."
+          $notes = "FRE LAUNCH $version — internal Modrinth search and installation for Java mods and modpacks; optional CurseForge Java mod search using an approved user API key, without opening external sites; local file browser for native Rust and Horizon profiles; detached Horizon client launch independent of CMD/PowerShell; Ukrainian localization and signed updater. CurseForge ZIP pack automatic installation is not supported. Source: $env:GITHUB_SHA. This release does not contain proprietary Minecraft assets."
           Set-Content -LiteralPath 'release-notes-ci.md' -Value $notes -Encoding UTF8
           node scripts/modrinth-fork/package-update.mjs $env:FRE_REVIEW_INSTALLER release-notes-ci.md
           if ($LASTEXITCODE -ne 0) { throw 'Minisign updater verification failed: do not publish' }
@@ -176,7 +188,7 @@ jobs:
           retention-days: 7
 
       - name: Publish signed v0.5.10 to the installed launcher
-        if: inputs.publish && vars.FRE_LAUNCH_SECURITY_APPROVED == 'true'
+        if: (inputs.publish || github.event_name == 'push') && vars.FRE_LAUNCH_SECURITY_APPROVED == 'true'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
