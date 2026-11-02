@@ -48,6 +48,7 @@ pub fn init<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
             rust_import_resources,
             rust_launch,
             rust_logs,
+            rust_open_folder,
         ])
         .build()
 }
@@ -483,6 +484,50 @@ async fn rust_launch<R: tauri::Runtime>(
     }
 }
 
+// Open a validated game subfolder, just like Java's Files button.
+// Never accept arbitrary paths or let a profile folder symlink escape the app.
+fn safe_game_folder(dir: &Path, folder: &str) -> Result<PathBuf, String> {
+    const ALLOWED: &[&str] = &[
+        "root", "saves", "mods", "resourcepacks", "shaderpacks", "screenshots", "logs"
+    ];
+    if !ALLOWED.contains(&folder) {
+        return Err("Unsupported Rust game folder.".into());
+    }
+    let base = dir.canonicalize().map_err(|e| e.to_string())?;
+    let target = if folder == "root" { base.clone() } else { base.join(folder) };
+    let resolved = target.canonicalize().map_err(|e| e.to_string())?;
+    if !resolved.starts_with(&base) || !resolved.is_dir() {
+        return Err("Cannot open a folder outside the Rust game profile.".into());
+    }
+    Ok(resolved)
+}
+
+#[tauri::command]
+async fn rust_open_folder<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    profile_id: String,
+    folder: String,
+) -> Result<(), String> {
+    let dir = profile_dir(&base(&app)?, &profile_id)?;
+    read_profile(&dir, &profile_id).ok_or("Rust profile does not exist.")?;
+    let target = safe_game_folder(&dir, &folder)?;
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        std::process::Command::new("explorer.exe")
+            .arg(&target)
+            .creation_flags(0x08000000)
+            .spawn()
+            .map_err(|e| format!("Cannot open Rust game folder: {e}"))?;
+        Ok(())
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = target;
+        Err("Opening a Rust game folder is currently supported on Windows.".into())
+    }
+}
+
 #[tauri::command]
 async fn rust_logs<R: tauri::Runtime>(
     app: tauri::AppHandle<R>, profile_id: String,
@@ -504,6 +549,19 @@ async fn rust_logs<R: tauri::Runtime>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn only_profile_game_folders_are_openable() {
+        let root = std::env::temp_dir().join(format!("fre-rust-folders-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("mods")).unwrap();
+        assert!(safe_game_folder(&root, "root").is_ok());
+        assert!(safe_game_folder(&root, "mods").is_ok());
+        assert!(safe_game_folder(&root, "..").is_err());
+        assert!(safe_game_folder(&root, "../saves").is_err());
+        assert!(safe_game_folder(&root, "missing").is_err());
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
     #[test]
     fn rejects_path_traversal_and_invalid_profiles() {
         assert!(!profile_id_valid("../save"));
