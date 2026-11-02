@@ -119,7 +119,8 @@ async function refreshStatus() {
     launchName.value = next.instances.find(i => i.selected)?.id || next.instances[0]?.id || ''
   }
 }
-async function show() {
+async function show(instanceId?: string) {
+  if (instanceId) launchName.value = instanceId
   visible.value = true
   if (pending.value) return
   error.value = ''
