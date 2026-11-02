@@ -26,15 +26,15 @@ function component(file, invoke, instances = [], options = {}) {
   const mocks = {
     '@tauri-apps/api/core': { invoke },
     '@tauri-apps/api/event': { listen: options.listen || (async () => () => {}) },
-    '@tauri-apps/plugin-opener': { openUrl: async () => {} },
+    '@tauri-apps/plugin-opener': { openUrl: options.openUrl || (async () => {}) },
     '@tauri-apps/plugin-dialog': { open: options.open || (async () => null) },
-    '@/helpers/instance': { list: async () => instances },
+    '@/helpers/instance': { list: async () => instances, add_project_from_path: options.addProjectFromPath || (async () => {}) },
     '@modrinth/ui': { defineMessages: x => x, useVIntl: () => ({ formatMessage: (m, args = {}) =>
       m.defaultMessage.replace(/\{(\w+)\}/g, (_, k) => String(args[k])) }) },
     vue: { ...vue, onMounted: f => mounted.push(f), onUnmounted: f => unmounted.push(f) },
   }
   const names = file === 'CurseForgeBrowser.vue'
-    ? 'instanceId,searchText,apiKey,results,loading,notice,error,installing,doSearch,install'
+    ? 'instanceId,searchText,apiKey,useApiSearch,importingFile,results,loading,notice,error,installing,doSearch,install,browseWithoutKey,curseForgeWebsiteSearchUrl,importDownloadedMod'
     : file === 'FreRustPanel.vue'
       ? 'source,name,selectedId,profiles,runtime,pending,error,notice,chooseSourceFolder,importResources,openProfileFiles,create,refresh,show,hide,visible'
       : file === 'FreRustLibrary.vue'
@@ -68,10 +68,70 @@ const deferred = () => {
   return { promise, resolve, reject }
 }
 
+test('Keyless CurseForge search opens official mods results without invoking the API', async () => {
+  const urls = [], invokes = []
+  const c = component('CurseForgeBrowser.vue', async (command, args) => {
+    invokes.push({ command, args })
+    throw new Error('API must not be called without opt-in')
+  }, instances, { openUrl: async url => urls.push(url) })
+  await c.mount()
+  c.state.searchText.value = 'Sodium & shaders'
+  await c.state.doSearch()
+  assert.deepEqual(invokes, [])
+  assert.deepEqual(urls, ['https://www.curseforge.com/minecraft/mc-mods?search=Sodium%20%26%20shaders'])
+  assert.equal(c.state.searched.value, false)
+  assert.match(c.state.notice.value, /Opened search results/)
+})
+
+test('Keyless modpack search opens official modpacks page, never API or Java installer', async () => {
+  const urls = [], invokes = []
+  const c = component('CurseForgeBrowser.vue', async (command, args) => {
+    invokes.push({ command, args })
+    throw new Error('Modpack must never be installed as JAR')
+  }, instances, { props: { contentType: 'modpack' }, openUrl: async url => urls.push(url) })
+  await c.mount()
+  c.state.searchText.value = 'Better Minecraft'
+  await c.state.doSearch()
+  await c.state.importDownloadedMod()
+  assert.deepEqual(invokes, [])
+  assert.deepEqual(urls, ['https://www.curseforge.com/minecraft/modpacks?search=Better%20Minecraft'])
+})
+
+test('Manual CurseForge JAR import keeps its original Java instance selected', async () => {
+  const chooser = deferred(), imports = []
+  const c = component('CurseForgeBrowser.vue', async () => {
+    throw new Error('No native API call should be needed')
+  }, instances, {
+    open: async () => chooser.promise,
+    addProjectFromPath: async (instance, file) => imports.push({ instance, file }),
+  })
+  await c.mount()
+  const pending = c.state.importDownloadedMod()
+  c.state.instanceId.value = 'b'
+  chooser.resolve('C:\\Downloads\\demo.jar')
+  await pending
+  assert.deepEqual(imports, [{ instance: 'a', file: 'C:\\Downloads\\demo.jar' }])
+  assert.match(c.state.notice.value, /^Fabric:/)
+  assert.equal(c.state.importingFile.value, false)
+})
+
+test('Manual CurseForge import rejects non-JAR files', async () => {
+  const imports = []
+  const c = component('CurseForgeBrowser.vue', async () => null, instances, {
+    open: async () => 'C:\\Downloads\\untrusted.exe',
+    addProjectFromPath: async (...args) => imports.push(args),
+  })
+  await c.mount()
+  await c.state.importDownloadedMod()
+  assert.deepEqual(imports, [])
+  assert.match(c.state.error.value, /Choose a .jar/)
+})
+
 test('CurseForge discards an old search after switching instance', async () => {
   const request = deferred()
   const c = component('CurseForgeBrowser.vue', () => request.promise, instances)
   await c.mount()
+  c.state.useApiSearch.value = true
   const searching = c.state.doSearch()
   c.state.instanceId.value = 'b'
   request.resolve([{ id: 1, name: 'Wrong version' }])
@@ -85,6 +145,7 @@ test('CurseForge latest query wins even when responses arrive out of order', asy
   let calls = 0
   const c = component('CurseForgeBrowser.vue', () => (++calls === 1 ? old : recent).promise, instances)
   await c.mount()
+  c.state.useApiSearch.value = true
   const first = c.state.doSearch()
   c.state.searchText.value = 'new'
   const second = c.state.doSearch()
@@ -120,6 +181,7 @@ test('CurseForge modpack search uses the approved modpack category, not Java mod
     throw new Error(command)
   }, instances, { props: { contentType: 'modpack' } })
   await c.mount()
+  c.state.useApiSearch.value = true
   await c.state.doSearch()
   assert.equal(calls.at(-1).args.contentType, 'modpack')
   assert.equal(calls.at(-1).args.gameVersion, null)
