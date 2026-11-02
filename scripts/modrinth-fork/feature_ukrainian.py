@@ -202,6 +202,8 @@ NEW = {
 "fre-launch.horizon.separate":("Наявні Java-збірки Minecraft, моди та світи залишаються без змін.","Existing Minecraft Java instances, mods and worlds remain untouched."),
 "fre-launch.cf.source":("Джерело модів","Mod source"),
 "fre-launch.cf.intro":("Моди з CurseForge можна встановлювати в ту саму збірку, що й моди з Modrinth.","Mods from CurseForge can be installed into the same game instance as Modrinth mods."),
+"fre-launch.cf.pack-intro":("Шукай модпаки CurseForge та відкривай їхні сторінки. Автоматичне встановлення ZIP-модпаків поки недоступне.","Find CurseForge modpacks and open their project pages. Installing CurseForge ZIP packs is not available yet."),
+"fre-launch.cf.pack-search":("Знайти модпаки","Find modpacks"),
 "fre-launch.cf.api-key":("Схвалений ключ CurseForge API (не зберігається)","Approved CurseForge API key (not saved)"),
 "fre-launch.cf.key-help":("CurseForge вимагає схвалений API-ключ для сторонніх застосунків. Без нього можна відкривати сторінки модів у браузері. Ключ діє лише протягом цієї сесії.","CurseForge requires an approved third-party API key. Without one you can open projects in the browser. The key stays in this session only."),
 "fre-launch.cf.key-link":("Як отримати доступ","How to request access"),
