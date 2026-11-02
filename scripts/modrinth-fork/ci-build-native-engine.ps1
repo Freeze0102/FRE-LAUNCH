@@ -13,6 +13,23 @@ git -C $source checkout --detach $Revision
 if ($LASTEXITCODE -ne 0) { throw 'Could not resolve pinned source revision' }
 $actual = (git -C $source rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $actual -ne $Revision) { throw "Invalid Rust engine revision: $actual" }
+# Reject a pinned engine checkout missing the verified gameplay branches.
+# This is not a substitute for runtime parity testing on Windows.
+$mechanics = @(
+    @('crates\horizon-client\src\game\beds.rs', 'destroy_straw_bed'),
+    @('crates\horizon-client\src\game\remote.rs', 'release_use_for_keybind_screen'),
+    @('crates\horizon-world\src\level\interact.rs', 'Class::Note'),
+    @('crates\horizon-world\src\level\redstone.rs', 'note_play'),
+    @('crates\horizon-world\src\level\redstone.rs', 'note_trigger_event'),
+    @('crates\horizon-world\src\level\redstone.rs', 'note_neighbor_changed')
+)
+foreach ($check in $mechanics) {
+    $file = Join-Path $source $check[0]
+    if (!(Test-Path -LiteralPath $file -PathType Leaf) -or
+        !(Select-String -LiteralPath $file -SimpleMatch -Quiet -Pattern $check[1])) {
+        throw "Pinned Rust gameplay contract changed: $($check[0]) missing $($check[1])."
+    }
+}
 Push-Location $source
 try {
     cargo build --locked --release -p horizon-client -p horizon-prepare
