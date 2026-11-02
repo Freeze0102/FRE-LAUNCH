@@ -1,4 +1,4 @@
-name: FRE LAUNCH unified Rust library preflight (no Windows engine build)
+name: FRE LAUNCH Rust grid and UA/EN preflight (no native build)
 
 on:
   push:
