@@ -157,8 +157,8 @@ function showHorizonWizard(instanceId?: string) {
         "import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'",
         "import { computed, nextTick, onMounted, onUnmounted, provide, ref, watch } from 'vue'")
     exactly(app,
-        "function showHorizonWizard() {\n    installationModal.value?.hide()\n    horizonWizard.value?.show()\n}",
-        "function showHorizonWizard() {\n    installationModal.value?.hide()\n    horizonWizard.value?.show()\n}\n"
+        "function showHorizonWizard(instanceId?: string) {\n    installationModal.value?.hide()\n    horizonWizard.value?.show(instanceId)\n}",
+        "function showHorizonWizard(instanceId?: string) {\n    installationModal.value?.hide()\n    horizonWizard.value?.show(instanceId)\n}\n"
         "provide('showHorizonWizard', showHorizonWizard)")
 
     print("FRE LAUNCH Horizon Rust instance integration added to the Create Instance wizard.")
