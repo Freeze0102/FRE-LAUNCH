@@ -357,6 +357,7 @@ NEW.update({
 "fre-rust.setup.error":("Помилка: {reason}", "Error: {reason}"),
 "fre-rust.library.title":("Minecraft на Rust", "Minecraft on Rust"),
 "fre-rust.library.new":("Створити Rust-збірку", "Create Rust profile"),
+"fre-rust.library.empty":("Rust-збірок ще немає. Створи збірку, і вона з’явиться в бібліотеці.", "No Rust profiles yet. Create one to see it in your library."),
 "fre-rust.library.ready":("Готово", "Ready"),
 "fre-rust.library.install":("Потрібні файли гри", "Game files required"),
 "fre-rust.library.play":("Грати", "Play"),
