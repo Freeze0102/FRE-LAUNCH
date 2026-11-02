@@ -39,7 +39,7 @@ def apply(root: Path):
             '''            .plugin(
                 "fre-rust",
                 InlinedPlugin::new()
-                    .commands(&["rust_profiles", "rust_create_profile", "rust_runtime", "rust_import_resources", "rust_launch", "rust_logs", "rust_open_folder"])
+                    .commands(&["rust_profiles", "rust_create_profile", "rust_runtime", "rust_import_resources", "rust_launch", "rust_logs", "rust_open_folder", "rust_list_files"])
                     .default_permission(DefaultPermissionRule::AllowAllCommands),
             )
             .plugin(
