@@ -53,7 +53,7 @@ function component(file, invoke, instances = [], options = {}) {
   const state = setup(name => {
     assert.ok(name in mocks, `Unexpected dependency: ${name}`)
     return mocks[name]
-  }, () => ({}), () => {}, { getItem: () => null, setItem: () => {} }, browser, Event, {})
+  }, () => options.props || ({}), () => {}, { getItem: () => null, setItem: () => {} }, browser, Event, {})
   return { state, mount: async () => { for (const f of mounted) await f() },
     unmount: () => { for (const f of unmounted) f() } }
 }
@@ -110,6 +110,24 @@ test('CurseForge refuses unavailable distribution and keeps install destination 
   await install
   assert.equal(calls[0].args.instanceId, 'a')
   assert.match(c.state.notice.value, /^Fabric:/)
+})
+
+test('CurseForge modpack search uses the approved modpack category, not Java mod installer', async () => {
+  const calls = []
+  const c = component('CurseForgeBrowser.vue', async (command, args) => {
+    calls.push({ command, args })
+    if (command.endsWith('|cf_search')) return [{ id: 47, slug: 'test-pack', name: 'Test', allowModDistribution: true }]
+    throw new Error(command)
+  }, instances, { props: { contentType: 'modpack' } })
+  await c.mount()
+  await c.state.doSearch()
+  assert.equal(calls.at(-1).args.contentType, 'modpack')
+  assert.equal(calls.at(-1).args.gameVersion, null)
+  assert.equal(calls.at(-1).args.modLoader, null)
+  await c.state.install({ id: 47, allowModDistribution: true })
+  assert.equal(calls.length, 1, 'Modpack search must never invoke the Java jar installer')
+  const template = fs.readFileSync(path.join(__dirname, 'CurseForgeBrowser.vue'), 'utf8')
+  assert.match(template, /v-if="!isModpack"/)
 })
 
 test('Rust library stays accessible when no profile exists yet', async () => {
