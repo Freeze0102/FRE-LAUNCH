@@ -110,9 +110,10 @@ function reason(error: unknown): string {
 }
 
 function curseForgeWebsiteSearchUrl(): string {
-  const base = 'https://www.curseforge.com/minecraft/' + (isModpack.value ? 'modpacks' : 'mc-mods')
+  const category = isModpack.value ? 'modpacks' : 'mc-mods'
   const query = searchText.value.trim()
-  return query ? base + '?search=' + encodeURIComponent(query) : base
+  const base = 'https://www.curseforge.com/minecraft/search?class=' + category
+  return query ? base + '&search=' + encodeURIComponent(query) : base
 }
 
 async function browseWithoutKey() {
