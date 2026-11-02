@@ -203,9 +203,6 @@ async function install(mod: CurseForgeMod) {
       <p v-else-if="isModded" class="mt-3 mb-0 text-sm text-secondary">{{ t(m.compatible) }}</p>
       <p v-else class="mt-3 mb-0 text-sm text-secondary">{{ t(m.noInstance) }}</p>
     </div>
-      <p v-else-if="isModded" class="mt-3 mb-0 text-sm text-secondary">{{ t(m.compatible) }}</p>
-      <p v-else class="mt-3 mb-0 text-sm text-secondary">{{ t(m.noInstance) }}</p>
-    </div>
 
     <p v-if="error" role="alert" class="rounded-lg border border-solid border-red-500/50 p-3 text-sm text-red-400">{{ error }}</p>
     <p v-if="notice" role="status" class="rounded-lg border border-solid border-surface-4 p-3 text-sm text-brand">{{ notice }}</p>
