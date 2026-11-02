@@ -24,6 +24,7 @@ def apply(root: Path):
     shutil.copyfile(here / "fre_rust_backend.rs", app / "src/api/fre_rust.rs")
     shutil.copyfile(here / "FreRustPanel.vue", frontend / "src/components/ui/FreRustPanel.vue")
     shutil.copyfile(here / "FreRustLibrary.vue", frontend / "src/components/ui/FreRustLibrary.vue")
+    shutil.copyfile(here / "RustInstanceGrid.vue", frontend / "src/components/ui/library/instance-group/RustInstanceGrid.vue")
 
     # Theseus exports its minecraft_auth API but keeps State.pool private.
     # Bridge the existing refreshed default-credentials lookup INSIDE Theseus,
@@ -86,29 +87,63 @@ provide('showFreRustWizard', showFreRustWizard)""")
     exactly(app_vue, '<HorizonRustPanel ref="horizonWizard" />',
             '<HorizonRustPanel ref="horizonWizard" />\n\t\t<FreRustPanel ref="freRustWizard" />')
 
-    # Render Rust cards within the Java Library section; GameInstance is a
-    # different data model, so do not route Rust through Java launch controls.
-    library_view = frontend / "src/components/ui/library/index.vue"
-    exactly(library_view,
-            '\t\t</section>\n\t</InstanceGroupDnd>',
-            '\t\t\t<slot name="freRustProfiles" />\n\t\t</section>\n\t</InstanceGroupDnd>')
-
+    # Keep independent Rust backend data, but show each profile in the SAME
+    # virtualized card grid as Java instances. Never masquerade as GameInstance:
+    # that would run a Rust profile through the Java loader and risk user data.
+    group = frontend / "src/components/ui/library/instance-group/index.vue"
+    exactly(group,
+            "import InstanceCard from '@/components/ui/library/instance-group/instance-card.vue'",
+            "import InstanceCard from '@/components/ui/library/instance-group/instance-card.vue'\nimport RustInstanceGrid from '@/components/ui/library/instance-group/RustInstanceGrid.vue'")
+    exactly(group,
+            "\tsetSectionCollapsed,\n\tisSearching,",
+            "\tsetSectionCollapsed,\n\tisSearching,\n\tsearch,")
+    exactly(group,
+            "const focusedInstanceId = ref<string | null>(null)",
+            "const focusedInstanceId = ref<string | null>(null)\nconst rustCardCount = ref(0)")
+    exactly(group,
+            "Math.ceil(props.instanceGroup.instances.length / columnCount.value) *",
+            "Math.ceil((props.instanceGroup.instances.length + (isUngrouped.value ? rustCardCount.value : 0)) / columnCount.value) *")
+    exactly(group,
+            "v-if=\"instanceGroup.instances.length\"",
+            "v-if=\"instanceGroup.instances.length || (isUngrouped && rustCardCount)\"")
+    exactly(group,
+            "v-if=\"instanceGroup.instances.length === 0\"",
+            "v-if=\"instanceGroup.instances.length === 0 && (!isUngrouped || rustCardCount === 0)\"")
+    exactly(group,
+            '<div ref="instanceGridContent" :style="{ height: `${gridHeight}px` }">',
+            '<div ref="instanceGridContent" class="relative" :style="{ height: `${gridHeight}px` }">')
+    exactly(group,
+            """\t\t\t\t\t</TransitionGroup>
+\t\t\t\t</div>
+\t\t\t</div>
+\t\t</Accordion>""",
+            """\t\t\t\t\t</TransitionGroup>
+\t\t\t\t\t<RustInstanceGrid
+\t\t\t\t\t\tv-if="isUngrouped"
+\t\t\t\t\t\t:start-index="instanceGroup.instances.length"
+\t\t\t\t\t\t:column-count="columnCount"
+\t\t\t\t\t\t:card-width="cardWidth"
+\t\t\t\t\t\t:card-height="cardHeight"
+\t\t\t\t\t\t:gap="gap"
+\t\t\t\t\t\t:compact="compactMode"
+\t\t\t\t\t\t:search="search"
+\t\t\t\t\t\t@count-change="rustCardCount = $event"
+\t\t\t\t\t/>
+\t\t\t\t</div>
+\t\t\t</div>
+\t\t</Accordion>""")
     index = frontend / "src/pages/Index.vue"
+    # Don't append separate Horizon/Rust sections or an empty "Rust library".
     exactly(index,
-            "import HorizonLibrary from '@/components/ui/HorizonLibrary.vue'",
-            "import HorizonLibrary from '@/components/ui/HorizonLibrary.vue'\nimport FreRustLibrary from '@/components/ui/FreRustLibrary.vue'")
+            "import HorizonLibrary from '@/components/ui/HorizonLibrary.vue'\n",
+            "")
     exactly(index, "import WelcomeScreen from '@/components/ui/WelcomeScreen.vue'\n", "")
     exactly(index,
             '\t<WelcomeScreen v-if="isReady && !hasCreatedInstance" />\n\t<div\n\t\tv-else-if="isReady"',
             '\t<div\n\t\tv-if="isReady"')
     exactly(index,
             '\t\t<LibrarySection :instances="instances" />\n\t\t<HorizonLibrary />',
-            '''\t\t<LibrarySection :instances="instances">
-\t\t\t<template #freRustProfiles>
-\t\t\t\t<HorizonLibrary />
-\t\t\t\t<FreRustLibrary />
-\t\t\t</template>
-\t\t</LibrarySection>''')
+            '\t\t<LibrarySection :instances="instances" />')
     exactly(index,
             '\t<HorizonLibrary v-if="isReady && !hasCreatedInstance" class="px-6 pb-6" />',
             '')
