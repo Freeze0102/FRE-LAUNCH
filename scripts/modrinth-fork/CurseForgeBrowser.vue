@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { invoke } from '@tauri-apps/api/core'
 import { openUrl } from '@tauri-apps/plugin-opener'
+import { open } from '@tauri-apps/plugin-dialog'
 import { defineMessages, useVIntl } from '@modrinth/ui'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { list as listInstances } from '@/helpers/instance'
+import { add_project_from_path, list as listInstances } from '@/helpers/instance'
 
 type GameChoice = { id: string; name: string; game_version: string; loader: string }
 type CurseForgeMod = {
@@ -23,7 +24,17 @@ const m = defineMessages({
   packIntro: { id: 'fre-launch.cf.pack-intro', defaultMessage: 'Find CurseForge modpacks and open their project pages. Installing CurseForge ZIP packs is not available yet.' },
   packSearch: { id: 'fre-launch.cf.pack-search', defaultMessage: 'Find modpacks' },
   apiKey: { id: 'fre-launch.cf.api-key', defaultMessage: 'Approved CurseForge API key (not saved)' },
-  keyHelp: { id: 'fre-launch.cf.key-help', defaultMessage: 'CurseForge requires an approved third-party API key. Without one you can open projects in the browser. The key stays in this session only.' },
+  keyHelp: { id: 'fre-launch.cf.key-help', defaultMessage: 'Website search needs no key. Only enable API mode if you have approved access; the key is not saved.' },
+  directIntro: { id: 'fre-launch.cf.direct-intro', defaultMessage: 'Search on the official CurseForge website without an API key. Downloads are handled by your browser.' },
+  modeApi: { id: 'fre-launch.cf.mode-api', defaultMessage: 'Use in-app API search (advanced, requires approved access)' },
+  siteSearch: { id: 'fre-launch.cf.site-search', defaultMessage: 'Search CurseForge website' },
+  siteOpened: { id: 'fre-launch.cf.site-opened', defaultMessage: 'Opened search results in your browser. Download a compatible file from CurseForge, then import the JAR here.' },
+  packOpened: { id: 'fre-launch.cf.pack-opened', defaultMessage: 'Opened CurseForge modpacks in your browser. Importing full modpacks is not supported in this panel.' },
+  importFile: { id: 'fre-launch.cf.import-file', defaultMessage: 'Import downloaded JAR to this instance' },
+  importingFile: { id: 'fre-launch.cf.importing-file', defaultMessage: 'Importing file...' },
+  importedFile: { id: 'fre-launch.cf.imported-file', defaultMessage: 'JAR imported. Check the Minecraft version, loader and dependencies before playing.' },
+  importFileError: { id: 'fre-launch.cf.import-file-error', defaultMessage: 'Cannot import downloaded JAR: {reason}' },
+  importFileHelp: { id: 'fre-launch.cf.import-file-help', defaultMessage: 'Download the correct JAR on CurseForge, then import it to the selected Java instance. This does not check dependencies or mod compatibility.' },
   helpLink: { id: 'fre-launch.cf.key-link', defaultMessage: 'How to request access' },
   instance: { id: 'fre-launch.cf.instance', defaultMessage: 'Install to game instance' },
   selectInstance: { id: 'fre-launch.cf.select-instance', defaultMessage: 'Select a game instance' },
@@ -43,13 +54,15 @@ const m = defineMessages({
   openWebsite: { id: 'fre-launch.cf.website', defaultMessage: 'Open on CurseForge' },
   distribution: { id: 'fre-launch.cf.distribution', defaultMessage: 'Author has disabled third-party distribution' },
   warning: { id: 'fre-launch.cf.warning', defaultMessage: 'Different sources can share one mods folder, but dependencies and mod conflicts are not automatically resolved. Back up your instance first.' },
-  browseLink: { id: 'fre-launch.cf.browse-link', defaultMessage: 'Browse on CurseForge without an API key' },
+  browseLink: { id: 'fre-launch.cf.browse-link', defaultMessage: 'Open CurseForge catalog' },
 })
 
 const instances = ref<GameChoice[]>([])
 const instanceId = ref(props.instanceId ?? '')
 const searchText = ref('')
 const apiKey = ref('')
+const useApiSearch = ref(false)
+const importingFile = ref(false)
 const results = ref<CurseForgeMod[]>([])
 const searched = ref(false)
 const loading = ref(false)
@@ -67,7 +80,7 @@ const isModded = computed(() => ['fabric', 'forge', 'neoforge', 'quilt'].include
 watch(() => props.instanceId, (value) => {
   if (value) instanceId.value = value
 })
-watch([instanceId, searchText, apiKey], () => {
+watch([instanceId, searchText, apiKey, useApiSearch], () => {
   searchSequence++
   loading.value = false
   results.value = []
@@ -96,7 +109,31 @@ function reason(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
+function curseForgeWebsiteSearchUrl(): string {
+  const base = 'https://www.curseforge.com/minecraft/' + (isModpack.value ? 'modpacks' : 'mc-mods')
+  const query = searchText.value.trim()
+  return query ? base + '?search=' + encodeURIComponent(query) : base
+}
+
+async function browseWithoutKey() {
+  error.value = ''
+  notice.value = ''
+  try {
+    await openUrl(curseForgeWebsiteSearchUrl())
+    notice.value = t(isModpack.value ? m.packOpened : m.siteOpened)
+  } catch (err) {
+    error.value = t(m.searchError, { reason: reason(err) })
+  }
+}
+
 async function doSearch() {
+  if (!useApiSearch.value) {
+    searchSequence++
+    results.value = []
+    searched.value = false
+    await browseWithoutKey()
+    return
+  }
   const sequence = ++searchSequence
   loading.value = true
   error.value = ''
@@ -119,6 +156,29 @@ async function doSearch() {
     error.value = t(m.searchError, { reason: reason(err) })
   } finally {
     if (sequence === searchSequence) loading.value = false
+  }
+}
+
+async function importDownloadedMod() {
+  const target = selected.value
+  if (isModpack.value || !target || !isModded.value || importingFile.value || installing.value !== null) return
+  importingFile.value = true
+  error.value = ''
+  notice.value = ''
+  try {
+    const path = await open({
+      multiple: false,
+      directory: false,
+      filters: [{ name: 'Minecraft Java mod (JAR)', extensions: ['jar'] }],
+    })
+    if (typeof path !== 'string') return
+    if (!/\.jar$/i.test(path)) throw new Error('Choose a .jar Minecraft mod file.')
+    await add_project_from_path(target.id, path)
+    notice.value = `${target.name}: ${t(m.importedFile)}`
+  } catch (err) {
+    error.value = t(m.importFileError, { reason: reason(err) })
+  } finally {
+    importingFile.value = false
   }
 }
 
@@ -147,9 +207,6 @@ function openProject(mod: CurseForgeMod) {
   if (!/^[a-z0-9-]+$/.test(mod.slug)) return
   void openUrl('https://www.curseforge.com/minecraft/' + (isModpack.value ? 'modpacks/' : 'mc-mods/') + mod.slug)
 }
-function browseWithoutKey() {
-  void openUrl('https://www.curseforge.com/minecraft/' + (isModpack.value ? 'modpacks' : 'mc-mods') + '?search=' + encodeURIComponent(searchText.value.trim()))
-}
 function openKeyHelp() {
   void openUrl('https://support.curseforge.com/support/solutions/articles/9000208346-about-the-curseforge-api-and-how-to-apply-for-a-key')
 }
@@ -161,9 +218,9 @@ function openKeyHelp() {
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 class="m-0 text-xl font-semibold text-contrast">CurseForge</h2>
-          <p class="mt-2 mb-0 text-sm text-secondary">{{ t(isModpack ? m.packIntro : m.intro) }}</p>
+          <p class="mt-2 mb-0 text-sm text-secondary">{{ t(useApiSearch ? (isModpack ? m.packIntro : m.intro) : m.directIntro) }}</p>
         </div>
-        <span class="rounded-lg border border-solid border-surface-5 px-3 py-1 text-xs text-secondary">CurseForge API</span>
+        <span class="rounded-lg border border-solid border-surface-5 px-3 py-1 text-xs text-secondary">{{ useApiSearch ? 'CurseForge API' : 'CurseForge.com' }}</span>
       </div>
 
       <label v-if="!isModpack" class="mt-4 flex flex-col gap-2 text-sm text-secondary">
@@ -177,6 +234,10 @@ function openKeyHelp() {
       </label>
       <details class="mt-3 rounded-lg border border-solid border-surface-5 p-3">
         <summary class="cursor-pointer text-sm text-secondary">{{ t(m.apiKey) }}</summary>
+        <label class="mt-3 flex items-center gap-2 text-sm text-secondary">
+          <input v-model="useApiSearch" type="checkbox" />
+          {{ t(m.modeApi) }}
+        </label>
         <label class="mt-3 flex flex-col gap-2 text-sm text-secondary">
           {{ t(m.apiKey) }}
           <input
@@ -202,14 +263,22 @@ function openKeyHelp() {
           maxlength="100"
         />
         <button type="submit" class="rounded-lg border-0 bg-brand px-5 py-2 font-semibold text-white cursor-pointer disabled:opacity-50" :disabled="loading">
-          {{ loading ? t(m.searching) : t(isModpack ? m.packSearch : m.searchButton) }}
+          {{ loading ? t(m.searching) : t(useApiSearch ? (isModpack ? m.packSearch : m.searchButton) : m.siteSearch) }}
         </button>
       </form>
-      <button class="mt-3 cursor-pointer border-0 bg-transparent p-0 text-sm text-brand hover:underline" @click="browseWithoutKey">
+      <button type="button" class="mt-3 cursor-pointer border-0 bg-transparent p-0 text-sm text-brand hover:underline" @click="browseWithoutKey">
         {{ t(m.browseLink) }}
       </button>
 
       <p v-if="isModpack" class="mt-3 mb-0 text-sm text-secondary">{{ t(m.packIntro) }}</p>
+      <div v-else-if="isModded && !useApiSearch" class="mt-3 flex flex-col items-start gap-2">
+        <p class="m-0 text-xs text-secondary">{{ t(m.importFileHelp) }}</p>
+        <button type="button"
+          class="cursor-pointer rounded-lg border border-solid border-surface-4 bg-button-bg px-4 py-2 text-sm text-contrast disabled:opacity-50"
+          :disabled="importingFile || installing !== null" @click="importDownloadedMod">
+          {{ importingFile ? t(m.importingFile) : t(m.importFile) }}
+        </button>
+      </div>
       <p v-else-if="isModded" class="mt-3 mb-0 text-sm text-secondary">{{ t(m.compatible) }}</p>
       <p v-else class="mt-3 mb-0 text-sm text-secondary">{{ t(m.noInstance) }}</p>
     </div>
@@ -218,7 +287,7 @@ function openKeyHelp() {
     <p v-if="notice" role="status" class="rounded-lg border border-solid border-surface-4 p-3 text-sm text-brand">{{ notice }}</p>
     <p v-if="!isModpack" class="text-xs text-secondary">{{ t(m.warning) }}</p>
 
-    <div v-if="searched" class="space-y-3">
+    <div v-if="useApiSearch && searched" class="space-y-3">
       <h3 class="m-0 font-semibold text-contrast">{{ t(m.results) }} · {{ results.length }}</h3>
       <p v-if="!results.length" class="text-secondary">{{ t(m.noResults) }}</p>
       <article
