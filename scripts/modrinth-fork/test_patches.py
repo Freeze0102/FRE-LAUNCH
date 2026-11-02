@@ -96,7 +96,7 @@ class PatchTests(unittest.TestCase):
                 prepare.customize(root, sha)
             self.assertEqual(main.read_bytes(), before)
             capability = json.loads((root / 'apps/app/capabilities/plugins.json').read_text())
-            self.assertTrue({'fre-curseforge:default', 'fre-horizon:default'} <= set(
+            self.assertTrue({'fre-curseforge:default', 'fre-horizon:default', 'fre-rust:default'} <= set(
                 p for p in capability['permissions'] if isinstance(p, str)))
             # Optionally retain this exact verified result for local compilation.
             destination = os.environ.get('FRE_AUDIT_SOURCE')
