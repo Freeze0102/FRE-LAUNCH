@@ -12,7 +12,6 @@ use std::{
 };
 use tauri::Manager;
 use tokio::io::AsyncWriteExt;
-use theseus::{State, state::Credentials};
 
 const MAX_NAME: usize = 64;
 const MAX_METADATA: u64 = 8192;
@@ -365,8 +364,9 @@ async fn rust_import_resources<R: tauri::Runtime>(
     let _guard = RESOURCE_IMPORT.lock().await;
     let runtime = bundle(&app)?;
     verify_native_client(&runtime)?;
-    let state = State::get().await.map_err(|e| e.to_string())?;
-    let credentials = Credentials::get_default_credential(&state.pool).await
+    // Use Theseus's public Minecraft authentication API. Its private
+    // State.pool and state::Credentials internals are inaccessible here.
+    let credentials = theseus::minecraft_auth::fre_rust_default_credentials().await
         .map_err(|e| e.to_string())?
         .ok_or("Sign in to the Microsoft account that owns Minecraft: Java Edition first.")?;
     if credentials.is_offline_profile() || credentials.online_profile_fresh().await.is_none() {
@@ -406,9 +406,7 @@ async fn rust_launch<R: tauri::Runtime>(
     // owner session (docs/api/launch.md). Reuse the active FRE LAUNCH
     // Minecraft account, never launch an online-mode client using a fake
     // nickname or an expired guest token.
-    let state = State::get().await
-        .map_err(|e| format!("Minecraft account state unavailable: {e}"))?;
-    let credentials = Credentials::get_default_credential(&state.pool).await
+    let credentials = theseus::minecraft_auth::fre_rust_default_credentials().await
         .map_err(|e| format!("Could not refresh Minecraft account: {e}"))?
         .ok_or("Sign in with the Microsoft account that owns Minecraft: Java Edition before playing Rust Minecraft.")?;
     if credentials.access_token.trim().is_empty()
