@@ -4,6 +4,13 @@ import { defineMessages, useVIntl } from '@modrinth/ui'
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
 
 type RustInstance = { id: string; name: string; version: string | null; selected: boolean }
+type HorizonGameFile = { name: string; bytes: number; isDirectory: boolean }
+type FileCategory = 'mods' | 'resourcepacks' | 'shaderpacks' | 'saves' | 'logs' | 'root'
+const fileCategories: { id: FileCategory; label: string }[] = [
+  { id: 'mods', label: 'Моди' }, { id: 'resourcepacks', label: 'Ресурс-паки' },
+  { id: 'shaderpacks', label: 'Шейдери' }, { id: 'saves', label: 'Світи' },
+  { id: 'logs', label: 'Журнали' }, { id: 'root', label: 'Усі файли' },
+]
 type RustStatus = {
   instances: RustInstance[]
   installedVersions: string[]
@@ -30,6 +37,15 @@ const status = ref<RustStatus | null>(null)
 const executable = ref('')
 const error = ref('')
 const launching = ref<string | null>(null)
+const fileProfile = ref<RustInstance | null>(null)
+const fileCategory = ref<FileCategory>('mods')
+const fileEntries = ref<HorizonGameFile[]>([])
+const fileFilter = ref('')
+const filesLoading = ref(false)
+let fileSequence = 0
+const filteredFiles = computed(() => fileEntries.value.filter(entry =>
+  entry.name.toLowerCase().includes(fileFilter.value.trim().toLowerCase()),
+))
 let generation = 0
 const profiles = computed(() => status.value?.instances.filter(i =>
   i.id === 'horizon' || /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(i.id),
@@ -81,17 +97,55 @@ async function play(profile: RustInstance) {
     error.value = t(messages.error, { reason: reason(e) })
   } finally { launching.value = null }
 }
+async function refreshFiles(category: FileCategory = fileCategory.value) {
+  const profile = fileProfile.value
+  if (!profile) return
+  const current = ++fileSequence
+  fileCategory.value = category
+  filesLoading.value = true
+  fileEntries.value = []
+  error.value = ''
+  try {
+    const files = await invoke<HorizonGameFile[]>('plugin:fre-horizon|horizon_list_files', {
+      exePath: executable.value,
+      name: profile.id,
+      folder: category,
+    })
+    if (current === fileSequence) fileEntries.value = files
+  } catch (e) {
+    if (current === fileSequence) error.value = t(messages.error, { reason: reason(e) })
+  } finally {
+    if (current === fileSequence) filesLoading.value = false
+  }
+}
 async function openFiles(profile: RustInstance) {
+  fileProfile.value = profile
+  fileFilter.value = ''
+  await refreshFiles('mods')
+}
+async function openExplorer() {
+  const profile = fileProfile.value
+  if (!profile) return
   error.value = ''
   try {
     await invoke<void>('plugin:fre-horizon|horizon_open_folder', {
       exePath: executable.value,
       name: profile.id,
-      folder: 'root',
+      folder: fileCategory.value,
     })
   } catch (e) {
     error.value = t(messages.error, { reason: reason(e) })
   }
+}
+function closeFiles() {
+  fileSequence++
+  fileProfile.value = null
+  fileEntries.value = []
+  filesLoading.value = false
+}
+function formatSize(bytes: number) {
+  return bytes >= 1048576 ? (bytes / 1048576).toFixed(1) + ' MB' :
+    bytes >= 1024 ? (bytes / 1024).toFixed(1) + ' KB' : bytes + ' B'
 }
 function update() { void refresh() }
 onMounted(() => {
@@ -99,6 +153,7 @@ onMounted(() => {
   void refresh()
 })
 onUnmounted(() => {
+  fileSequence++
   generation++
   window.removeEventListener('fre-horizon-library-refresh', update)
 })
@@ -147,6 +202,38 @@ onUnmounted(() => {
           </button>
         </div>
       </article>
+    </div>
+    <div v-if="fileProfile" class="rounded-xl border border-solid border-surface-4 bg-bg-raised p-4" aria-label="Файли Horizon-збірки">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 class="m-0 font-semibold text-contrast">Файли · {{ fileProfile.name }}</h3>
+          <p class="m-0 mt-1 text-xs text-secondary">Окремі файли Horizon, без Java-модів</p>
+        </div>
+        <div class="flex gap-2">
+          <button type="button" class="cursor-pointer rounded-lg bg-button-bg px-3 py-2 text-sm text-contrast" :disabled="filesLoading" @click="refreshFiles()">Оновити</button>
+          <button type="button" class="cursor-pointer rounded-lg bg-button-bg px-3 py-2 text-sm text-contrast" @click="openExplorer">Папка Windows</button>
+          <button type="button" class="cursor-pointer rounded-lg bg-button-bg px-3 py-2 text-sm text-contrast" @click="closeFiles">Закрити</button>
+        </div>
+      </div>
+      <div class="mt-4 flex flex-wrap gap-2">
+        <button v-for="category in fileCategories" :key="category.id" type="button"
+          class="cursor-pointer rounded-lg px-3 py-2 text-sm"
+          :class="fileCategory === category.id ? 'bg-brand text-white' : 'bg-button-bg text-secondary'"
+          :aria-pressed="fileCategory === category.id"
+          @click="refreshFiles(category.id)">{{ category.label }}</button>
+      </div>
+      <input v-model="fileFilter" aria-label="Пошук файлів Horizon" placeholder="Пошук встановлених файлів..."
+        class="mt-4 w-full rounded-lg bg-button-bg p-3 text-contrast" />
+      <p v-if="filesLoading" class="mt-3 text-sm text-secondary">Читаємо файли…</p>
+      <p v-else-if="!filteredFiles.length" class="mt-3 text-sm text-secondary">Файлів не знайдено.</p>
+      <div v-else class="mt-3 max-h-64 overflow-auto rounded-lg border border-solid border-surface-4">
+        <div v-for="file in filteredFiles" :key="file.name"
+          class="flex items-center justify-between gap-3 border-b border-solid border-surface-4 px-3 py-2 text-sm">
+          <span class="min-w-0 truncate text-contrast" :title="file.name">{{ file.isDirectory ? '📁' : '📄' }} {{ file.name }}</span>
+          <span class="shrink-0 text-xs text-secondary">{{ file.isDirectory ? 'Папка' : formatSize(file.bytes) }}</span>
+        </div>
+      </div>
+      <p class="mt-3 text-xs text-secondary">Java JAR-моди несумісні з нативним Horizon. Встановлюй лише формати, які підтримує цей клієнт.</p>
     </div>
     <p v-if="error" role="alert" class="text-sm text-red-400">{{ error }}</p>
   </section>
