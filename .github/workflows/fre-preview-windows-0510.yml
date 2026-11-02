@@ -1,0 +1,167 @@
+name: FRE LAUNCH v0.5.10 Windows preview (not an updater)
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/release-requests/v0.5.10-preview'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frelaunch-0510-preview
+  cancel-in-progress: false
+
+jobs:
+  windows-preview:
+    if: github.ref == 'refs/heads/main'
+    runs-on: windows-latest
+    timeout-minutes: 180
+    steps:
+      - name: Checkout pinned FRE LAUNCH sources
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Set up Rust MSVC
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            vendor/fre-rust-source -> target
+            FRE-Modrinth-Source -> target
+
+      - name: Install pinned tooling
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          npm.cmd install -g pnpm@12.11.2
+          if ($LASTEXITCODE -ne 0) { throw 'pnpm setup failed' }
+          python -m pip install 'Pillow>=11,<13'
+          if ($LASTEXITCODE -ne 0) { throw 'Pillow setup failed' }
+
+      - name: Build MIT-only native game engine
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          ./scripts/modrinth-fork/ci-build-native-engine.ps1
+          if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { throw 'Native Rust engine compile failed' }
+          if (Test-Path 'scripts/modrinth-fork/fre-rust-runtime/resources') {
+            throw 'Proprietary Minecraft assets must never be uploaded'
+          }
+
+      - name: Prepare and verify source without signing keys
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          ./FRE-MODRINTH-LOCAL.ps1
+          if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { throw 'Source generation failed' }
+          Push-Location FRE-Modrinth-Source
+          try {
+            pnpm.cmd --filter '@modrinth/app...' install --frozen-lockfile
+            if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed' }
+            pnpm.cmd -w i18n:coverage
+            if ($LASTEXITCODE -ne 0) { throw 'Translation generation failed' }
+            pnpm.cmd --filter '@modrinth/app-frontend' run tsc:check
+            if ($LASTEXITCODE -ne 0) { throw 'Vue typecheck failed' }
+            node ../scripts/modrinth-fork/test_frontend.cjs .
+            if ($LASTEXITCODE -ne 0) { throw 'Content and profile regression tests failed' }
+          } finally { Pop-Location }
+
+      - name: Build independent preview without updater signatures
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Push-Location FRE-Modrinth-Source
+          try {
+            # This is a local preview only. Never substitute a new key for the
+            # already installed v0.5.9 updater's missing original key.
+            $env:TAURI_SIGNING_PRIVATE_KEY = $null
+            $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = $null
+            Set-Content -LiteralPath 'apps/app/tauri.preview.conf.json' -Value '{"bundle":{"createUpdaterArtifacts":false}}' -Encoding utf8
+            pnpm.cmd --filter '@modrinth/app' tauri build --ci --bundles nsis --no-sign --config tauri.preview.conf.json
+            if ($LASTEXITCODE -ne 0) { throw 'Unsigned preview installer build failed' }
+          } finally { Pop-Location }
+
+      - name: Scan preview with Microsoft Defender before sharing
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $dir = 'FRE-Modrinth-Source/target/release/bundle/nsis'
+          $installer = Get-ChildItem $dir -File -Filter '*.exe' | Select-Object -First 1
+          if (!$installer) { throw 'Preview NSIS installer missing' }
+          if (!(Get-Command Get-MpComputerStatus -ErrorAction SilentlyContinue)) {
+            throw 'Microsoft Defender unavailable: do not share build'
+          }
+          $defender = Get-MpComputerStatus
+          if (!$defender.AMServiceEnabled -or !$defender.AntivirusEnabled) {
+            throw 'Microsoft Defender inactive: do not share build'
+          }
+          Update-MpSignature -ErrorAction Stop
+          Start-MpScan -ScanType CustomScan -ScanPath $installer.FullName -ErrorAction Stop
+          if (!(Test-Path -LiteralPath $installer.FullName)) { throw 'Installer quarantined' }
+          $appExe = Get-ChildItem 'FRE-Modrinth-Source/target/release' -File -Filter '*.exe' | Select-Object -First 1
+          if (!$appExe) { throw 'Launcher executable missing' }
+          Start-MpScan -ScanType CustomScan -ScanPath $appExe.FullName -ErrorAction Stop
+          $rustExe = 'scripts/modrinth-fork/fre-rust-runtime/fre-rust-client.exe'
+          Start-MpScan -ScanType CustomScan -ScanPath $rustExe -ErrorAction Stop
+          if (@(Get-MpThreatDetection).Count -gt 0) { throw 'Defender reported a threat: preview upload blocked' }
+          "PREVIEW_INSTALLER=$($installer.FullName)" >> $env:GITHUB_ENV
+
+      - name: Smoke-test clean preview installation and launch
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $folder = Join-Path $env:RUNNER_TEMP 'FRELaunch0510Preview'
+          $installer = Start-Process -FilePath $env:PREVIEW_INSTALLER -ArgumentList @('/S',"/D=$folder") -Wait -PassThru
+          if ($installer.ExitCode -ne 0) { throw "Preview installer failed: $($installer.ExitCode)" }
+          $executables = @(Get-ChildItem -LiteralPath $folder -Recurse -File -Filter '*.exe' |
+            Where-Object { $_.Name -notmatch 'unins|uninstall' })
+          if (!$executables.Count) { throw 'Installed preview launcher missing' }
+          $binary = $executables | Sort-Object Length -Descending | Select-Object -First 1
+          $app = Start-Process -FilePath $binary.FullName -PassThru
+          Start-Sleep -Seconds 12
+          $app.Refresh()
+          if ($app.HasExited) { throw "Preview launcher exited unexpectedly: $($app.ExitCode)" }
+          Stop-Process -Id $app.Id -Force
+
+      - name: Stage reviewed preview only
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path preview-artifacts | Out-Null
+          $target = 'preview-artifacts/FRE-LAUNCH-v0.5.10-PREVIEW-Windows-x64-Setup.exe'
+          Copy-Item -LiteralPath $env:PREVIEW_INSTALLER -Destination $target
+          (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash.ToLowerInvariant() |
+            Set-Content -LiteralPath 'preview-artifacts/SHA256.txt'
+          @"
+          FRE LAUNCH v0.5.10 preview from main commit $env:GITHUB_SHA.
+          UNSIGNED TEST BUILD, not a signed update for installed v0.5.9.
+          Microsoft Defender scan and clean installation startup smoke passed in Windows CI.
+          Includes Java in-app Modrinth catalog, optional approved-key CurseForge search,
+          Rust/Horizon file viewing, and detached Horizon Play.
+          This preview never contains private Minecraft game resources.
+          To publish an automatic update, restore the ORIGINAL 0.5.9 Tauri signing key.
+          "@ | Set-Content -LiteralPath 'preview-artifacts/README.txt' -Encoding utf8
+
+      - name: Upload Windows preview (not official release)
+        uses: actions/upload-artifact@v4
+        with:
+          name: FRE-LAUNCH-v0.5.10-PREVIEW-Windows
+          path: preview-artifacts/
+          if-no-files-found: error
+          retention-days: 7
