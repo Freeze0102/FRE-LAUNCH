@@ -36,10 +36,12 @@ function component(file, invoke, instances = [], options = {}) {
   const names = file === 'CurseForgeBrowser.vue'
     ? 'instanceId,searchText,apiKey,results,loading,notice,error,installing,doSearch,install'
     : file === 'FreRustPanel.vue'
-      ? 'source,name,selectedId,profiles,runtime,pending,error,notice,chooseSourceFolder,importResources,create,refresh,show,hide,visible'
+      ? 'source,name,selectedId,profiles,runtime,pending,error,notice,chooseSourceFolder,importResources,openProfileFiles,create,refresh,show,hide,visible'
       : file === 'FreRustLibrary.vue'
-        ? 'profiles,runtime,error,refresh,play,openRustWizard'
-        : 'minecraftPath,executable,instanceName,launchName,pending,error,feedback,status,prepared,canPlay,activeVersion,releaseTag,downloadProgress,manageHorizon,createInstance,playInstance,downloadLauncher,show,hide,visible'
+        ? 'profiles,runtime,error,refresh,play,openFiles,openRustWizard'
+        : file === 'HorizonLibrary.vue'
+          ? 'profiles,status,executable,error,refresh,openFiles,openHorizonWizard'
+          : 'minecraftPath,executable,instanceName,launchName,pending,error,feedback,status,prepared,canPlay,activeVersion,releaseTag,downloadProgress,manageHorizon,createInstance,playInstance,downloadLauncher,show,hide,visible'
   const setup = new Function('require', 'defineProps', 'defineExpose', 'localStorage', 'window', 'Event', 'exports',
     `${output}\nreturn {${names}}`)
   const listeners = new Map()
@@ -169,6 +171,55 @@ test('Rust resource folder picker passes selected directory to import command', 
   assert.ok(calls.some(({ command, args }) =>
     command === 'plugin:fre-rust|rust_import_resources' && args.source === chosen))
   assert.equal(c.state.pending.value, null)
+})
+
+test('Native Rust Files uses the chosen profile ID, never the active Java instance', async () => {
+  const calls = []
+  const profile = { id: '999888', name: 'Rust survival', created: 1 }
+  const c = component('FreRustLibrary.vue', async (command, args) => {
+    calls.push({ command, args })
+    if (command.endsWith('|rust_profiles')) return [profile]
+    if (command.endsWith('|rust_runtime')) return { installed: true, prepared: true, version: '26.3', reason: null }
+    if (command.endsWith('|rust_open_folder')) return undefined
+    throw new Error(command)
+  })
+  await c.state.refresh()
+  await c.state.openFiles(profile)
+  assert.deepEqual(calls.at(-1), { command: 'plugin:fre-rust|rust_open_folder', args: { profileId: profile.id, folder: 'root' } })
+})
+
+test('Native Rust manager folder shortcut targets the selected profile', async () => {
+  const calls = []
+  const profile = { id: '112233', name: 'Another Rust game', created: 1 }
+  const c = component('FreRustPanel.vue', async (command, args) => {
+    calls.push({ command, args })
+    if (command.endsWith('|rust_profiles')) return [profile]
+    if (command.endsWith('|rust_runtime')) return { installed: true, prepared: true, version: '26.3', reason: null }
+    if (command.endsWith('|rust_open_folder')) return undefined
+    throw new Error(command)
+  })
+  await c.state.show(profile.id)
+  assert.equal(c.state.selectedId.value, profile.id)
+  await c.state.openProfileFiles('mods')
+  assert.deepEqual(calls.at(-1), { command: 'plugin:fre-rust|rust_open_folder', args: { profileId: profile.id, folder: 'mods' } })
+})
+
+test('Existing Horizon Files opens its own instance, not the Java folder', async () => {
+  const calls = []
+  const profile = { id: 'horizon', name: 'Old Rust game', version: null, selected: true }
+  const c = component('HorizonLibrary.vue', async (command, args) => {
+    calls.push({ command, args })
+    if (command.endsWith('|horizon_detect_launcher')) return 'C:\\Horizon\\horizon-launcher.exe'
+    if (command.endsWith('|horizon_status')) return { instances: [profile], installedVersions: ['nightly'], preparedVersions: ['nightly'], selectedVersion: 'nightly' }
+    if (command.endsWith('|horizon_open_folder')) return undefined
+    throw new Error(command)
+  })
+  await c.state.refresh()
+  await c.state.openFiles(profile)
+  assert.deepEqual(calls.at(-1), {
+    command: 'plugin:fre-horizon|horizon_open_folder',
+    args: { exePath: 'C:\\Horizon\\horizon-launcher.exe', name: profile.id, folder: 'root' },
+  })
 })
 
 test('Horizon forwards the optional Minecraft folder using the official prepare flag input', async () => {
