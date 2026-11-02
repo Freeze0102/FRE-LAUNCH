@@ -17,7 +17,7 @@ pub fn init<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
             horizon_instances, horizon_create, horizon_play, horizon_logs,
             horizon_versions, horizon_install_version, horizon_set_version, horizon_prepare,
             horizon_install_launcher, horizon_detect_launcher, horizon_status, horizon_open_launcher,
-            horizon_direct_play, horizon_open_folder,
+            horizon_direct_play, horizon_open_folder, horizon_list_files,
         ])
         .build()
 }
@@ -148,6 +148,62 @@ async fn horizon_open_folder(
         let _ = target;
         Err("Opening Horizon folders is currently supported on Windows.".into())
     }
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct HorizonGameFile {
+    name: String,
+    bytes: u64,
+    is_directory: bool,
+}
+
+fn read_horizon_files(home: &Path, folder: &str) -> Result<Vec<HorizonGameFile>, String> {
+    if !matches!(folder, "root" | "saves" | "mods" | "resourcepacks" | "shaderpacks" | "logs") {
+        return Err("Unsupported Horizon game folder.".into());
+    }
+    let home = home.canonicalize().map_err(|e| e.to_string())?;
+    if !home.is_dir() { return Err("Horizon game folder is unavailable.".into()); }
+    let target = if folder == "root" { home.clone() } else { home.join(folder) };
+    let resolved = target.canonicalize().map_err(|e| e.to_string())?;
+    if !resolved.starts_with(&home) || !resolved.is_dir() {
+        return Err("The selected folder is outside the Horizon game directory or missing.".into());
+    }
+    let mut results = Vec::new();
+    for entry in std::fs::read_dir(resolved).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let kind = entry.file_type().map_err(|e| e.to_string())?;
+        if kind.is_symlink() || !(kind.is_file() || kind.is_dir()) { continue; }
+        if results.len() >= 500 {
+            return Err("Folder has more than 500 entries; open it in Windows Explorer.".into());
+        }
+        let name = entry.file_name().to_string_lossy().into_owned();
+        let bytes = if kind.is_file() {
+            entry.metadata().map_err(|e| e.to_string())?.len()
+        } else { 0 };
+        results.push(HorizonGameFile { name, bytes, is_directory: kind.is_dir() });
+    }
+    results.sort_by(|a,b| b.is_directory.cmp(&a.is_directory)
+        .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase())));
+    Ok(results)
+}
+
+#[tauri::command]
+async fn horizon_list_files(exe_path: String, name: String, folder: String)
+    -> Result<Vec<HorizonGameFile>, String> {
+    let exe = validate_launcher(&exe_path)?;
+    validate_name(&name)?;
+    let raw = run_cli(&exe, &["instance", "list", "--json"], QUICK_TIMEOUT).await?;
+    let entries: Vec<serde_json::Value> = serde_json::from_str(&raw)
+        .map_err(|_| "Horizon instance listing is invalid.")?;
+    let entry = entries.iter().find(|entry| entry["id"].as_str() == Some(name.as_str()))
+        .ok_or("The Horizon instance no longer exists.")?;
+    if !matches!(entry["kind"].as_str(), Some("own" | "default")) || !entry["java"].is_null() {
+        return Err("This is not a native Horizon game instance.".into());
+    }
+    let home = PathBuf::from(entry["home"].as_str()
+        .ok_or("Horizon did not return an instance folder.")?);
+    read_horizon_files(&home, &folder)
 }
 
 fn validate_launcher(path: &str) -> Result<PathBuf, String> {
@@ -401,6 +457,19 @@ async fn horizon_direct_play<R: tauri::Runtime>(
 mod tests {
     use super::*;
     static PROCESS_TEST: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+    #[test]
+    fn in_app_files_are_scoped_to_horizon_profile() {
+        let root = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(root.path().join("mods")).unwrap();
+        std::fs::write(root.path().join("mods/example.native"), b"game").unwrap();
+        let files = read_horizon_files(root.path(), "mods").unwrap();
+        assert_eq!(files.len(), 1);
+        assert_eq!(files[0].name, "example.native");
+        assert_eq!(files[0].bytes, 4);
+        assert!(read_horizon_files(root.path(), "../../").is_err());
+        assert!(read_horizon_files(root.path(), "missing").is_err());
+    }
+
     #[test]
     fn status_uses_real_cli_json_and_never_calls_unprepared_ready() {
         let instances = r#"[{"id":"horizon","name":"Horizon","kind":"default","version":null,"java":null,"selected":true},
