@@ -25,58 +25,59 @@ def apply(root: Path):
     shutil.copyfile(here / "FreRustPanel.vue", frontend / "src/components/ui/FreRustPanel.vue")
     shutil.copyfile(here / "FreRustLibrary.vue", frontend / "src/components/ui/FreRustLibrary.vue")
 
-    # Patch in place after the original pinned Modrinth -> Horizon adapter so
-    # the old adapter's rigid upstream anchors are kept stable. Only this new
-    # native module remains referenced in the final Tauri binary.
-    exactly(app / "src/api/mod.rs", "pub mod horizon;", "pub mod fre_rust;")
+    # Existing Horizon profiles already work for some players. Keep their
+    # launcher, profile folders and library card instead of silently replacing
+    # them with a new incompatible native profile format.
+    exactly(app / "src/api/mod.rs",
+            "pub mod horizon;",
+            "pub mod horizon;\npub mod fre_rust;")
     exactly(app / "src/main.rs",
-            ".plugin(api::horizon::init())",
-            ".plugin(api::fre_rust::init())")
-    build = app / "build.rs"
-    old = '''            .plugin(
-                "fre-horizon",
-                InlinedPlugin::new()
-                    .commands(&["horizon_instances", "horizon_create", "horizon_play", "horizon_logs", "horizon_versions", "horizon_install_version", "horizon_set_version", "horizon_prepare", "horizon_install_launcher", "horizon_detect_launcher", "horizon_status", "horizon_open_launcher", "horizon_direct_play"])
-                    .default_permission(DefaultPermissionRule::AllowAllCommands),
-            )'''
-    new = '''            .plugin(
+            "        .plugin(api::horizon::init())",
+            "        .plugin(api::horizon::init())\n        .plugin(api::fre_rust::init())")
+    exactly(app / "build.rs",
+            '            .plugin(\n                "fre-horizon",',
+            '''            .plugin(
                 "fre-rust",
                 InlinedPlugin::new()
                     .commands(&["rust_profiles", "rust_create_profile", "rust_runtime", "rust_import_resources", "rust_launch", "rust_logs"])
                     .default_permission(DefaultPermissionRule::AllowAllCommands),
-            )'''
-    exactly(build, old, new)
+            )
+            .plugin(
+                "fre-horizon",''')
     exactly(app / "capabilities/plugins.json",
-            '"fre-horizon:default"', '"fre-rust:default"')
+            '"fre-horizon:default",',
+            '"fre-horizon:default",\n\t\t"fre-rust:default",')
 
     app_vue = frontend / "src/App.vue"
-    replacements = {
-        "import HorizonRustPanel from '@/components/ui/HorizonRustPanel.vue'":
-            "import FreRustPanel from '@/components/ui/FreRustPanel.vue'",
-        "const horizonWizard = ref(null)": "const freRustWizard = ref(null)",
-        "function showHorizonWizard() {": "function showFreRustWizard() {",
-        "horizonWizard.value?.show()": "freRustWizard.value?.show()",
-        "provide('showHorizonWizard', showHorizonWizard)":
-            "provide('showFreRustWizard', showFreRustWizard)",
-        ':on-horizon="showHorizonWizard"': ':on-horizon="showFreRustWizard"',
-        '<HorizonRustPanel ref="horizonWizard" />': '<FreRustPanel ref="freRustWizard" />',
-    }
-    for before, after in replacements.items():
-        exactly(app_vue, before, after)
+    exactly(app_vue,
+            "import HorizonRustPanel from '@/components/ui/HorizonRustPanel.vue'",
+            "import HorizonRustPanel from '@/components/ui/HorizonRustPanel.vue'\nimport FreRustPanel from '@/components/ui/FreRustPanel.vue'")
+    exactly(app_vue, "const horizonWizard = ref(null)",
+            "const horizonWizard = ref(null)\nconst freRustWizard = ref(null)")
+    exactly(app_vue, "provide('showHorizonWizard', showHorizonWizard)",
+            """provide('showHorizonWizard', showHorizonWizard)
+function showFreRustWizard() {
+    installationModal.value?.hide()
+    freRustWizard.value?.show()
+}
+provide('showFreRustWizard', showFreRustWizard)""")
+    # The new Create flow selects the built-in game, while existing Horizon
+    # cards still open their original wizard through showHorizonWizard.
+    exactly(app_vue, ':on-horizon="showHorizonWizard"',
+            ':on-horizon="showFreRustWizard"')
+    exactly(app_vue, '<HorizonRustPanel ref="horizonWizard" />',
+            '<HorizonRustPanel ref="horizonWizard" />\n\t\t<FreRustPanel ref="freRustWizard" />')
 
     index = frontend / "src/pages/Index.vue"
-    for before, after in {
-        "import HorizonLibrary from '@/components/ui/HorizonLibrary.vue'":
-            "import FreRustLibrary from '@/components/ui/FreRustLibrary.vue'",
-        "<HorizonLibrary": "<FreRustLibrary",
-    }.items():
-        if before == "<HorizonLibrary":
-            old = index.read_text(encoding="utf-8")
-            if old.count(before) != 2:
-                raise RuntimeError("Expected two Rust library mounts on Index.vue")
-            index.write_text(old.replace(before, after), encoding="utf-8")
-        else:
-            exactly(index, before, after)
+    exactly(index,
+            "import HorizonLibrary from '@/components/ui/HorizonLibrary.vue'",
+            "import HorizonLibrary from '@/components/ui/HorizonLibrary.vue'\nimport FreRustLibrary from '@/components/ui/FreRustLibrary.vue'")
+    exactly(index,
+            '\t\t<HorizonLibrary />',
+            '\t\t<HorizonLibrary />\n\t\t<FreRustLibrary />')
+    exactly(index,
+            '\t<HorizonLibrary v-if="isReady && !hasCreatedInstance" class="px-6 pb-6" />',
+            '\t<HorizonLibrary v-if="isReady && !hasCreatedInstance" class="px-6 pb-6" />\n\t<FreRustLibrary v-if="isReady && !hasCreatedInstance" class="px-6 pb-6" />')
 
     stage = root / "packages/ui/src/components/flows/creation-flow-modal/components/SetupTypeStage.vue"
     exactly(stage, "defaultMessage: 'Horizon (Rust)'",
@@ -85,17 +86,8 @@ def apply(root: Path):
             "defaultMessage: 'Separate native Rust Minecraft client and versions; FRE LAUNCH launches the game directly.'",
             "defaultMessage: 'An independent Rust game, installed and played inside FRE LAUNCH.'")
 
-    # Drop unused legacy source templates from the GENERATED build tree.
-    # They are not deleted from this repository, which keeps historical work.
-    for path in (
-        app / "src/api/horizon.rs",
-        app / "src/api/horizon_bootstrap.rs",
-        frontend / "src/components/ui/HorizonRustPanel.vue",
-        frontend / "src/components/ui/HorizonLibrary.vue",
-    ):
-        if path.exists():
-            path.unlink()
-
+    # Preserve the older Horizon adapter and its UI so an update does not
+    # strand already installed Rust profiles. No automatic world migration.
     # Bundle the native game only when the local build has prepared real
     # artifacts. Missing assets are an explicit Runtime: Not installed state
     # in the UI, NEVER a fake Play button.
