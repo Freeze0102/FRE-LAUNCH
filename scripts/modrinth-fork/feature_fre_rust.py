@@ -25,6 +25,24 @@ def apply(root: Path):
     shutil.copyfile(here / "FreRustPanel.vue", frontend / "src/components/ui/FreRustPanel.vue")
     shutil.copyfile(here / "FreRustLibrary.vue", frontend / "src/components/ui/FreRustLibrary.vue")
 
+    # Theseus exports its minecraft_auth API but keeps State.pool private.
+    # Bridge the existing refreshed default-credentials lookup INSIDE Theseus,
+    # rather than accessing private state internals from the Tauri app.
+    auth_api = root / "packages/app-lib/src/api/minecraft_auth.rs"
+    exactly(
+        auth_api,
+        "#[tracing::instrument]\npub async fn get_default_user()",
+        """/// Return the active Minecraft account after Theseus's normal token
+/// refresh, without exposing the private database pool to the Tauri app.
+pub async fn fre_rust_default_credentials() -> crate::Result<Option<Credentials>> {
+    let state = State::get().await?;
+    Credentials::get_default_credential(&state.pool).await
+}
+
+#[tracing::instrument]
+pub async fn get_default_user()""",
+    )
+
     # Existing Horizon profiles already work for some players. Keep their
     # launcher, profile folders and library card instead of silently replacing
     # them with a new incompatible native profile format.
