@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { invoke } from '@tauri-apps/api/core'
+import { open } from '@tauri-apps/plugin-dialog'
 import { defineMessages, useVIntl } from '@modrinth/ui'
 import { computed, onMounted, ref } from 'vue'
 
@@ -22,6 +23,7 @@ const m = defineMessages({
   notReady: { id: 'fre-rust.setup.not-ready', defaultMessage: 'Minecraft resources not prepared' },
   details: { id: 'fre-rust.setup.details', defaultMessage: 'The Rust engine is part of FRE LAUNCH. Import the prepared game resources from your own Minecraft Java Edition installation; private resources are never included in public updates.' },
   source: { id: 'fre-rust.setup.source', defaultMessage: 'Prepared game resources folder (optional; leave blank for automatic detection)' },
+  browse: { id: 'fre-rust.setup.browse', defaultMessage: 'Choose folder' },
   import: { id: 'fre-rust.setup.import', defaultMessage: 'Import Minecraft resources' },
   importing: { id: 'fre-rust.setup.importing', defaultMessage: 'Importing game resources...' },
   importHelp: { id: 'fre-rust.setup.import-help', defaultMessage: 'Import a prepared resource folder containing horizon-resources.json. Your original files and worlds are not moved or deleted.' },
@@ -90,6 +92,17 @@ async function create() {
   finally { pending.value = null }
 }
 
+async function chooseSourceFolder() {
+  if (pending.value) return
+  error.value = ''
+  try {
+    const selected = await open({ multiple: false, directory: true })
+    if (typeof selected === 'string') source.value = selected
+  } catch (e) {
+    error.value = t(m.error, { reason: reason(e) })
+  }
+}
+
 async function importResources() {
   if (pending.value || !runtime.value?.installed || runtime.value.prepared) return
   pending.value = 'import'
@@ -156,7 +169,10 @@ defineExpose({ show, hide })
       <div v-if="runtime?.installed && !runtime.prepared" class="mt-4 rounded-xl border border-solid border-surface-5 p-4">
         <p class="m-0 text-xs text-secondary">{{ t(m.importHelp) }}</p>
         <form class="mt-3 flex flex-wrap gap-2" @submit.prevent="importResources">
-          <input v-model="source" class="min-w-48 flex-1 rounded-lg bg-button-bg p-3 text-contrast" :placeholder="t(m.source)" :disabled="!!pending" />
+          <input v-model="source" class="min-w-48 flex-1 rounded-lg bg-button-bg p-3 text-contrast" :aria-label="t(m.source)" :placeholder="t(m.source)" :disabled="!!pending" />
+          <button type="button" class="cursor-pointer rounded-lg border border-solid border-surface-4 bg-button-bg px-4 py-2 font-semibold text-contrast disabled:opacity-40" :disabled="!!pending" @click="chooseSourceFolder">
+            {{ t(m.browse) }}
+          </button>
           <button type="submit" class="rounded-lg border-0 bg-brand px-4 py-2 font-semibold text-white disabled:opacity-40" :disabled="!!pending">
             {{ pending === 'import' ? t(m.importing) : t(m.import) }}
           </button>
