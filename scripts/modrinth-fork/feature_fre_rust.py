@@ -56,7 +56,7 @@ def apply(root: Path):
             "const horizonWizard = ref(null)\nconst freRustWizard = ref(null)")
     exactly(app_vue, "provide('showHorizonWizard', showHorizonWizard)",
             """provide('showHorizonWizard', showHorizonWizard)
-function showFreRustWizard(profileId?: string) {
+function showFreRustWizard(profileId) {
     installationModal.value?.hide()
     freRustWizard.value?.show(profileId)
 }
