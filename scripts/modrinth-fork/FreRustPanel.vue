@@ -29,6 +29,11 @@ const m = defineMessages({
   importHelp: { id: 'fre-rust.setup.import-help', defaultMessage: 'Import a prepared resource folder containing horizon-resources.json. Your original files and worlds are not moved or deleted.' },
   none: { id: 'fre-rust.setup.none', defaultMessage: 'No Rust profiles yet.' },
   logs: { id: 'fre-rust.setup.logs', defaultMessage: 'Show game log' },
+  files: { id: 'fre-rust.setup.files', defaultMessage: 'Files' },
+  worlds: { id: 'fre-rust.setup.worlds', defaultMessage: 'Worlds' },
+  mods: { id: 'fre-rust.setup.mods', defaultMessage: 'Native mods' },
+  resourcepacks: { id: 'fre-rust.setup.resourcepacks', defaultMessage: 'Resource packs' },
+  shaderpacks: { id: 'fre-rust.setup.shaderpacks', defaultMessage: 'Shader packs' },
   error: { id: 'fre-rust.setup.error', defaultMessage: 'Error: {reason}' },
 })
 const visible = ref(false)
@@ -60,12 +65,15 @@ async function refresh() {
   window.dispatchEvent(new Event('fre-rust-library-refresh'))
 }
 
-async function show() {
+async function show(profileId?: string) {
   visible.value = true
   if (pending.value) return
   pending.value = 'load'
   error.value = ''
-  try { await refresh() }
+  try {
+    await refresh()
+    if (profileId && profiles.value.some(p => p.id === profileId)) selectedId.value = profileId
+  }
   catch (e) { error.value = t(m.error, { reason: reason(e) }) }
   finally { pending.value = null }
 }
@@ -126,6 +134,14 @@ async function play() {
     notice.value = await invoke<string>('plugin:fre-rust|rust_launch', { profileId: selectedId.value })
   } catch (e) { error.value = t(m.error, { reason: reason(e) }) }
   finally { pending.value = null }
+}
+
+async function openProfileFiles(folder: 'root' | 'saves' | 'mods' | 'resourcepacks' | 'shaderpacks') {
+  if (!selectedId.value || pending.value) return
+  error.value = ''
+  try {
+    await invoke<void>('plugin:fre-rust|rust_open_folder', { profileId: selectedId.value, folder })
+  } catch (e) { error.value = t(m.error, { reason: reason(e) }) }
 }
 
 async function showLogs() {
@@ -196,6 +212,17 @@ defineExpose({ show, hide })
               {{ pending === 'play' ? t(m.playing) : t(m.play) }}
             </button>
             <button type="button" class="rounded-lg bg-button-bg px-4 py-2 text-contrast disabled:opacity-40" :disabled="!!pending" @click="showLogs">{{ t(m.logs) }}</button>
+          </div>
+          <div class="mt-3 flex flex-wrap gap-2">
+            <button v-for="entry in [
+              { key: 'root', label: t(m.files) },
+              { key: 'saves', label: t(m.worlds) },
+              { key: 'mods', label: t(m.mods) },
+              { key: 'resourcepacks', label: t(m.resourcepacks) },
+              { key: 'shaderpacks', label: t(m.shaderpacks) },
+            ] as const" :key="entry.key" type="button"
+              class="cursor-pointer rounded-lg border border-solid border-surface-4 bg-button-bg px-3 py-2 text-xs text-contrast disabled:opacity-40"
+              :disabled="!!pending" @click="openProfileFiles(entry.key)">{{ entry.label }}</button>
           </div>
         </template>
       </div>
