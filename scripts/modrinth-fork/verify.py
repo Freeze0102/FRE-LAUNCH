@@ -132,6 +132,7 @@ def verify(root):
     cf_backend=(root/"apps/app/src/api/curseforge.rs").read_text(encoding="utf-8")
     cf_frontend=(root/"apps/app-frontend/src/components/ui/CurseForgeBrowser.vue").read_text(encoding="utf-8")
     cf_browse=(root/"apps/app-frontend/src/pages/Browse.vue").read_text(encoding="utf-8")
+    java_instance_layout=(root/"apps/app-frontend/src/pages/instance/layout.vue").read_text(encoding="utf-8")
     cf_mod=(root/"apps/app/src/api/mod.rs").read_text(encoding="utf-8")
     cf_main=(root/"apps/app/src/main.rs").read_text(encoding="utf-8")
     cf_build=(root/"apps/app/build.rs").read_text(encoding="utf-8")
@@ -145,7 +146,8 @@ def verify(root):
         ("CurseForge browser", cf_frontend, ["plugin:fre-curseforge|cf_search",
             "plugin:fre-curseforge|cf_install", "instanceId", "apiKey"]),
         ("Browse source selector", cf_browse, ["CurseForgeBrowser", "freContentSource",
-            "Modrinth</button>", "CurseForge</button>"]),
+            "route.query.source === 'curseforge'", "Modrinth</button>", "CurseForge</button>"]),
+        ("Java instance CurseForge entry", java_instance_layout, ["fre-launch.cf.for-instance", "source: 'curseforge'", "query: { i: instance.id"]),
         ("CurseForge Rust API module", cf_mod, ["pub mod curseforge;"]),
         ("CurseForge Rust plugin", cf_main, [".plugin(api::curseforge::init())"]),
         ("CurseForge Tauri permissions", cf_build, ['"fre-curseforge"', '"cf_search"', '"cf_install"']),
@@ -157,7 +159,7 @@ def verify(root):
     assert "api.curseforge.com" in cf_backend
     assert "https://api.curseforge.com" in cf_backend
     assert "npm install" not in cf_backend
-    for key in ("fre-launch.cf.source", "fre-launch.cf.api-key", "fre-launch.cf.install-error"):
+    for key in ("fre-launch.cf.source", "fre-launch.cf.api-key", "fre-launch.cf.install-error", "fre-launch.cf.for-instance"):
         assert key in app_uk and key in app_en, f"CurseForge translation missing: {key}"
 
     # The new implementation does not invoke a foreign Minecraft launcher.
@@ -182,25 +184,27 @@ def verify(root):
             '"--resources"', '"--home"', '"--game-dir"', '"--session-stdin"',
             "Credentials::get_default_credential", "online_profile_fresh",
             "verify_native_client", "Sha256::new", "RUNNING_PROFILES",
-            "profile_id_valid", "read_profile",
+            "profile_id_valid", "read_profile", "safe_game_folder", "rust_open_folder", "explorer.exe",
         ]),
         (rust_panel, [
             "plugin:fre-rust|rust_import_resources", "plugin:fre-rust|rust_create_profile", "plugin:fre-rust|rust_launch",
             "plugin:fre-rust|rust_profiles", "plugin:fre-rust|rust_runtime",
-            "fre-rust-library-refresh", "chooseSourceFolder", "@tauri-apps/plugin-dialog",
+            "fre-rust-library-refresh", "chooseSourceFolder", "@tauri-apps/plugin-dialog", "openProfileFiles", "rust_open_folder",
         ]),
         (rust_library, [
             "plugin:fre-rust|rust_profiles", "plugin:fre-rust|rust_launch",
-            "showFreRustWizard", "fre-rust-library-refresh", "fre-rust.library.empty",
+            "showFreRustWizard", "fre-rust-library-refresh", "fre-rust.library.empty", "openFiles", "rust_open_folder",
         ]),
-        (rust_index, ["import FreRustLibrary", "<FreRustLibrary", "import HorizonLibrary", "<HorizonLibrary"]),
+        (rust_index, ["import FreRustLibrary", "<FreRustLibrary", "import HorizonLibrary", "<HorizonLibrary",
+            "#freRustProfiles", "<LibrarySection :instances=\"instances\">"]),
         (rust_app, [
             "import FreRustPanel", "<FreRustPanel", "showFreRustWizard",
             "provide('showFreRustWizard', showFreRustWizard)",
         ]),
         (rust_stage, ["Minecraft (Rust)", "ctx.onHorizon?.()"]),
         (rust_main, [".plugin(api::fre_rust::init())", ".plugin(api::horizon::init())"]),
-        (rust_build, ['"fre-rust"', '"fre-horizon"', '"rust_create_profile"', '"rust_launch"']),
+        (rust_build, ['"fre-rust"', '"fre-horizon"', '"rust_create_profile"', '"rust_launch"',
+            '"rust_open_folder"', '"horizon_open_folder"']),
     ):
         for marker in markers:
             assert marker in source, f"Standalone Rust Minecraft integration missing: {marker}"
@@ -208,7 +212,8 @@ def verify(root):
         "fre-rust.setup.title", "fre-rust.setup.create", "fre-rust.setup.error",
         "fre-rust.setup.import", "fre-rust.setup.source", "fre-rust.setup.browse",
         "fre-rust.library.title", "fre-rust.library.play", "fre-rust.library.error", "fre-rust.library.empty",
-        "fre-launch.rust.library.empty",
+        "fre-launch.rust.library.empty", "fre-rust.setup.files", "fre-rust.library.files",
+        "fre-launch.rust.library.files", "fre-rust.library.mods-info",
     ):
         assert key in app_uk and key in app_en, f"FRE Rust localization missing: {key}"
     # Runtime is either entirely absent (Play remains disabled) or a
@@ -230,6 +235,10 @@ def verify(root):
     assert (root/"apps/app/src/api/horizon.rs").exists()
     assert (root/"apps/app-frontend/src/components/ui/HorizonRustPanel.vue").exists()
     legacy_library = (root/"apps/app-frontend/src/components/ui/HorizonLibrary.vue").read_text(encoding="utf-8")
+    library_shell = (root/"apps/app-frontend/src/components/ui/library/index.vue").read_text(encoding="utf-8")
+    assert '<slot name="freRustProfiles" />' in library_shell, "Rust cards must be inside the Java library surface"
+    assert '<WelcomeScreen v-if=' not in rust_index, "Rust-first users must see the library before creating a Java profile"
+    assert 'plugin:fre-horizon|horizon_open_folder' in legacy_library
     assert 'v-if="profiles.length || executable || error"' in legacy_library, "Missing Horizon profiles/errors must be visible"
     assert 'fre-launch.rust.library.empty' in legacy_library
     assert 'v-if="profiles.length > 0"' not in rust_library, "Native Rust library must expose Create before first profile"
@@ -283,6 +292,8 @@ def verify(root):
     assert (root / 'apps/app/src/api/fre_rust.rs').is_file()
     assert 'rust_launch' in (root / 'apps/app/build.rs').read_text()
     assert 'horizon_install_launcher' in (root / 'apps/app/build.rs').read_text(), 'Horizon compatibility must survive an update'
+    assert 'horizon_open_folder' in (root / 'apps/app/src/api/horizon.rs').read_text()
+    assert 'rust_open_folder' in (root / 'apps/app/src/api/fre_rust.rs').read_text()
     from feature_security_dependencies import workspace_overrides
     security = json.loads((Path(__file__).parent / 'security-dependencies.json').read_text())
     lock = (root / 'pnpm-lock.yaml').read_text(encoding='utf-8')
