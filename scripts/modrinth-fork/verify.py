@@ -144,7 +144,9 @@ def verify(root):
             "gameVersion", "modLoaderType", "file_length", "verify_hash", "add_project_from_path",
             "sync_content_files", "cf_search", "cf_install", "loader_type", "MINECRAFT_MODPACK_CLASS_ID", "category_id"]),
         ("CurseForge browser", cf_frontend, ["plugin:fre-curseforge|cf_search",
-            "plugin:fre-curseforge|cf_install", "instanceId", "apiKey", "contentType", "isModpack", "v-if=\"!isModpack\""]),
+            "plugin:fre-curseforge|cf_install", "instanceId", "apiKey", "contentType", "isModpack", "v-if=\"!isModpack\"",
+            "useApiSearch = ref(false)", "curseForgeWebsiteSearchUrl()", "openUrl(curseForgeWebsiteSearchUrl())",
+            "class=", "&search=", "importDownloadedMod", "add_project_from_path"]),
         ("Browse source selector", cf_browse, ["CurseForgeBrowser", "freContentSource",
             "route.query.source === 'curseforge'", "Modrinth</button>", "CurseForge</button>",
             "projectType === 'modpack'", ":content-type"]),
@@ -161,7 +163,8 @@ def verify(root):
     assert "https://api.curseforge.com" in cf_backend
     assert "npm install" not in cf_backend
     for key in ("fre-launch.cf.source", "fre-launch.cf.api-key", "fre-launch.cf.install-error",
-                "fre-launch.cf.for-instance", "fre-launch.cf.pack-intro", "fre-launch.cf.pack-search"):
+                "fre-launch.cf.for-instance", "fre-launch.cf.pack-intro", "fre-launch.cf.pack-search",
+                "fre-launch.cf.direct-intro", "fre-launch.cf.site-search", "fre-launch.cf.import-file"):
         assert key in app_uk and key in app_en, f"CurseForge translation missing: {key}"
 
     # The new implementation does not invoke a foreign Minecraft launcher.
