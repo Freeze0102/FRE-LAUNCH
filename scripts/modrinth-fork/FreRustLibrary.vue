@@ -10,6 +10,7 @@ const { formatMessage: t } = useVIntl()
 const m = defineMessages({
   title: { id: 'fre-rust.library.title', defaultMessage: 'Minecraft on Rust' },
   newProfile: { id: 'fre-rust.library.new', defaultMessage: 'Create Rust profile' },
+  empty: { id: 'fre-rust.library.empty', defaultMessage: 'No Rust profiles yet. Create one to see it in your library.' },
   ready: { id: 'fre-rust.library.ready', defaultMessage: 'Ready' },
   install: { id: 'fre-rust.library.install', defaultMessage: 'Game files required' },
   play: { id: 'fre-rust.library.play', defaultMessage: 'Play' },
@@ -68,12 +69,13 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <section v-if="profiles.length > 0" class="flex flex-col gap-3">
+  <section class="flex flex-col gap-3" aria-label="Minecraft on Rust">
     <div class="flex items-center justify-between gap-3">
       <h2 class="m-0 text-2xl font-semibold text-contrast">{{ t(m.title) }}</h2>
       <button type="button" class="cursor-pointer rounded-lg bg-button-bg px-4 py-2 text-sm font-semibold text-contrast" @click="openRustWizard">{{ t(m.newProfile) }}</button>
     </div>
-    <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+    <p v-if="!profiles.length && !error" class="m-0 rounded-xl border border-solid border-surface-4 bg-bg-raised p-4 text-sm text-secondary">{{ t(m.empty) }}</p>
+    <div v-if="profiles.length" class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
       <article v-for="profile in profiles" :key="profile.id" class="flex min-h-36 flex-col justify-between gap-3 rounded-xl border border-solid border-surface-4 bg-bg-raised p-4">
         <div class="flex items-center gap-3">
           <div class="flex size-12 items-center justify-center rounded-lg bg-button-bg text-xl font-semibold text-brand">R</div>
