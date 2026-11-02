@@ -148,15 +148,16 @@ jobs:
           Copy-Item -LiteralPath $env:PREVIEW_INSTALLER -Destination $target
           (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash.ToLowerInvariant() |
             Set-Content -LiteralPath 'preview-artifacts/SHA256.txt'
-          @"
-          FRE LAUNCH v0.5.10 preview from main commit $env:GITHUB_SHA.
-          UNSIGNED TEST BUILD, not a signed update for installed v0.5.9.
-          Microsoft Defender scan and clean installation startup smoke passed in Windows CI.
-          Includes Java in-app Modrinth catalog, optional approved-key CurseForge search,
-          Rust/Horizon file viewing, and detached Horizon Play.
-          This preview never contains private Minecraft game resources.
-          To publish an automatic update, restore the ORIGINAL 0.5.9 Tauri signing key.
-          "@ | Set-Content -LiteralPath 'preview-artifacts/README.txt' -Encoding utf8
+          $notes = @(
+            "FRE LAUNCH v0.5.10 preview from main commit $env:GITHUB_SHA."
+            'UNSIGNED TEST BUILD, not a signed update for installed v0.5.9.'
+            'Microsoft Defender scan and clean installation startup smoke passed in Windows CI.'
+            'Includes Java in-app Modrinth catalog, optional approved-key CurseForge search,'
+            'Rust/Horizon file viewing, and detached Horizon Play.'
+            'This preview never contains private Minecraft game resources.'
+            'To publish an automatic update, restore the ORIGINAL 0.5.9 Tauri signing key.'
+          )
+          Set-Content -LiteralPath 'preview-artifacts/README.txt' -Value $notes -Encoding utf8
 
       - name: Upload Windows preview (not official release)
         uses: actions/upload-artifact@v4
