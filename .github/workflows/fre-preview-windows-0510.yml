@@ -54,6 +54,19 @@ jobs:
           python -m pip install 'Pillow>=11,<13'
           if ($LASTEXITCODE -ne 0) { throw 'Pillow setup failed' }
 
+      - name: Preflight Vue source patch anchors before lengthy Rust compilation
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $preflight = Join-Path $env:RUNNER_TEMP 'FRE-Preflight-Source'
+          if (Test-Path -LiteralPath $preflight) { throw 'Unexpected existing preflight folder' }
+          Copy-Item -LiteralPath 'vendor/modrinth' -Destination $preflight -Recurse -Force
+          python scripts/modrinth-fork/prepare.py $preflight --upstream-sha 4ccf4d51804627cd0687ce7dfd5004f20c267acc
+          if ($LASTEXITCODE -ne 0) { throw 'FRE LAUNCH source patch preflight failed' }
+          python scripts/modrinth-fork/verify.py $preflight
+          if ($LASTEXITCODE -ne 0) { throw 'FRE LAUNCH source verification preflight failed' }
+          Write-Host 'All Vue/Rust integration patches applied to the pinned Modrinth source.'
+
       - name: Build MIT-only native game engine
         shell: pwsh
         run: |
