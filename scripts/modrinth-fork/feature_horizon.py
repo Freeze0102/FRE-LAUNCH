@@ -34,7 +34,7 @@ def apply(root: Path):
             '''            .plugin(
                 "fre-horizon",
                 InlinedPlugin::new()
-                    .commands(&["horizon_instances", "horizon_create", "horizon_play", "horizon_logs", "horizon_versions", "horizon_install_version", "horizon_set_version", "horizon_prepare", "horizon_install_launcher", "horizon_detect_launcher", "horizon_status", "horizon_open_launcher", "horizon_direct_play", "horizon_open_folder"])
+                    .commands(&["horizon_instances", "horizon_create", "horizon_play", "horizon_logs", "horizon_versions", "horizon_install_version", "horizon_set_version", "horizon_prepare", "horizon_install_launcher", "horizon_detect_launcher", "horizon_status", "horizon_open_launcher", "horizon_direct_play", "horizon_open_folder", "horizon_list_files"])
                     .default_permission(DefaultPermissionRule::AllowAllCommands),
             )
             .plugin(
