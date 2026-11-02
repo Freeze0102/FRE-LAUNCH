@@ -204,7 +204,10 @@ jobs:
           New-Item -ItemType Directory -Path preview-pending -Force | Out-Null
           Copy-Item -LiteralPath $installers[0].FullName -Destination 'preview-pending/FRE-LAUNCH-v0.5.10-Windows-x64-Setup.exe'
           Copy-Item -LiteralPath $launcher -Destination 'preview-pending/FRE LAUNCH.exe'
-          $hashes = foreach ($name in @('FRE-LAUNCH-v0.5.10-Windows-x64-Setup.exe', 'FRE LAUNCH.exe')) {
+          $engine = 'scripts/modrinth-fork/fre-rust-runtime/fre-rust-client.exe'
+          if (-not (Test-Path -LiteralPath $engine -PathType Leaf)) { throw 'Native Rust client missing from bundle' }
+          Copy-Item -LiteralPath $engine -Destination 'preview-pending/fre-rust-client.exe'
+          $hashes = foreach ($name in @('FRE-LAUNCH-v0.5.10-Windows-x64-Setup.exe', 'FRE LAUNCH.exe', 'fre-rust-client.exe')) {
             $digest = (Get-FileHash -LiteralPath (Join-Path 'preview-pending' $name) -Algorithm SHA256).Hash
             "$name|$digest"
           }
@@ -223,7 +226,7 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $manifest = 'preview-pending/SHA256-MANIFEST.txt'
           if (-not (Test-Path -LiteralPath $manifest -PathType Leaf)) { throw 'Preview digest manifest missing' }
-          $expectedNames = @('FRE-LAUNCH-v0.5.10-Windows-x64-Setup.exe', 'FRE LAUNCH.exe')
+          $expectedNames = @('FRE-LAUNCH-v0.5.10-Windows-x64-Setup.exe', 'FRE LAUNCH.exe', 'fre-rust-client.exe')
           $entries = @(Get-Content -LiteralPath $manifest)
           if ($entries.Count -ne $expectedNames.Count) { throw 'Incorrect preview digest manifest' }
           foreach ($i in 0..($expectedNames.Count - 1)) {
@@ -242,7 +245,8 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $files = @(
             'preview-pending/FRE-LAUNCH-v0.5.10-Windows-x64-Setup.exe',
-            'preview-pending/FRE LAUNCH.exe'
+            'preview-pending/FRE LAUNCH.exe',
+            'preview-pending/fre-rust-client.exe'
           )
           & ./.github/scripts/scan-preview-defender.ps1 -Paths $files
 
