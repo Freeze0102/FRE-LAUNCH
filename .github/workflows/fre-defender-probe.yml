@@ -1,0 +1,32 @@
+name: FRE LAUNCH Defender scanner probe (no compilation)
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/fre-defender-probe.yml'
+      - '.github/scripts/scan-preview-defender.ps1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  defender-scanner:
+    runs-on: windows-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout the scanner without building the app
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Scan an unmodified Microsoft Windows binary with Defender
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $probe = Join-Path $env:RUNNER_TEMP 'FRE-Defender-Probe.exe'
+          Copy-Item -LiteralPath "$env:WINDIR/System32/cmd.exe" -Destination $probe
+          & ./.github/scripts/scan-preview-defender.ps1 -Paths @($probe)
+          if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { throw 'Defender scan failed' }
+          Write-Host 'Scanner operational. No application was compiled or published.'
