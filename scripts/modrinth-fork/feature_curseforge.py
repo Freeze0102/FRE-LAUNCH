@@ -80,7 +80,7 @@ def apply(root: Path):
 \t\t<BrowsePageLayout>''',
             '''<template>
 \t<div class="flex flex-col gap-2 p-6">
-\t\t<div v-if="projectType === 'mod'" class="flex flex-wrap items-center gap-2 rounded-xl border border-solid border-surface-4 bg-bg-raised p-2">
+\t\t<div v-if="projectType === 'mod' || projectType === 'modpack'" class="flex flex-wrap items-center gap-2 rounded-xl border border-solid border-surface-4 bg-bg-raised p-2">
 \t\t\t<span class="mr-2 px-2 text-sm text-secondary">{{ formatMessage(sourceMessages.sourceLabel) }}</span>
 \t\t\t<button
 \t\t\t\ttype="button"
@@ -98,13 +98,14 @@ def apply(root: Path):
 \t\t\t>CurseForge</button>
 \t\t</div>
 \t\t<CurseForgeBrowser
-\t\t\tv-if="projectType === 'mod' && freContentSource === 'curseforge'"
+\t\t\tv-if="(projectType === 'mod' || projectType === 'modpack') && freContentSource === 'curseforge'"
 \t\t\t:instance-id="String(route.query.i ?? '')"
+\t\t\t:content-type="projectType === 'modpack' ? 'modpack' : 'mod'"
 \t\t/>
 \t\t<BrowsePageLayout v-else>''')
     exactly(browse,
             '<Teleport v-if="browseRouteActive" to="#sidebar-teleport-target">',
-            '<Teleport v-if="browseRouteActive && (projectType !== \'mod\' || freContentSource === \'modrinth\')" to="#sidebar-teleport-target">')
+            '<Teleport v-if="browseRouteActive && (projectType !== \'mod\' && projectType !== \'modpack\' || freContentSource === \'modrinth\')" to="#sidebar-teleport-target">')
     exactly(browse,
             "const freContentSource = ref<'modrinth' | 'curseforge'>(route.query.source === 'curseforge' ? 'curseforge' : 'modrinth')",
             '''const freContentSource = ref<'modrinth' | 'curseforge'>(route.query.source === 'curseforge' ? 'curseforge' : 'modrinth')
