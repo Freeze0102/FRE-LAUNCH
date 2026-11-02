@@ -208,6 +208,7 @@ def verify(root):
         "fre-rust.setup.title", "fre-rust.setup.create", "fre-rust.setup.error",
         "fre-rust.setup.import", "fre-rust.setup.source", "fre-rust.setup.browse",
         "fre-rust.library.title", "fre-rust.library.play", "fre-rust.library.error", "fre-rust.library.empty",
+        "fre-launch.rust.library.empty",
     ):
         assert key in app_uk and key in app_en, f"FRE Rust localization missing: {key}"
     # Runtime is either entirely absent (Play remains disabled) or a
@@ -228,6 +229,10 @@ def verify(root):
     # the external launcher or imports existing worlds without consent.
     assert (root/"apps/app/src/api/horizon.rs").exists()
     assert (root/"apps/app-frontend/src/components/ui/HorizonRustPanel.vue").exists()
+    legacy_library = (root/"apps/app-frontend/src/components/ui/HorizonLibrary.vue").read_text(encoding="utf-8")
+    assert 'v-if="profiles.length || executable || error"' in legacy_library, "Missing Horizon profiles/errors must be visible"
+    assert 'fre-launch.rust.library.empty' in legacy_library
+    assert 'v-if="profiles.length > 0"' not in rust_library, "Native Rust library must expose Create before first profile"
     assert "horizon-launcher.exe" not in rust_backend
     assert "horizon-launcher.exe" not in rust_panel
     assert "horizon-launcher.exe" not in rust_library
