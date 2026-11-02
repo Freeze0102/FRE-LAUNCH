@@ -73,7 +73,7 @@ def apply(root: Path):
     exactly(browse,
             "const projectType = ref<ProjectType>(route.params.projectType as ProjectType)",
             "const projectType = ref<ProjectType>(route.params.projectType as ProjectType)\n"
-            "const freContentSource = ref<'modrinth' | 'curseforge'>('modrinth')")
+            "const freContentSource = ref<'modrinth' | 'curseforge'>(route.query.source === 'curseforge' ? 'curseforge' : 'modrinth')")
     exactly(browse,
             '''<template>
 \t<div class="flex flex-col gap-2 p-6">
@@ -106,13 +106,30 @@ def apply(root: Path):
             '<Teleport v-if="browseRouteActive" to="#sidebar-teleport-target">',
             '<Teleport v-if="browseRouteActive && (projectType !== \'mod\' || freContentSource === \'modrinth\')" to="#sidebar-teleport-target">')
     exactly(browse,
-            "const freContentSource = ref<'modrinth' | 'curseforge'>('modrinth')",
-            '''const freContentSource = ref<'modrinth' | 'curseforge'>('modrinth')
-const sourceMessages = defineMessages({
+            "const freContentSource = ref<'modrinth' | 'curseforge'>(route.query.source === 'curseforge' ? 'curseforge' : 'modrinth')",
+            '''const sourceMessages = defineMessages({
     sourceLabel: { id: 'fre-launch.cf.source', defaultMessage: 'Mod source' },
 })''')
 
-    print("FRE LAUNCH CurseForge source selector, approved API search and verified mod installation added.")
+    # A Java instance's own detail screen offers CurseForge in the same
+    # content-management context. It opens the catalog with its exact ID,
+    # so the user cannot accidentally install to the wrong game profile.
+    layout = root / "apps/app-frontend/src/pages/instance/layout.vue"
+    exactly(layout,
+            '\t\t\t<NavTabs :links="tabs" />',
+            '''\t\t\t<NavTabs :links="tabs" />
+\t\t\t<button
+\t\t\t\tv-if="!instance.quarantined && !instance.shared_instance && ['fabric', 'forge', 'neoforge', 'quilt'].includes(String(instance.loader).toLowerCase())"
+\t\t\t\ttype="button"
+\t\t\t\tclass="mt-3 cursor-pointer rounded-lg border border-solid border-surface-4 bg-button-bg px-4 py-2 text-sm font-semibold text-contrast transition-colors hover:bg-bg-raised"
+\t\t\t\t@click="router.push({ path: '/browse/mod', query: { i: instance.id, source: 'curseforge' } })"
+\t\t\t>{{ formatMessage(messages.freCurseforge) }}</button>''')
+    exactly(layout,
+            "const messages = defineMessages({",
+            """const messages = defineMessages({
+\tfreCurseforge: { id: 'fre-launch.cf.for-instance', defaultMessage: 'Find CurseForge mods for this instance' },""")
+
+    print("FRE LAUNCH CurseForge is available from modded Java instances and the source selector.")
 
 if __name__ == "__main__":
     raise SystemExit("Import through prepare.py")
