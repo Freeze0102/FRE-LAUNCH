@@ -45,6 +45,25 @@ foreach ($relative in @('LICENSE', 'research-lock.json', 'crates\horizon-client\
     }
 }
 
+# Prevent packaging a gameplay regression when the pinned Rust source changes.
+# These source guards do not replace tests inside the actual game.
+$mechanics = @(
+    @('crates\horizon-client\src\game\beds.rs', 'destroy_straw_bed'),
+    @('crates\horizon-client\src\game\remote.rs', 'release_use_for_keybind_screen'),
+    @('crates\horizon-world\src\level\interact.rs', 'Class::Note'),
+    @('crates\horizon-world\src\level\redstone.rs', 'note_play'),
+    @('crates\horizon-world\src\level\redstone.rs', 'note_trigger_event'),
+    @('crates\horizon-world\src\level\redstone.rs', 'note_neighbor_changed')
+)
+foreach ($check in $mechanics) {
+    $sourceFile = Join-Path $SourceDir $check[0]
+    if (!(Test-Path -LiteralPath $sourceFile -PathType Leaf) -or
+        !(Select-String -LiteralPath $sourceFile -SimpleMatch -Quiet -Pattern $check[1])) {
+        throw "Pinned Rust gameplay behaviour changed: $($check[0]) missing $($check[1]); review before packaging."
+    }
+}
+Write-Host 'Pinned bed, inventory and note-block mechanics source checks passed (not an in-game test).'
+
 Write-Host 'Compiling native game and private-resource preparer (no external launcher)...'
 Push-Location $SourceDir
 try {
