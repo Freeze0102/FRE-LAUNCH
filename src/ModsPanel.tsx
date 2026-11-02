@@ -38,10 +38,10 @@ const categoryLists:Record<string,{id:string;label:string}[]>={
     {id:"utility",label:"Утиліти"},{id:"worldgen",label:"Генерація світу"}]
 };
 
-export default function ModsPanel({version, instanceId, initialProject, onServers, onPackInstalled, onImportPack, importBusy}: {
+export default function ModsPanel({version, instanceId, initialProject, onServers, onPackInstalled, onImportPack, importBusy, onContentInstalled}: {
   version: string; instanceId: string; initialProject?: ModrinthHit | null;
   onServers?:()=>void;
-  onImportPack:()=>void;importBusy:boolean;
+  onImportPack:()=>void;importBusy:boolean;onContentInstalled?:()=>void;
   onPackInstalled?:(instance:{id:string;name:string;version:string;memoryMb:number;iconUrl?:string|null})=>void;
 }) {
   const [query,setQuery]=useState("");
@@ -149,12 +149,12 @@ export default function ModsPanel({version, instanceId, initialProject, onServer
         }
         const added=await invoke<string[]>("install_fabric_mod",{instanceId,projectId:opened.project_id,versionId:chosenVersion});
         setMessage(`Встановлено: ${added.join(", ")}`);
-        await refreshMods();
+        await refreshMods();onContentInstalled?.();
       } else if(opened.project_type==="resourcepack"||opened.project_type==="shader") {
         const command=opened.project_type==="shader"?"install_shaderpack":"install_resourcepack";
         const response=await invoke<string>(command,{instanceId,projectId:opened.project_id,versionId:chosenVersion});
         setMessage(opened.project_type==="shader"?`${response}. Для роботи шейдерів також потрібен Iris або інший сумісний шейдерний завантажувач.`:response);
-        await refreshMods();
+        await refreshMods();onContentInstalled?.();
       } else {throw Error("Для цієї категорії автоматичне встановлення поки недоступне.");}
     } catch(e){setError(String(e));}finally{setBusy(false);}
   }
@@ -172,13 +172,13 @@ export default function ModsPanel({version, instanceId, initialProject, onServer
         const command=kind==="shader"?"install_shaderpack":"install_resourcepack";
         const response=await invoke<string>(command,{instanceId,projectId:hit.project_id});
         setMessage(kind==="shader"?`${response}. Для шейдерів потрібен Iris/інший сумісний завантажувач.`:response);
-        await refreshMods();
+        await refreshMods();onContentInstalled?.();
       } else if (kind==="mod") {
         if(!selectedInstance)throw Error("Спочатку вибери Fabric-збірку.");
         if (selectedInstance.loader!=="fabric")throw Error("Для встановлення модів вибери Fabric у налаштуваннях збірки.");
         const added=await invoke<string[]>("install_fabric_mod",{instanceId,projectId:hit.project_id});
         setMessage(`Встановлено ${added.length} модів разом із потрібними залежностями: ${added.join(", ")}`);
-        await refreshMods();
+        await refreshMods();onContentInstalled?.();
       }
     } catch(err){setError(String(err));}
     finally{setBusy(false);}
@@ -187,7 +187,7 @@ export default function ModsPanel({version, instanceId, initialProject, onServer
     setBusy(true);setError("");setMessage("");
     try {
       await invoke("toggle_installed_mod",{instanceId,filename:mod.filename});
-      await refreshMods();
+      await refreshMods();onContentInstalled?.();
     } catch(err){setError(String(err));}
     finally{setBusy(false);}
   }
@@ -196,7 +196,7 @@ export default function ModsPanel({version, instanceId, initialProject, onServer
     setBusy(true);setError("");setMessage("");
     try {
       await invoke("remove_installed_mod",{instanceId,filename:mod.filename});
-      await refreshMods();
+      await refreshMods();onContentInstalled?.();
     } catch(err){setError(String(err));}
     finally{setBusy(false);}
   }
@@ -222,7 +222,7 @@ export default function ModsPanel({version, instanceId, initialProject, onServer
     setBusy(true);setError("");setMessage("");
     try{
       await invoke("toggle_installed_pack",{instanceId,kind:packKind,filename:pack.filename});
-      await refreshMods();
+      await refreshMods();onContentInstalled?.();
     }catch(err){setError(String(err));}
     finally{setBusy(false);}
   }
@@ -231,7 +231,7 @@ export default function ModsPanel({version, instanceId, initialProject, onServer
     setBusy(true);setError("");setMessage("");
     try{
       await invoke("remove_installed_pack",{instanceId,kind:packKind,filename:pack.filename});
-      await refreshMods();
+      await refreshMods();onContentInstalled?.();
     }catch(err){setError(String(err));}
     finally{setBusy(false);}
   }
