@@ -47,6 +47,13 @@ const notice = ref('')
 const logs = ref('')
 const pending = ref<'load' | 'create' | 'play' | 'logs' | 'import' | null>(null)
 const playable = computed(() => runtime.value?.installed === true && runtime.value?.prepared === true)
+const gameFolders = computed(() => [
+  { key: 'root' as const, label: t(m.files) },
+  { key: 'saves' as const, label: t(m.worlds) },
+  { key: 'mods' as const, label: t(m.mods) },
+  { key: 'resourcepacks' as const, label: t(m.resourcepacks) },
+  { key: 'shaderpacks' as const, label: t(m.shaderpacks) },
+])
 
 function reason(e: unknown): string {
   return e instanceof Error ? e.message : String(e)
@@ -214,13 +221,7 @@ defineExpose({ show, hide })
             <button type="button" class="rounded-lg bg-button-bg px-4 py-2 text-contrast disabled:opacity-40" :disabled="!!pending" @click="showLogs">{{ t(m.logs) }}</button>
           </div>
           <div class="mt-3 flex flex-wrap gap-2">
-            <button v-for="entry in [
-              { key: 'root', label: t(m.files) },
-              { key: 'saves', label: t(m.worlds) },
-              { key: 'mods', label: t(m.mods) },
-              { key: 'resourcepacks', label: t(m.resourcepacks) },
-              { key: 'shaderpacks', label: t(m.shaderpacks) },
-            ] as const" :key="entry.key" type="button"
+            <button v-for="entry in gameFolders"" :key="entry.key" type="button"
               class="cursor-pointer rounded-lg border border-solid border-surface-4 bg-button-bg px-3 py-2 text-xs text-contrast disabled:opacity-40"
               :disabled="!!pending" @click="openProfileFiles(entry.key)">{{ entry.label }}</button>
           </div>
