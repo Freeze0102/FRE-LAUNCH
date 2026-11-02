@@ -111,6 +111,9 @@ def apply(root: Path):
             '''const freContentSource = ref<'modrinth' | 'curseforge'>(route.query.source === 'curseforge' ? 'curseforge' : 'modrinth')
 const sourceMessages = defineMessages({
     sourceLabel: { id: 'fre-launch.cf.source', defaultMessage: 'Mod source' },
+})
+watch(() => route.query.source, (source) => {
+    freContentSource.value = source === 'curseforge' ? 'curseforge' : 'modrinth'
 })''')
 
     # A Java instance's own detail screen offers CurseForge in the same
