@@ -221,7 +221,7 @@ defineExpose({ show, hide })
             <button type="button" class="rounded-lg bg-button-bg px-4 py-2 text-contrast disabled:opacity-40" :disabled="!!pending" @click="showLogs">{{ t(m.logs) }}</button>
           </div>
           <div class="mt-3 flex flex-wrap gap-2">
-            <button v-for="entry in gameFolders"" :key="entry.key" type="button"
+            <button v-for="entry in gameFolders" :key="entry.key" type="button"
               class="cursor-pointer rounded-lg border border-solid border-surface-4 bg-button-bg px-3 py-2 text-xs text-contrast disabled:opacity-40"
               :disabled="!!pending" @click="openProfileFiles(entry.key)">{{ entry.label }}</button>
           </div>
