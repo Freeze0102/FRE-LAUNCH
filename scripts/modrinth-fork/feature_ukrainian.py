@@ -319,7 +319,7 @@ NEW.update({
 # Distinct from Java game instance rows: Rust profiles appear as independent
 # cards sourced from the installed Horizon profile manifest.
 NEW.update({
-"fre-launch.rust.library.title":("Minecraft на Rust","Minecraft on Rust"),
+"fre-launch.rust.library.title":("Horizon — раніше створені збірки","Horizon — existing profiles"),
 "fre-launch.rust.library.subtitle":("Окремі збірки Horizon з власними світами, налаштуваннями й файлами гри.","Horizon profiles are separate game installations with their own worlds, options and game files."),
 "fre-launch.rust.library.version":("Версія {version}","Version {version}"),
 "fre-launch.rust.library.play":("Грати","Play"),
