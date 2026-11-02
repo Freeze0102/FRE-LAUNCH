@@ -9,6 +9,7 @@ import {
 import FabricOptions from "./FabricOptions";
 import GameFolders from "./GameFolders";
 import BackupsPanel from "./BackupsPanel";
+import ModsPanel from "./ModsPanel";
 
 export type Instance = {
   id:string;name:string;version:string;favorite:boolean;memoryMb:number;
@@ -43,6 +44,7 @@ export function InstancesPanel({version,active,setActive,setVersion,setMemory,na
   const [layout,setLayout]=useState<"grid"|"list">("grid");
   const [selected,setSelected]=useState<string|null>(null);
   const [tab,setTab]=useState<Tab>("content");
+  const [catalogOpen,setCatalogOpen]=useState(false);
   const [category,setCategory]=useState<Category>("mods");
   const [fileFilter,setFileFilter]=useState("");
   const [files,setFiles]=useState<Installed[]>([]);
@@ -109,7 +111,7 @@ export function InstancesPanel({version,active,setActive,setVersion,setMemory,na
   },[current?.id,tab]);
 
   function open(item:Instance){
-    setSelected(item.id);setTab("content");setCategory("mods");setFileFilter("");setWorldFilter("");
+    setSelected(item.id);setTab("content");setCatalogOpen(false);setCategory("mods");setFileFilter("");setWorldFilter("");
     setEditName(item.name);setEditRam(item.memoryMb);setEditJava(item.javaPath||"");
     setActive(item.id);setVersion(item.version);setMemory(item.memoryMb);
   }
@@ -275,9 +277,10 @@ export function InstancesPanel({version,active,setActive,setVersion,setMemory,na
         {tab==="content"&&<div className="fre-instance-content">
           <div className="fre-instance-content-head"><h3>Додатковий контент</h3><div>
             <button className="secondary" onClick={()=>void openFolder(current,category==="mods"?"mods":category)}><FolderOpen size={15}/> Завантажити файли</button>
-            <button className="fre-instance-browse-content" onClick={navigateMods}><Plus size={15}/> Пошук контенту</button>
+            <button className="fre-instance-browse-content" aria-expanded={catalogOpen} onClick={()=>setCatalogOpen(value=>!value)}><Plus size={15}/> {catalogOpen?"Закрити каталог":"Знайти моди й модпаки"}</button>
             <button className="secondary" title="Оновити список" aria-label="Оновити список" onClick={()=>void refreshFiles()} disabled={loadingFiles}><RefreshCw size={16}/></button>
           </div></div>
+          {catalogOpen&&<div className="fre-instance-embedded-catalog" aria-label="Внутрішній каталог модів і модпаків"><ModsPanel key={current.id} version={current.version} instanceId={current.id} onImportPack={onImportPack} importBusy={importBusy} onContentInstalled={()=>void refreshFiles()} onPackInstalled={()=>void refresh()}/></div>}
           <div className="fre-instance-content-filters">{categories.map(x=><button className={category===x.id?"active":""} onClick={()=>setCategory(x.id)} key={x.id}>{x.label}</button>)}</div>
           <div className="fre-instance-content-search"><Search size={16}/><input value={fileFilter} onChange={e=>setFileFilter(e.target.value)} placeholder="Шукати встановлені файли..."/></div>
           <div className="fre-instance-content-table">
