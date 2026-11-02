@@ -92,9 +92,6 @@ provide('showFreRustWizard', showFreRustWizard)""")
 \t\t\t</template>
 \t\t</LibrarySection>''')
     exactly(index,
-            '\t\t</LibrarySection>\n\t\t<FreRustLibrary />',
-            '\t\t</LibrarySection>')
-    exactly(index,
             '\t<HorizonLibrary v-if="isReady && !hasCreatedInstance" class="px-6 pb-6" />',
             '')
 
