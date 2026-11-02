@@ -381,7 +381,7 @@ async fn horizon_direct_play<R: tauri::Runtime>(
         .arg("--resources").arg(&resources)
         .stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
     #[cfg(windows)]
-    child.creation_flags(0x08000000); // no console window
+    child.creation_flags(0x00000008 | 0x00000200); // DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP: no terminal or Ctrl+C inheritance
     let mut child = child.spawn().map_err(|e| format!("Could not start the Rust client: {e}"))?;
     let pid = child.id().unwrap_or_default();
     let mut task = tokio::spawn(async move { child.wait().await });
