@@ -327,7 +327,7 @@ onUnmounted(() => {
         <div class="overflow-y-auto p-5">
           <div class="flex flex-wrap gap-2">
             <button type="button" class="rounded-lg border-0 bg-brand px-5 py-2 font-semibold text-white disabled:opacity-50"
-              :disabled="!!busy" @click="play(selected)">
+              :disabled="!!busy" @click="selected.ready ? play(selected) : manage(selected)">
               {{ busy === selected.key ? t(m.starting) : selected.ready ? '▶ ' + t(m.play) : t(m.setup) }}
             </button>
             <button type="button" class="rounded-lg bg-button-bg px-4 py-2 text-sm font-semibold" @click="manage(selected)">
