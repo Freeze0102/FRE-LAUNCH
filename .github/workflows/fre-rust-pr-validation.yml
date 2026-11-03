@@ -45,6 +45,12 @@ jobs:
         with:
           targets: x86_64-pc-windows-msvc
 
+      - name: Cache Rust dependencies between validation runs
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: FRE-Modrinth-Source -> target
+          cache-on-failure: true
+
       - name: Install pinned pnpm and Python dependencies
         shell: pwsh
         run: |
