@@ -207,8 +207,8 @@ async function deleteFreRustQuick() {
     />
 \t<div ref="container\"""")
     exactly(quick,
-            ':to="\`/instance/\${encodeURIComponent(instance.id)}\`"',
-            ':to="instance.freRustKind ? freRustDetailUrl(instance) : \`/instance/\${encodeURIComponent(instance.id)}\`"')
+            ':to="`/instance/${encodeURIComponent(instance.id)}`"',
+            ':to="instance.freRustKind ? freRustDetailUrl(instance) : `/instance/${encodeURIComponent(instance.id)}`"')
 
     # The main library's native cards use the actual shared Java selection
     # state. The special ID namespace is crucial: Java bulk operations cannot
