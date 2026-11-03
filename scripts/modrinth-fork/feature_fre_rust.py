@@ -27,6 +27,7 @@ def apply(root: Path):
     shutil.copyfile(here / "RustInstanceGrid.vue", frontend / "src/components/ui/library/instance-group/RustInstanceGrid.vue")
     shutil.copyfile(here / "RustInstanceFiles.vue", frontend / "src/components/ui/RustInstanceFiles.vue")
     shutil.copyfile(here / "RustInstancePage.vue", frontend / "src/pages/RustInstancePage.vue")
+    shutil.copyfile(here / "RustNativeMods.vue", frontend / "src/components/ui/RustNativeMods.vue")
     shutil.copyfile(here / "rust-library-group.ts", frontend / "src/components/ui/library/rust-library-group.ts")
 
     # Theseus exports its minecraft_auth API but keeps State.pool private.
@@ -61,7 +62,7 @@ pub async fn get_default_user()""",
             '''            .plugin(
                 "fre-rust",
                 InlinedPlugin::new()
-                    .commands(&["rust_profiles", "rust_create_profile", "rust_rename_profile", "rust_delete_profile", "rust_runtime", "rust_import_resources", "rust_launch", "rust_logs", "rust_open_folder", "rust_list_files"])
+                    .commands(&["rust_profiles", "rust_create_profile", "rust_rename_profile", "rust_delete_profile", "rust_runtime", "rust_import_resources", "rust_mods", "rust_launch", "rust_logs", "rust_open_folder", "rust_list_files"])
                     .default_permission(DefaultPermissionRule::AllowAllCommands),
             )
             .plugin(
@@ -466,6 +467,11 @@ onUnmounted(() => {
                 'Automatic preparation requires an owned Minecraft Java Edition installation and an active Microsoft account.',
             ),
             'fre-rust.page.choose-resources': ('Обрати папку ресурсів', 'Choose prepared resources folder'),
+            'fre-rust.page.sign-in-horizon': ('Увійти у Horizon через Microsoft', 'Sign in to Horizon with Microsoft'),
+            'fre-rust.page.first-run-hint': (
+                'Перший запуск: FRE LAUNCH використає наявні файли Minecraft 26.3 або завантажить відсутні з Mojang через Horizon. Може знадобитися одноразовий вхід у Horizon під акаунтом із придбаною Java Edition. Наступні запуски використовують кеш.',
+                'First run: FRE LAUNCH uses cached Minecraft 26.3 or downloads missing files from Mojang through Horizon. A Microsoft login owning Java Edition may be required in Horizon once. Further launches reuse the cached resources.',
+            ),
             'fre-rust.page.resources': ('Файли гри', 'Game resources'),
             'fre-rust.page.preparing': ('Перевірка локальних ресурсів…', 'Checking locally available resources…'),
             'fre-rust.page.tab.general': ('Загальні', 'General'),
@@ -477,9 +483,22 @@ onUnmounted(() => {
                 'Permanently deletes this Rust instance and its worlds. Shared game resources are kept.',
             ),
             'fre-rust.page.not-downloaded': (
-                'Порожній профіль не встановлює Minecraft автоматично. Підготуй файли зі своєї придбаної гри.',
-                'An empty profile does not install Minecraft automatically. Prepare files from your owned game.',
+                'Якщо Minecraft ще немає на комп’ютері, Horizon завантажить перевірені файли з Mojang для авторизованого власника.',
+                'When local files are missing, Horizon downloads verified Minecraft assets from Mojang for an authenticated owner.',
             ),
+            'fre-rust.mods.title': ('Нативні моди Horizon', 'Horizon native mods'),
+            'fre-rust.mods.explanation': (
+                'Пошук в офіційному каталозі Horizon. Моди перевіряються та встановлюються лише в цю Rust-збірку. Java-моди Fabric і Forge не є нативними.',
+                'Search the official Horizon registry. Verified mods are installed only into this Rust instance. Fabric and Forge JARs are not native.',
+            ),
+            'fre-rust.mods.search': ('Пошук', 'Search'),
+            'fre-rust.mods.placeholder': ('Знайти мод для Horizon…', 'Find a Horizon mod…'),
+            'fre-rust.mods.installed': ('Встановлено', 'Installed'),
+            'fre-rust.mods.empty': ('У цій збірці ще немає модів із каталогу Horizon.', 'No mods installed from the Horizon registry yet.'),
+            'fre-rust.mods.install': ('Встановити', 'Install'),
+            'fre-rust.mods.remove': ('Видалити', 'Remove'),
+            'fre-rust.mods.refresh': ('Оновити', 'Refresh'),
+            'fre-rust.mods.none': ('Моди не знайдено.', 'No matching native mods found.'),
         }
         for key, pair in detail_messages.items():
             messages[key] = {'message': pair[position]}
