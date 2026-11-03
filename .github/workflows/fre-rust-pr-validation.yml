@@ -1,0 +1,83 @@
+name: FRE Rust first-run PR validation
+# Branch-only validation for the Rust onboarding change. Does not sign, publish
+# or download any proprietary Minecraft resources.
+on:
+  push:
+    branches:
+      - fix/rust-onboarding-horizon-mods-20261103
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fre-rust-pr-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  generated-windows-source:
+    runs-on: windows-latest
+    timeout-minutes: 70
+    steps:
+      - name: Checkout patch sources and pinned Modrinth submodule
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Install Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Install Rust MSVC
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Install pinned pnpm and Python dependencies
+        shell: pwsh
+        run: |
+          npm.cmd install -g pnpm@12.11.2
+          if ($LASTEXITCODE -ne 0) { throw 'pnpm installation failed' }
+          python -m pip install 'Pillow>=11,<13'
+          if ($LASTEXITCODE -ne 0) { throw 'Pillow installation failed' }
+
+      - name: Generate FRE LAUNCH Vue source and check assets / permissions
+        shell: pwsh
+        run: |
+          ./FRE-MODRINTH-LOCAL.ps1
+          if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { throw 'Source generation failed' }
+          if (!(Test-Path 'FRE-Modrinth-Source/apps/app/src/api/fre_rust.rs')) {
+            throw 'Rust Tauri backend was not generated'
+          }
+
+      - name: Install pinned workspace dependencies
+        shell: pwsh
+        working-directory: FRE-Modrinth-Source
+        run: |
+          pnpm.cmd --filter '@modrinth/app...' install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { throw 'pnpm workspace installation failed' }
+
+      - name: Build locale coverage and check Vue TypeScript
+        shell: pwsh
+        working-directory: FRE-Modrinth-Source
+        run: |
+          pnpm.cmd -w i18n:coverage
+          if ($LASTEXITCODE -ne 0) { throw 'Locale coverage generation failed' }
+          pnpm.cmd --filter '@modrinth/app-frontend' run tsc:check
+          if ($LASTEXITCODE -ne 0) { throw 'Vue type checking failed' }
+
+      - name: Run Vue components and native mod source regression tests
+        shell: pwsh
+        run: |
+          node scripts/modrinth-fork/test_frontend.cjs FRE-Modrinth-Source
+          if ($LASTEXITCODE -ne 0) { throw 'Rust Vue regression tests failed' }
+
+      - name: Check Tauri Rust backend compilation
+        shell: pwsh
+        working-directory: FRE-Modrinth-Source
+        run: |
+          cargo check --manifest-path apps/app/Cargo.toml --locked
+          if ($LASTEXITCODE -ne 0) { throw 'Tauri backend compilation failed' }
