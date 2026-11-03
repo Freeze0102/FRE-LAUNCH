@@ -130,7 +130,9 @@ async function handleFreRustOrJavaCreate(config) {
                 // open the in-app importer with the exact new profile.
             }
         }
-        if (!status.prepared) showFreRustWizard(profile.id)
+        // Keep the user in the ordinary Library after Create. The Rust
+        // card's Setup action opens the importer if resources are still needed.
+        window.dispatchEvent(new Event('fre-rust-library-refresh'))
     } catch (error) {
         config.loading.value = false
         handleError(error)
