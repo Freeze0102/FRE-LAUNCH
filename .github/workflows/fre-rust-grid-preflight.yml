@@ -1,4 +1,4 @@
-name: FRE LAUNCH Rust management and Play corrected preflight
+name: FRE LAUNCH Rust native management and accessible menu preflight
 
 on:
   push:
