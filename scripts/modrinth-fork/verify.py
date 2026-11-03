@@ -195,7 +195,7 @@ def verify(root):
     for source, markers in (
         (rust_backend, [
             'Builder::new("fre-rust")', "async fn rust_create_profile",
-            "async fn rust_import_resources", "async fn rust_launch", "async fn rust_profiles", "async fn rust_runtime",
+            "async fn rust_import_resources", "async fn rust_launch", "async fn rust_rename_profile", "async fn rust_delete_profile", "async fn rust_profiles", "async fn rust_runtime",
             "async fn rust_logs", '"fre-rust-client.exe"', 'Command::new(client)',
             '"--resources"', '"--home"', '"--game-dir"', '"--session-stdin"',
             "theseus::minecraft_auth::fre_rust_default_credentials", "online_profile_fresh",
@@ -220,7 +220,7 @@ def verify(root):
         ]),
         (rust_stage, ["Minecraft (Rust)"]),
         (rust_main, [".plugin(api::fre_rust::init())", ".plugin(api::horizon::init())"]),
-        (rust_build, ['"fre-rust"', '"fre-horizon"', '"rust_create_profile"', '"rust_launch"',
+        (rust_build, ['"fre-rust"', '"fre-horizon"', '"rust_create_profile"', '"rust_rename_profile"', '"rust_delete_profile"', '"rust_launch"',
             '"rust_open_folder"', '"rust_list_files"', '"horizon_open_folder"', '"horizon_list_files"']),
     ):
         for marker in markers:
@@ -286,7 +286,9 @@ def verify(root):
         "Rust profile must open a Java-like full page, not a self-built modal"
     )
     for marker in ('<PageHeader', '<PageHeaderActions', '<PageHeaderMetadata',
-                   '<NavTabs', '<RustInstanceFiles', 'useRootBreadcrumb',
+                   '<NavTabs', '<RustInstanceFiles', '<ConfirmDeleteInstanceModal',
+                   '<NewModal', 'rust_rename_profile', 'rust_delete_profile',
+                   'useRootBreadcrumb',
                    'plugin:fre-rust|rust_launch', 'plugin:fre-horizon|horizon_direct_play',
                    'showFreRustWizard', 'showHorizonWizard'):
         assert marker in rust_detail, f"Java-like Rust profile page incomplete: {marker}"
@@ -320,7 +322,12 @@ def verify(root):
     for translation in ('fre-rust.page.unavailable', 'fre-rust.page.content-note',
                         'fre-rust.page.no-logs', 'fre-rust.page.retry', 'fre-rust.files.read-only'):
         assert translation in app_uk and translation in app_en
-    assert '<WelcomeScreen v-if=' not in rust_index, "Rust-first users must see the library before creating a Java profile"
+    assert '<WelcomeScreen v-if="isReady && !hasCreatedInstance && rustHomeReady && !hasRustProfiles"' in rust_index, (
+        "Preserve original Home/Welcome when no Java or Rust profiles exist"
+    )
+    assert 'v-else-if="isReady && (hasCreatedInstance || hasRustProfiles)"' in rust_index, (
+        "Native Rust-only users must still see the library"
+    )
     assert 'plugin:fre-horizon|horizon_open_folder' in legacy_library
     assert 'v-if="profiles.length || executable || error"' in legacy_library, "Legacy Horizon component preserved for existing users"
     assert 'fre-launch.rust.library.empty' in legacy_library
