@@ -1,4 +1,4 @@
-name: FRE LAUNCH Rust loader Create, icons and Browse source check
+name: FRE LAUNCH Rust loader and all Java grouping regression preflight
 
 on:
   push:
