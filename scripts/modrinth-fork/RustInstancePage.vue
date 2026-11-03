@@ -50,7 +50,7 @@ const m = defineMessages({
   delete: { id: 'fre-rust.page.delete', defaultMessage: 'Delete instance' },
   install: { id: 'fre-rust.page.install', defaultMessage: 'Install game resources' },
   installing: { id: 'fre-rust.page.installing', defaultMessage: 'Preparing Minecraft…' },
-  installFailed: { id: 'fre-rust.page.install-failed', defaultMessage: 'Automatic preparation needs an installed, legally owned Minecraft Java Edition and an active Microsoft account.' },
+  installFailed: { id: 'fre-rust.page.install-failed', defaultMessage: 'Automatic preparation requires a Microsoft account that owns Minecraft Java Edition in FRE LAUNCH. The native resource preparer may require Java 25.' },
   chooseResources: { id: 'fre-rust.page.choose-resources', defaultMessage: 'Choose prepared resources folder' },
   firstRunHint: { id: 'fre-rust.page.first-run-hint', defaultMessage: 'FRE LAUNCH prepares Minecraft 26.3 using your own Microsoft Minecraft account, verified Mojang downloads and its bundled native game. No separate launcher is required.' },
   prepHelper: { id: 'fre-rust.page.prep-helper', defaultMessage: 'Checking native FRE LAUNCH setup…' },
