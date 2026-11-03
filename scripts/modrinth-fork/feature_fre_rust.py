@@ -25,6 +25,8 @@ def apply(root: Path):
     shutil.copyfile(here / "FreRustPanel.vue", frontend / "src/components/ui/FreRustPanel.vue")
     shutil.copyfile(here / "FreRustLibrary.vue", frontend / "src/components/ui/FreRustLibrary.vue")
     shutil.copyfile(here / "RustInstanceGrid.vue", frontend / "src/components/ui/library/instance-group/RustInstanceGrid.vue")
+    shutil.copyfile(here / "RustInstanceFiles.vue", frontend / "src/components/ui/RustInstanceFiles.vue")
+    shutil.copyfile(here / "RustInstancePage.vue", frontend / "src/pages/RustInstancePage.vue")
     shutil.copyfile(here / "rust-library-group.ts", frontend / "src/components/ui/library/rust-library-group.ts")
 
     # Theseus exports its minecraft_auth API but keeps State.pool private.
@@ -190,6 +192,19 @@ async function handleFreRustOrJavaCreate(config) {
 \t\t\t\t/>\n''',
             '')
 
+
+    # The same Java instance card now opens a real full-width route rather
+    # than a bespoke modal. No native Rust operation reaches Java's loader.
+    routes = frontend / "src/routes.js"
+    exactly(routes,
+            "\t\t{\n\t\t\tpath: '/instance/:id',",
+            """\t\t{
+            path: '/rust-instance/:kind(native|horizon)/:id',
+            name: 'RustInstance',
+            component: () => import('@/pages/RustInstancePage.vue'),
+        },
+\t\t{
+\t\t\tpath: '/instance/:id',""")
 
     # Keep independent Rust backend data, but show each profile in the SAME
     # virtualized card grid as Java instances. Never masquerade as GameInstance:
@@ -381,6 +396,21 @@ const visibleInstanceGroups = computed(() => {
             'and a Microsoft account that owns Java Edition. A Rust profile is not a Fabric modpack.',
         )
         messages['fre-rust.create.requirement'] = {'message': rust_requirement[position]}
+        detail_messages = {
+            'fre-rust.page.unavailable': ('Профіль Rust не знайдено.', 'Rust profile was not found.'),
+            'fre-rust.page.content-note': (
+                'Нативні Rust-моди зберігаються у файлах гри. Java-моди Fabric/Forge несумісні.',
+                'Native Rust mods are managed in the game files. Java Fabric/Forge mods are not compatible.',
+            ),
+            'fre-rust.page.no-logs': ('Журналів гри ще немає.', 'No local game logs yet.'),
+            'fre-rust.page.retry': ('Оновити', 'Refresh'),
+            'fre-rust.files.read-only': (
+                'Файли Rust наразі змінюються через провідник Windows.',
+                'Native Rust files are currently managed using your file explorer.',
+            ),
+        }
+        for key, pair in detail_messages.items():
+            messages[key] = {'message': pair[position]}
         locale.write_text(json.dumps(messages, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
 
     # Preserve the older Horizon adapter and its UI so an update does not
