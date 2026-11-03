@@ -286,7 +286,7 @@ def verify(root):
     )
     for marker in ('<PageHeader', '<PageHeaderActions', '<PageHeaderMetadata',
                    '<NavTabs', '<RustInstanceFiles', '<ConfirmDeleteInstanceModal',
-                   '<NewModal', 'rust_rename_profile', 'rust_delete_profile',
+                   '<TabbedModal', 'query="tab"', 'fre-rust-tab', 'rust_rename_profile', 'rust_delete_profile',
                    'useRootBreadcrumb',
                    'plugin:fre-rust|rust_launch', 'plugin:fre-horizon|horizon_direct_play',
                    'showHorizonWizard'):
