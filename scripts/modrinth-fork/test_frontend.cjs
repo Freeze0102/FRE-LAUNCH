@@ -12,7 +12,10 @@ const vue = workspace('vue')
 const compiler = rootRequire('@vue/compiler-sfc')
 
 function component(file, invoke, instances = [], options = {}) {
-  const text = fs.readFileSync(path.join(__dirname, file), 'utf8')
+  const filePath = file === 'RustInstanceGrid.vue'
+    ? path.join(source, 'apps/app-frontend/src/components/ui/library/instance-group/RustInstanceGrid.vue')
+    : path.join(__dirname, file)
+  const text = fs.readFileSync(filePath, 'utf8')
   const { descriptor, errors } = compiler.parse(text, { filename: file })
   assert.deepEqual(errors, [])
   compiler.compileScript(descriptor, { id: file })
