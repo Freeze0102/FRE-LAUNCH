@@ -677,3 +677,13 @@ test('Native Rust reuses Java quick switcher with real game route and avoids Jav
   assert.match(quick, /getInstanceIconUrl\(instance\.icon_path\)/)
   assert.match(quick, /freRustDetailUrl\(instance\)/)
 });
+
+
+test('Native Rust-only onboarding uses the original checklist but counts a Rust profile', () => {
+  const provider = fs.readFileSync(path.join(source, 'apps/app-frontend/src/providers/onboarding-checklist.ts'), 'utf8')
+  assert.match(provider, /hasNativeRustProfile/)
+  assert.match(provider, /plugin:fre-rust\|rust_profiles/)
+  assert.match(provider, /has_created_instance \?\? false\) \|\| hasNativeRustProfile\.value/)
+  assert.match(provider, /fre-rust-library-refresh/)
+  assert.doesNotMatch(provider, /showChecklist: computed\(\(\) => false/)
+});
