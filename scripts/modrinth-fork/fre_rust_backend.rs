@@ -10,7 +10,7 @@ use std::{
     process::Stdio,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 use tokio::io::AsyncWriteExt;
 
 const MAX_NAME: usize = 64;
@@ -533,8 +533,10 @@ async fn rust_import_resources<R: tauri::Runtime>(
         PathBuf::from(source.trim())
     };
     if !selected.is_dir() { return Err("Minecraft resource folder not found.".into()); }
+    let _ = app.emit("fre-rust-prepare-stage", "copy");
     let bytes = tokio::task::spawn_blocking(move || copy_prepared(&selected, &destination))
         .await.map_err(|e| e.to_string())??;
+    let _ = app.emit("fre-rust-prepare-stage", "ready");
     Ok(format!("Imported {bytes} bytes of your Minecraft resources into FRE LAUNCH."))
 }
 
