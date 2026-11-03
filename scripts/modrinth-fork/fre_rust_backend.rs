@@ -931,6 +931,46 @@ mod tests {
         assert!(verify_native_client(directory.path()).is_err());
     }
     #[test]
+    fn cached_rust_resources_require_correct_version_and_file_hashes() {
+        let temp = tempfile::tempdir().unwrap();
+        let files = [
+            ("facts_sha256", "facts.json", b"facts".as_slice()),
+            ("block_tags_sha256", "block-tags.json", b"tags".as_slice()),
+            ("collision_sha256", "cached-collision.nbt", b"collision".as_slice()),
+        ];
+        let mut manifest = serde_json::json!({"schema": 7, "minecraft": "26.3"});
+        for (key, name, bytes) in files {
+            fs::write(temp.path().join(name), bytes).unwrap();
+            manifest[key] = serde_json::Value::String(format!("{:x}", Sha256::digest(bytes)));
+        }
+        fs::write(
+            temp.path().join("horizon-resources.json"),
+            serde_json::to_vec(&manifest).unwrap(),
+        ).unwrap();
+        assert!(resources_valid(temp.path()), "a verified resource cache can be reused");
+        fs::write(temp.path().join("facts.json"), b"corrupt").unwrap();
+        assert!(!resources_valid(temp.path()), "a corrupt file cannot appear playable");
+        fs::write(temp.path().join("facts.json"), b"facts").unwrap();
+        assert!(resources_valid(temp.path()));
+        manifest["minecraft"] = "26.4".into();
+        fs::write(temp.path().join("horizon-resources.json"), serde_json::to_vec(&manifest).unwrap()).unwrap();
+        assert!(!resources_valid(temp.path()), "a resource set for another game version is not valid");
+    }
+
+    #[test]
+    fn incomplete_resources_are_preserved_for_retry() {
+        let temp = tempfile::tempdir().unwrap();
+        let old = temp.path().join("prepared");
+        fs::create_dir(&old).unwrap();
+        fs::write(old.join("world.txt"), b"do not delete").unwrap();
+        preserve_incomplete(&old).unwrap();
+        assert!(!old.exists());
+        let backups: Vec<_> = fs::read_dir(temp.path()).unwrap().flatten().collect();
+        assert_eq!(backups.len(), 1);
+        assert_eq!(fs::read(backups[0].path().join("world.txt")).unwrap(), b"do not delete");
+    }
+
+    #[test]
     fn missing_game_is_not_reported_as_ready() {
         let folder = tempfile::tempdir().unwrap();
         let info = ready(folder.path(), folder.path());
