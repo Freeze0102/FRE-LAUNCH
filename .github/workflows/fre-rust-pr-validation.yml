@@ -2,9 +2,12 @@ name: FRE Rust first-run PR validation
 # Branch-only validation for the Rust onboarding change. Does not sign, publish
 # or download any proprietary Minecraft resources.
 on:
-  push:
+  pull_request:
     branches:
-      - fix/rust-onboarding-horizon-mods-20261103
+      - main
+    paths:
+      - '.github/workflows/fre-rust-pr-validation.yml'
+      - 'scripts/modrinth-fork/**'
   workflow_dispatch:
 
 permissions:
