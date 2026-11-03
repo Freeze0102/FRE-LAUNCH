@@ -1,4 +1,4 @@
-name: FRE LAUNCH Rust grid and UA/EN preflight (no native build)
+name: FRE LAUNCH Rust loader Create and CurseForge UI preflight
 
 on:
   push:
