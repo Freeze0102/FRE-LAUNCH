@@ -122,29 +122,30 @@ async function handleFreRustOrJavaCreate(config) {
         if (!name) throw new Error('Enter a name for the Rust profile.')
         const icon = config.instanceIcon.value
         const iconBytes = icon ? Array.from(new Uint8Array(await icon.arrayBuffer())) : null
-        const profile = await invoke('plugin:fre-rust|rust_create_profile', {
+        const profile = await invoke<{ id: string; name: string }>('plugin:fre-rust|rust_create_profile', {
             name,
             iconPath: icon ? null : config.instanceIconPath.value,
             iconBytes,
         })
         installationModal.value?.hide()
         window.dispatchEvent(new Event('fre-rust-library-refresh'))
-        // Engine is bundled with FRE LAUNCH. An authenticated owner's private
-        // Minecraft resources may still need to be prepared or imported.
-        let status = await invoke('plugin:fre-rust|rust_runtime')
-        if (status.installed && !status.prepared) {
-            // Reuse an existing owner's prepared Horizon installation when
-            // present. No unlicensed assets are fetched or shipped.
+        // Open the normal Java-style instance details immediately, even when
+        // its verified native assets still need installing.
+        await router.push('/rust-instance/native/' + encodeURIComponent(profile.id))
+        const status = await invoke<{ installed: boolean; prepared: boolean; reason: string | null }>('plugin:fre-rust|rust_runtime')
+        if (!status.installed) {
+            handleError(new Error(status.reason || 'The native Rust game is not bundled with this FRE LAUNCH build.'))
+            return
+        }
+        if (!status.prepared) {
+            // First run downloads only the player's authorized Mojang files.
+            // Surface real errors instead of silently leaving an empty profile.
             try {
-                await invoke('plugin:fre-rust|rust_import_resources', { source: '' })
-                status = await invoke('plugin:fre-rust|rust_runtime')
-            } catch {
-                // No prepared local resources or ownership verification:
-                // open the in-app importer with the exact new profile.
+                await invoke<string>('plugin:fre-rust|rust_import_resources', { source: '' })
+            } catch (error) {
+                handleError(error instanceof Error ? error : new Error(String(error)))
             }
         }
-        // Keep the user in the ordinary Library after Create. The Rust
-        // card's Setup action opens the importer if resources are still needed.
         window.dispatchEvent(new Event('fre-rust-library-refresh'))
     } catch (error) {
         config.loading.value = false
