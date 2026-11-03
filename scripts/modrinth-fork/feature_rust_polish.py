@@ -49,29 +49,6 @@ async function refreshFreRustInstances() {
             quarantined: false,
         })
     } catch { /* Still show ordinary Java profiles without a Rust backend. */ }
-    try {
-        const exePath = await invoke('plugin:fre-horizon|horizon_detect_launcher')
-        if (exePath) {
-            const status = await invoke('plugin:fre-horizon|horizon_status', { exePath })
-            for (const profile of status.instances) {
-                if (profile.id !== 'horizon' &&
-                    !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(profile.id)) continue
-                native.push({
-                    id: 'horizon:' + profile.id,
-                    freRustId: profile.id,
-                    freRustKind: 'horizon',
-                    name: profile.name,
-                    loader: 'Rust',
-                    game_version: profile.version || status.selectedVersion || '26.3',
-                    icon_path: null,
-                    created: new Date(0).toISOString(),
-                    last_played: null,
-                    install_stage: 'installed',
-                    quarantined: false,
-                })
-            }
-        }
-    } catch { /* A removed Horizon.exe cannot hide Java or native Rust. */ }
     if (request === freRustQueryId) freRustInstances.value = native
 }
 function freRustDetailUrl(instance) {
@@ -92,12 +69,6 @@ async function playFreRustQuick(instance) {
                 return
             }
             await invoke('plugin:fre-rust|rust_launch', { profileId: instance.freRustId })
-        } else {
-            const exePath = await invoke('plugin:fre-horizon|horizon_detect_launcher')
-            if (!exePath) throw new Error('Horizon executable not found')
-            await invoke('plugin:fre-horizon|horizon_direct_play', {
-                exePath, name: instance.freRustId,
-            })
         }
     } catch (error) {
         handleError(error instanceof Error ? error : new Error(String(error)))
@@ -127,7 +98,6 @@ async function deleteFreRustQuick() {
             "onMounted(() => {\n\tresizeObserver = new ResizeObserver(updateMaxAuto)",
             """onMounted(() => {
     window.addEventListener('fre-rust-library-refresh', refreshFreRustInstances)
-    window.addEventListener('fre-horizon-library-refresh', refreshFreRustInstances)
     void refreshFreRustInstances()
 \tresizeObserver = new ResizeObserver(updateMaxAuto)""")
     exactly(quick,
@@ -135,7 +105,6 @@ async function deleteFreRustQuick() {
             """onUnmounted(() => {
     freRustQueryId++
     window.removeEventListener('fre-rust-library-refresh', refreshFreRustInstances)
-    window.removeEventListener('fre-horizon-library-refresh', refreshFreRustInstances)
 \tresizeObserver?.disconnect()""")
     exactly(quick,
             "async function playInstance(instance) {\n\tif (instance.quarantined",
@@ -171,17 +140,9 @@ async function deleteFreRustQuick() {
                 icon: FolderOpenIcon,
                 action: async () => {
                     try {
-                        if (instance.freRustKind === 'native') {
-                            await invoke('plugin:fre-rust|rust_open_folder', {
-                                profileId: instance.freRustId, folder: 'root',
-                            })
-                        } else {
-                            const exePath = await invoke('plugin:fre-horizon|horizon_detect_launcher')
-                            if (!exePath) throw new Error('Horizon executable not found')
-                            await invoke('plugin:fre-horizon|horizon_open_folder', {
-                                exePath, name: instance.freRustId, folder: 'root',
-                            })
-                        }
+                        await invoke('plugin:fre-rust|rust_open_folder', {
+                            profileId: instance.freRustId, folder: 'root',
+                        })
                     } catch (error) {
                         handleError(error instanceof Error ? error : new Error(String(error)))
                     }
