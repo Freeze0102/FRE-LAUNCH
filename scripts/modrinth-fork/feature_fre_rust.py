@@ -67,7 +67,7 @@ pub async fn get_default_user()""",
             '''            .plugin(
                 "fre-rust",
                 InlinedPlugin::new()
-                    .commands(&["rust_profiles", "rust_create_profile", "rust_rename_profile", "rust_delete_profile", "rust_runtime", "rust_import_resources", "rust_mods", "rust_launch", "rust_logs", "rust_open_folder", "rust_list_files"])
+                    .commands(&["rust_profiles", "rust_create_profile", "rust_rename_profile", "rust_delete_profile", "rust_runtime", "rust_import_resources", "rust_mods", "rust_import_mod", "rust_launch", "rust_logs", "rust_open_folder", "rust_list_files"])
                     .default_permission(DefaultPermissionRule::AllowAllCommands),
             )
             .plugin(
@@ -454,16 +454,16 @@ onUnmounted(() => {
                 'Automatic preparation requires an owned Minecraft Java Edition installation and an active Microsoft account.',
             ),
             'fre-rust.page.choose-resources': ('Обрати папку ресурсів', 'Choose prepared resources folder'),
-            'fre-rust.page.sign-in-horizon': ('Увійти у Horizon через Microsoft', 'Sign in to Horizon with Microsoft'),
-            'fre-rust.page.prep-helper': ('Перевіряємо Horizon…', 'Checking verified Horizon setup…'),
-            'fre-rust.page.prep-version': ('Завантажуємо ігрову версію Horizon…', 'Downloading a Horizon game version…'),
+            'fre-rust.page.sign-in-horizon': ('Вхід через FRE LAUNCH', 'Sign in with FRE LAUNCH'),
+            'fre-rust.page.prep-helper': ('Перевіряємо вбудований Rust-рушій…', 'Checking bundled Rust engine…'),
+            'fre-rust.page.prep-version': ('Перевіряємо версію Rust-гри…', 'Checking Rust game version…'),
             'fre-rust.page.prep-local': ('Перевіряємо встановлені файли Minecraft…', 'Checking installed Minecraft files…'),
             'fre-rust.page.prep-download': ('Завантажуємо перевірені файли Minecraft із Mojang…', 'Downloading missing verified Minecraft files from Mojang…'),
             'fre-rust.page.prep-copy': ('Зберігаємо ресурси гри в кеш FRE LAUNCH…', 'Saving game resources in the FRE LAUNCH cache…'),
             'fre-rust.page.prep-ready': ('Ресурси Minecraft підготовлено.', 'Minecraft resources ready.'),
             'fre-rust.page.first-run-hint': (
-                'Перший запуск: FRE LAUNCH використає наявні файли Minecraft 26.3 або завантажить відсутні з Mojang через Horizon. Може знадобитися одноразовий вхід у Horizon під акаунтом із придбаною Java Edition. Наступні запуски використовують кеш.',
-                'First run: FRE LAUNCH uses cached Minecraft 26.3 or downloads missing files from Mojang through Horizon. A Microsoft login owning Java Edition may be required in Horizon once. Further launches reuse the cached resources.',
+                'Перший запуск: FRE LAUNCH використає наявні ресурси Minecraft 26.3 або завантажить перевірені файли з Mojang у власний кеш після перевірки Minecraft-акаунта у FRE LAUNCH. Жоден інший лаунчер встановлювати не потрібно.',
+                'First run: FRE LAUNCH reuses existing Minecraft 26.3 resources or downloads verified Mojang game files to its own cache after Minecraft account verification in FRE LAUNCH. No separate launcher is required.',
             ),
             'fre-rust.page.resources': ('Файли гри', 'Game resources'),
             'fre-rust.page.preparing': ('Перевірка локальних ресурсів…', 'Checking locally available resources…'),
@@ -476,21 +476,23 @@ onUnmounted(() => {
                 'Permanently deletes this Rust instance and its worlds. Shared game resources are kept.',
             ),
             'fre-rust.page.not-downloaded': (
-                'Якщо Minecraft ще немає на комп’ютері, Horizon завантажить перевірені файли з Mojang для авторизованого власника.',
-                'When local files are missing, Horizon downloads verified Minecraft assets from Mojang for an authenticated owner.',
+                'FRE LAUNCH завантажує перевірені ресурси Minecraft з Mojang для власника Java Edition без іншого лаунчера.',
+                'FRE LAUNCH downloads verified Minecraft resources from Mojang for a Java Edition owner, without another launcher.',
             ),
-            'fre-rust.mods.title': ('Нативні моди Horizon', 'Horizon native mods'),
+            'fre-rust.mods.title': ('Моди Rust', 'Rust content mods'),
             'fre-rust.mods.explanation': (
-                'Пошук в офіційному каталозі Horizon. Моди перевіряються та встановлюються лише в цю Rust-збірку. Java-моди Fabric і Forge не є нативними.',
-                'Search the official Horizon registry. Verified mods are installed only into this Rust instance. Fabric and Forge JARs are not native.',
+                'Імпортуй .hmod-файли безпосередньо в цю Rust-збірку. Увімкни їх у налаштуваннях «Моди» самої гри. Java JAR-моди не підтримуються; .hnmod потребують окремого компілювання.',
+                'Import .hmod content files directly into this Rust instance. Enable them in the game Mods settings. Fabric/Forge JAR files are incompatible; .hnmod source mods need a separate build.',
             ),
             'fre-rust.mods.search': ('Пошук', 'Search'),
             'fre-rust.mods.placeholder': ('Знайти мод для Horizon…', 'Find a Horizon mod…'),
-            'fre-rust.mods.installed': ('Встановлено', 'Installed'),
-            'fre-rust.mods.empty': ('У цій збірці ще немає модів із каталогу Horizon.', 'No mods installed from the Horizon registry yet.'),
+            'fre-rust.mods.installed': ('Файли цієї збірки', 'Files in this instance'),
+            'fre-rust.mods.empty': ('У цій збірці ще немає .hmod-файлів.', 'No .hmod content files yet.'),
             'fre-rust.mods.install': ('Встановити', 'Install'),
-            'fre-rust.mods.remove': ('Видалити', 'Remove'),
+            'fre-rust.mods.remove': ('Видалити файл', 'Remove file'),
             'fre-rust.mods.refresh': ('Оновити', 'Refresh'),
+            'fre-rust.mods.import-file': ('Імпортувати .hmod', 'Import .hmod'),
+            'fre-rust.mods.open-folder': ('Відкрити папку модів', 'Open mods folder'),
             'fre-rust.mods.none': ('Моди не знайдено.', 'No matching native mods found.'),
         }
         for key, pair in detail_messages.items():
