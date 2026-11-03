@@ -25,6 +25,7 @@ def apply(root: Path):
     shutil.copyfile(here / "FreRustPanel.vue", frontend / "src/components/ui/FreRustPanel.vue")
     shutil.copyfile(here / "FreRustLibrary.vue", frontend / "src/components/ui/FreRustLibrary.vue")
     shutil.copyfile(here / "RustInstanceGrid.vue", frontend / "src/components/ui/library/instance-group/RustInstanceGrid.vue")
+    shutil.copyfile(here / "rust-library-group.ts", frontend / "src/components/ui/library/rust-library-group.ts")
 
     # Theseus exports its minecraft_auth API but keeps State.pool private.
     # Bridge the existing refreshed default-credentials lookup INSIDE Theseus,
@@ -196,22 +197,22 @@ async function handleFreRustOrJavaCreate(config) {
     group = frontend / "src/components/ui/library/instance-group/index.vue"
     exactly(group,
             "import InstanceCard from '@/components/ui/library/instance-group/instance-card.vue'",
-            "import InstanceCard from '@/components/ui/library/instance-group/instance-card.vue'\nimport RustInstanceGrid from '@/components/ui/library/instance-group/RustInstanceGrid.vue'")
+            "import InstanceCard from '@/components/ui/library/instance-group/instance-card.vue'\nimport RustInstanceGrid from '@/components/ui/library/instance-group/RustInstanceGrid.vue'\nimport { rustLibraryGroupId } from '@/components/ui/library/rust-library-group'")
     exactly(group,
             "\tsetSectionCollapsed,\n\tisSearching,",
             "\tsetSectionCollapsed,\n\tisSearching,\n\tsearch,")
     exactly(group,
             "const focusedInstanceId = ref<string | null>(null)",
-            "const focusedInstanceId = ref<string | null>(null)\nconst rustCardCount = ref(0)")
+            "const focusedInstanceId = ref<string | null>(null)\nconst rustCardCount = ref(0)\nconst isRustGridGroup = computed(() => props.instanceGroup.id === rustLibraryGroupId(displayState.value.group))")
     exactly(group,
             "Math.ceil(props.instanceGroup.instances.length / columnCount.value) *",
-            "Math.ceil((props.instanceGroup.instances.length + (isUngrouped.value ? rustCardCount.value : 0)) / columnCount.value) *")
+            "Math.ceil((props.instanceGroup.instances.length + (isRustGridGroup.value ? rustCardCount.value : 0)) / columnCount.value) *")
     exactly(group,
             "v-if=\"instanceGroup.instances.length\"",
-            "v-if=\"instanceGroup.instances.length || (isUngrouped && rustCardCount)\"")
+            "v-if=\"instanceGroup.instances.length || (isRustGridGroup && rustCardCount)\"")
     exactly(group,
             "v-if=\"instanceGroup.instances.length === 0\"",
-            "v-if=\"instanceGroup.instances.length === 0 && (!isUngrouped || rustCardCount === 0)\"")
+            "v-if=\"instanceGroup.instances.length === 0 && (!isRustGridGroup || rustCardCount === 0)\"")
     exactly(group,
             '<div ref="instanceGridContent" :style="{ height: `${gridHeight}px` }">',
             '<div ref="instanceGridContent" class="relative" :style="{ height: `${gridHeight}px` }">')
@@ -222,7 +223,7 @@ async function handleFreRustOrJavaCreate(config) {
 \t\t</Accordion>""",
             """\t\t\t\t\t</TransitionGroup>
 \t\t\t\t\t<RustInstanceGrid
-\t\t\t\t\t\tv-if="isUngrouped"
+\t\t\t\t\t\tv-if="isRustGridGroup"
 \t\t\t\t\t\t:start-index="instanceGroup.instances.length"
 \t\t\t\t\t\t:column-count="columnCount"
 \t\t\t\t\t\t:card-width="cardWidth"
@@ -235,6 +236,82 @@ async function handleFreRustOrJavaCreate(config) {
 \t\t\t\t</div>
 \t\t\t</div>
 \t\t</Accordion>""")
+    # The native cards must still be visible when the Java library is empty
+    # and when the user switches between None/Loader/Game-version grouping.
+    # Query only profile names (never reclassify them as Java GameInstances).
+    library = frontend / "src/components/ui/library/index.vue"
+    exactly(library,
+            "import { StarIcon } from '@modrinth/assets'",
+            "import { invoke } from '@tauri-apps/api/core'\nimport { StarIcon } from '@modrinth/assets'")
+    exactly(library,
+            "computed, nextTick, onDeactivated, onUnmounted, ref, toRef, watch",
+            "computed, nextTick, onDeactivated, onMounted, onUnmounted, ref, toRef, watch")
+    exactly(library,
+            "import InstanceGroup from '@/components/ui/library/instance-group/index.vue'",
+            "import InstanceGroup from '@/components/ui/library/instance-group/index.vue'\nimport { rustLibraryGroupId, rustLibraryGroupLabel } from '@/components/ui/library/rust-library-group'")
+    exactly(library,
+            "\tinstanceGroups,\n\tlibraryGroupsLoaded,",
+            "\tinstanceGroups,\n\tlibraryGroupsLoaded,\n\tsearch,")
+    exactly(library,
+            "const visibleInstanceGroups = computed(() =>\n\tinstanceGroups.value.filter((instanceGroup) =>\n\t\tinstanceGroup.id === FAVORITES_GROUP_ID\n\t\t\t? instanceGroup.instances.length > 0\n\t\t\t: instanceGroup.instances.length > 0 ||\n\t\t\t\t(!isSearching.value && !hasActiveFilters.value && instanceGroup.key !== 'None'),\n\t),\n)",
+            """const rustProfileNames = ref<string[]>([])
+let rustRefreshGeneration = 0
+async function refreshRustNames() {
+    const generation = ++rustRefreshGeneration
+    const names: string[] = []
+    try {
+        const profiles = await invoke<{ name: string }[]>('plugin:fre-rust|rust_profiles')
+        names.push(...profiles.map(profile => profile.name))
+    } catch { /* A missing native plugin must not hide Java instances. */ }
+    try {
+        const exe = await invoke<string | null>('plugin:fre-horizon|horizon_detect_launcher')
+        if (exe) {
+            const state = await invoke<{ instances: { id: string; name: string }[] }>(
+                'plugin:fre-horizon|horizon_status', { exePath: exe },
+            )
+            names.push(...state.instances
+                .filter(profile => profile.id === 'horizon' || /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(profile.id))
+                .map(profile => profile.name))
+        }
+    } catch { /* No Horizon executable is not a Java library error. */ }
+    if (generation === rustRefreshGeneration) rustProfileNames.value = names
+}
+const refreshRustLibrary = () => { void refreshRustNames() }
+onMounted(() => {
+    window.addEventListener('fre-rust-library-refresh', refreshRustLibrary)
+    window.addEventListener('fre-horizon-library-refresh', refreshRustLibrary)
+    void refreshRustNames()
+})
+onUnmounted(() => {
+    rustRefreshGeneration++
+    window.removeEventListener('fre-rust-library-refresh', refreshRustLibrary)
+    window.removeEventListener('fre-horizon-library-refresh', refreshRustLibrary)
+})
+const rustMatchesSearch = computed(() => {
+    if (!rustProfileNames.value.length) return false
+    const query = search.value.trim().toLocaleLowerCase()
+    return !query || 'rust'.includes(query) || 'раст'.includes(query) ||
+        rustProfileNames.value.some(name => name.toLocaleLowerCase().includes(query))
+})
+const visibleInstanceGroups = computed(() => {
+    const nativeGroupId = rustLibraryGroupId(displayState.value.group)
+    const visible = instanceGroups.value.filter((instanceGroup) =>
+        instanceGroup.id === FAVORITES_GROUP_ID
+            ? instanceGroup.instances.length > 0
+            : instanceGroup.instances.length > 0 ||
+                (rustMatchesSearch.value && instanceGroup.id === nativeGroupId) ||
+                (!isSearching.value && !hasActiveFilters.value && instanceGroup.key !== 'None'),
+    )
+    if (rustMatchesSearch.value && !visible.some(group => group.id === nativeGroupId)) {
+        visible.push({
+            id: nativeGroupId,
+            key: rustLibraryGroupLabel(displayState.value.group),
+            instances: [],
+        })
+    }
+    return visible
+})""")
+
     index = frontend / "src/pages/Index.vue"
     # Don't append separate Horizon/Rust sections or an empty "Rust library".
     exactly(index,
