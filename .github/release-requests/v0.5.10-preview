@@ -1,10 +1,5 @@
-FRE LAUNCH v0.5.10 unsigned Windows preview — 2026-11-03 integrated Rust loader correction.
-Acceptance:
-- Rust 26.3 appears as a loader in the SAME ordinary Create instance dialog, retaining name, auto-generated/uploaded icons and version chooser.
-- Rust profiles are created by the native Rust backend, never by Java Theseus; they open as regular-looking cards inside the main library and their files/management are available.
-- Rust cards survive Java library grouping changes and zero Java instances; no duplicate standalone Rust or Horizon library sections.
-- Modrinth / CurseForge top selector is not obscured by the sticky Browse install header.
-- Private Minecraft Rust resource preparation and Microsoft ownership validation stay mandatory; the native engine is bundled but no unlicensed game resources are fetched.
-Verified in GitHub Actions run 41600088048: pinned source patching success, Vue TypeScript success, production Vite bundle success, all 26/26 regression tests passed. Prior Windows preview run 41496542387 compiled Windows and passed Defender and clean-installer smoke.
-This one controlled full Windows preview must pass actual Rust compilation, NSIS package build, Microsoft Defender scans of installer + launcher + engine, SHA-256 manifest and clean install-launch smoke before any artifact is uploaded.
-Never claim signed auto-update; original Tauri signing key remains unavailable. No branch, main only.
+FRE LAUNCH v0.5.10 unsigned Windows preview: reuse real Java instance card, full-page header, native page tabs and shared FilePageLayout for Rust.
+2026-11-03. Verified GitHub Actions preflight 41612985196 SUCCESS: pinned Modrinth source patches, verify.py, TypeScript Vue, Vite production frontend and 26/26 frontend regression tests all passed. No Rust engine compiled in preflight.
+Only the VISUAL Java components are reused for Rust native and Horizon; Rust launch, setup, profile data and file operations still use native Rust/Horizon commands, never the Java instance API.
+Previously signed release v0.5.9 remains unchanged. Updater secret is unavailable; this workflow must remain an UNSIGNED standalone preview only. Do not publish an auto-update or change the updater public key without the user recovering or replacing the signing key.
+This preview must pass actual Windows native launcher compilation, pinned Rust engine cache digest/license, SHA-256 manifest of final EXEs, Microsoft Defender scanning and clean-install launch smoke test before artifact upload.
