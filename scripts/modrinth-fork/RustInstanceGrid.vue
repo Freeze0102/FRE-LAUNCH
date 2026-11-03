@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { invoke } from '@tauri-apps/api/core'
-import { PlayIcon } from '@modrinth/assets'
-import { defineMessages, IconButton, injectNotificationManager, useVIntl } from '@modrinth/ui'
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { FolderOpenIcon, PlayIcon, SettingsIcon, TrashIcon } from '@modrinth/assets'
+import { ContextMenu, defineMessages, IconButton, injectNotificationManager, useVIntl } from '@modrinth/ui'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import InstanceCardView from '@/components/ui/library/instance-group/instance-card-view.vue'
+import ConfirmDeleteInstanceModal from '@/components/ui/modal/ConfirmDeleteInstanceModal.vue'
 import type { GameInstance } from '@/helpers/types'
 
 // Rust has its own real game engine. Only the VISUAL Java card is reused;
@@ -47,11 +48,18 @@ const { formatMessage } = useVIntl()
 const messages = defineMessages({
   open: { id: 'fre-rust.grid.open', defaultMessage: 'Open {name}' },
   start: { id: 'fre-rust.grid.start', defaultMessage: 'Play {name}' },
+  openFolder: { id: 'fre-rust.grid.open-folder', defaultMessage: 'Open folder' },
+  settings: { id: 'fre-rust.grid.settings', defaultMessage: 'Settings' },
+  delete: { id: 'fre-rust.page.delete', defaultMessage: 'Delete instance' },
 })
 const nativeProfiles = ref<NativeProfile[]>([])
 const runtime = ref<Runtime | null>(null)
 const horizonStatus = ref<HorizonStatus | null>(null)
 const busy = ref<string | null>(null)
+const actionsMenu = ref<InstanceType<typeof ContextMenu>>()
+const deleteModal = ref<InstanceType<typeof ConfirmDeleteInstanceModal>>()
+const deleteTarget = ref<Card | null>(null)
+const deleteInstance = computed(() => deleteTarget.value ? viewInstance(deleteTarget.value) : null)
 let requestId = 0
 
 const cards = computed<Card[]>(() => {
@@ -146,6 +154,52 @@ function detailUrl(card: Card) {
 function openCard(card: Card) {
   void router.push(detailUrl(card))
 }
+async function openFolder(card: Card) {
+  try {
+    if (card.kind === 'native') {
+      await invoke('plugin:fre-rust|rust_open_folder', { profileId: card.id, folder: 'root' })
+    } else {
+      const exePath = await invoke<string | null>('plugin:fre-horizon|horizon_detect_launcher')
+      if (!exePath) throw new Error('Horizon executable not found')
+      await invoke('plugin:fre-horizon|horizon_open_folder', {
+        exePath, name: card.id, folder: 'root',
+      })
+    }
+  } catch (err) {
+    handleError(err instanceof Error ? err : new Error(String(err)))
+  }
+}
+async function askDelete(card: Card) {
+  if (card.kind !== 'native') return
+  deleteTarget.value = card
+  await nextTick()
+  deleteModal.value?.show()
+}
+async function confirmedDelete() {
+  const card = deleteTarget.value
+  if (!card || card.kind !== 'native') return
+  try {
+    await invoke('plugin:fre-rust|rust_delete_profile', { profileId: card.id })
+    deleteTarget.value = null
+    await refresh()
+    window.dispatchEvent(new Event('fre-rust-library-refresh'))
+  } catch (err) {
+    handleError(err instanceof Error ? err : new Error(String(err)))
+  }
+}
+function openContext(event: MouseEvent, card: Card) {
+  event.preventDefault()
+  event.stopPropagation()
+  actionsMenu.value?.open(event, [
+    { id: 'open', label: formatMessage(messages.open, { name: card.name }), action: () => openCard(card) },
+    { id: 'play', label: formatMessage(messages.start, { name: card.name }), icon: PlayIcon, action: () => { void play(card) } },
+    { id: 'settings', label: formatMessage(messages.settings), icon: SettingsIcon, action: () => openCard(card) },
+    { id: 'files', label: formatMessage(messages.openFolder), icon: FolderOpenIcon, action: () => { void openFolder(card) } },
+    ...(card.kind === 'native'
+      ? [{ id: 'delete', label: formatMessage(messages.delete), icon: TrashIcon, action: () => { void askDelete(card) } }]
+      : []),
+  ])
+}
 async function play(card: Card) {
   if (busy.value) return
   if (!card.ready) {
@@ -185,6 +239,12 @@ onUnmounted(() => {
 </script>
 
 <template>
+  <ContextMenu ref="actionsMenu" />
+  <ConfirmDeleteInstanceModal
+    ref="deleteModal"
+    :instances="deleteInstance ? [deleteInstance] : []"
+    @delete="confirmedDelete"
+  />
   <div v-for="(card, index) in cards" :key="card.key" :style="cardStyle(index)">
     <InstanceCardView
       class="group/card cursor-pointer -outline-offset-2 focus-visible:!outline-2 hover:brightness-110"
@@ -195,6 +255,7 @@ onUnmounted(() => {
       tabindex="0"
       :aria-label="formatMessage(messages.open, { name: card.name })"
       @click="openCard(card)"
+      @contextmenu.prevent="openContext($event, card)"
       @keydown.enter.prevent="openCard(card)"
     >
       <template #leading="{ compact }">
