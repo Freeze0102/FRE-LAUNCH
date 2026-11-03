@@ -390,7 +390,7 @@ def verify(root):
     # download path. No empty profile may masquerade as prepared resources.
     native_backend = (root / 'apps/app/src/api/fre_rust.rs').read_text(encoding="utf-8")
     for marker in ('prepare_for_native_rust(app.clone()).await',
-                   'join("prepared")', 'if destination.join("horizon-resources.json").is_file()',
+                   'join("prepared")', 'if resources_valid(&destination)', 'fn resources_valid(root: &Path)',
                    'online_profile_fresh().await', 'rust_mods', 'join("horizon-mods")'):
         assert marker in native_backend, f"Native Rust first-run or mod path missing: {marker}"
     for marker in ('pub async fn prepare_for_native_rust', '["prepare", "--download", "--version"',
