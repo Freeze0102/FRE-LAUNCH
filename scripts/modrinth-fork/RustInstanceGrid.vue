@@ -202,15 +202,28 @@ function openContext(event: MouseEvent, card: Card) {
 }
 async function play(card: Card) {
   if (busy.value) return
-  if (!card.ready) {
-    openCard(card)
-    return
-  }
   busy.value = card.key
   try {
     if (card.kind === 'native') {
+      if (!card.ready) {
+        // First attempt an owner-authorized import of already prepared local
+        // game data. Do not claim to have downloaded Mojang game assets.
+        try {
+          await invoke<string>('plugin:fre-rust|rust_import_resources', { source: '' })
+          await refresh()
+        } catch {
+          openCard(card) // Full profile contains the actual actionable error.
+          return
+        }
+      }
+      const status = await invoke<Runtime>('plugin:fre-rust|rust_runtime')
+      if (!status.installed || !status.prepared) {
+        openCard(card)
+        return
+      }
       await invoke<string>('plugin:fre-rust|rust_launch', { profileId: card.id })
     } else {
+      if (!card.ready) { openCard(card); return }
       const exePath = await invoke<string | null>('plugin:fre-horizon|horizon_detect_launcher')
       if (!exePath) throw new Error('Horizon executable not found')
       await invoke<string>('plugin:fre-horizon|horizon_direct_play', {
