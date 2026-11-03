@@ -87,6 +87,7 @@ pub fn init<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
             rust_runtime,
             rust_import_resources,
             rust_mods,
+            rust_import_mod,
             rust_launch,
             rust_logs,
             rust_open_folder,
@@ -643,8 +644,50 @@ async fn rust_import_resources<R: tauri::Runtime>(
     Ok(format!("Imported {bytes} bytes of your Minecraft resources into FRE LAUNCH."))
 }
 
-/// Search the official Horizon registry and install only its native mods.
-/// The checked official helper uses the validated FRE profile as HORIZON_HOME.
+/// FRE-owned mods: .hmod are data-only, whereas native .hnmod source
+/// mixins require a separate trusted native rebuild and are not installed here.
+fn mod_filename_safe(name: &str) -> bool {
+    name.len() > 5 && name.len() <= 105 && name.to_ascii_lowercase().ends_with(".hmod")
+        && name.bytes().all(|c| c.is_ascii_alphanumeric() || matches!(c, b'.' | b'-' | b'_'))
+        && !name.starts_with('.')
+}
+fn owned_mods(dir: &Path) -> Result<PathBuf, String> {
+    let root = dir.canonicalize().map_err(|e| e.to_string())?;
+    let folder = dir.join("horizon-mods");
+    if !folder.exists() { fs::create_dir(&folder).map_err(|e| e.to_string())?; }
+    let resolved = folder.canonicalize().map_err(|e| e.to_string())?;
+    if resolved.parent() != Some(root.as_path()) {
+        return Err("Unsafe Rust content mod directory.".into());
+    }
+    Ok(resolved)
+}
+#[derive(Serialize)]
+struct LocalRustMod {
+    project: String,
+    slug: String,
+    title: String,
+    number: String,
+    file: String,
+    source: &'static str,
+}
+fn list_local_mods(dir: &Path) -> Result<Vec<LocalRustMod>, String> {
+    let mut files = Vec::new();
+    for entry in fs::read_dir(owned_mods(dir)?).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        if !entry.file_type().map_err(|e| e.to_string())?.is_file() { continue; }
+        let file = entry.file_name().to_string_lossy().into_owned();
+        if !mod_filename_safe(&file) { continue; }
+        let slug = file[..file.len()-5].to_owned();
+        files.push(LocalRustMod {
+            project: file.clone(), slug: slug.clone(), title: slug,
+            number: "local".into(), file, source: "FRE LAUNCH",
+        });
+        if files.len() > 500 { return Err("Too many mods; use Files to manage the profile.".into()); }
+    }
+    files.sort_by(|a,b| a.file.to_lowercase().cmp(&b.file.to_lowercase()));
+    Ok(files)
+}
+/// List/remove only .hmod content files in this profile. Never delete worlds.
 #[tauri::command]
 async fn rust_mods<R: tauri::Runtime>(
     app: tauri::AppHandle<R>,
@@ -654,17 +697,75 @@ async fn rust_mods<R: tauri::Runtime>(
 ) -> Result<String, String> {
     let dir = profile_dir(&base(&app)?, &profile_id)?;
     read_profile(&dir, &profile_id).ok_or("Rust profile does not exist.")?;
-    let dir = dir.canonicalize().map_err(|e| e.to_string())?;
-    if !dir.join("profile.json").is_file() && !dir.join("profile.json.backup").is_file() {
-        return Err("The Rust profile metadata is missing.".into());
+    match action.as_str() {
+        "list" => serde_json::to_string(&list_local_mods(&dir)?).map_err(|e| e.to_string()),
+        "remove" => {
+            if RUNNING_PROFILES.lock().await.contains(&profile_id) {
+                return Err("Close the Rust game before removing a mod.".into());
+            }
+            let filename = project.as_deref().ok_or("Choose a Rust content mod.")?;
+            if !mod_filename_safe(filename) {
+                return Err("Only .hmod content files can be removed here.".into());
+            }
+            let file = owned_mods(&dir)?.join(filename);
+            let meta = file.symlink_metadata().map_err(|e| e.to_string())?;
+            if !meta.file_type().is_file() {
+                return Err("Refusing to remove a non-regular mod.".into());
+            }
+            fs::remove_file(file).map_err(|e| format!("Cannot remove mod: {e}"))?;
+            Ok(format!("Removed {filename} from this Rust instance."))
+        }
+        _ => Err("Use local .hmod import. Native .hnmod code requires a separate trusted native build.".into()),
     }
-    if action != "search" && action != "list" &&
-        RUNNING_PROFILES.lock().await.contains(&profile_id) {
-        return Err("Close this Rust game before changing its mods.".into());
+}
+/// Local import only. Never uses the external Horizon Launcher or its account.
+#[tauri::command]
+async fn rust_import_mod<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>, profile_id: String, source: String,
+) -> Result<String, String> {
+    if RUNNING_PROFILES.lock().await.contains(&profile_id) {
+        return Err("Close the Rust game before importing a mod.".into());
     }
-    super::horizon::native_mods_for_profile(
-        app, &dir, &action, project.as_deref().unwrap_or(""),
-    ).await
+    let dir = profile_dir(&base(&app)?, &profile_id)?;
+    read_profile(&dir, &profile_id).ok_or("Rust profile does not exist.")?;
+    let source = PathBuf::from(source);
+    let filename = source.file_name().and_then(|name| name.to_str())
+        .ok_or("Invalid content mod file name.")?;
+    if !mod_filename_safe(filename) {
+        return Err("Select a .hmod content mod. Java JAR and .hnmod code are not supported.".into());
+    }
+    let meta = source.symlink_metadata().map_err(|e| format!("Cannot read mod: {e}"))?;
+    if !meta.file_type().is_file() || meta.len() > 32 * 1024 * 1024 || meta.len() < 4 {
+        return Err("The .hmod must be a regular archive smaller than 32 MiB.".into());
+    }
+    let mut header = [0u8; 4];
+    use std::io::Read;
+    fs::File::open(&source).and_then(|mut file| file.read_exact(&mut header))
+        .map_err(|e| format!("Cannot inspect mod: {e}"))?;
+    if &header != b"PK\x03\x04" {
+        return Err("Content mods must be ZIP-based .hmod bundles.".into());
+    }
+    let target = owned_mods(&dir)?.join(filename);
+    if target.symlink_metadata().is_ok() {
+        return Err("A content mod with this filename already exists. Remove it first.".into());
+    }
+    let staged = target.with_extension("hmod.pending");
+    let result: Result<(), String> = (|| {
+        let mut input = fs::File::open(&source).map_err(|e| e.to_string())?;
+        let mut output = fs::OpenOptions::new().create_new(true).write(true)
+            .open(&staged).map_err(|e| e.to_string())?;
+        let count = std::io::copy(&mut input.take(32 * 1024 * 1024 + 1), &mut output)
+            .map_err(|e| e.to_string())?;
+        if count != meta.len() {
+            return Err("Mod changed during import; try again.".into());
+        }
+        drop(output);
+        fs::rename(&staged, &target).map_err(|e| e.to_string())?;
+        Ok(())
+    })();
+    if result.is_err() { let _ = fs::remove_file(&staged); }
+    result?;
+    Ok(format!("Imported {filename}. Turn it on in the game's Mods options to activate it."))
 }
 
 #[tauri::command]
