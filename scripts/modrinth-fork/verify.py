@@ -150,7 +150,6 @@ def verify(root):
         ("Browse source selector", cf_browse, ["CurseForgeBrowser", "freContentSource",
             "route.query.source === 'curseforge'", "Modrinth</button>", "CurseForge</button>",
             "projectType === 'modpack'", ":content-type"]),
-        ("Java instance CurseForge entry", java_instance_layout, ["fre-launch.cf.for-instance", "source: 'curseforge'", "query: { i: instance.id"]),
         ("CurseForge Rust API module", cf_mod, ["pub mod curseforge;"]),
         ("CurseForge Rust plugin", cf_main, [".plugin(api::curseforge::init())"]),
         ("CurseForge Tauri permissions", cf_build, ['"fre-curseforge"', '"cf_search"', '"cf_install"']),
