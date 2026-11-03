@@ -365,18 +365,14 @@ pub async fn native_mods_for_profile<R: tauri::Runtime>(
                 project == "." || project == ".." {
                 return Err("Invalid Horizon mod identifier.".into());
             }
-            vec!["mods", action, project, "--instance", "horizon", "--source", "horizon"]
+            if action == "install" {
+                vec!["mods", "install", project, "--instance", "horizon", "--source", "horizon"]
+            } else {
+                vec!["mods", "remove", project, "--instance", "horizon"]
+            }
         }
         _ => return Err("Unsupported Horizon mod operation.".into()),
     };
-    // 'remove' does not accept --source; it identifies the installed mod by
-    // the canonical per-profile registry, not by a remote URL.
-    let mut args = args;
-    if action == "remove" {
-        args.retain(|arg| *arg != "--source" && *arg != "horizon");
-        // Retain the mandatory --instance horizon after removing --source.
-        args = vec!["mods", "remove", project, "--instance", "horizon"];
-    }
     let _operation = OPERATION.try_lock().map_err(|_| "Another Horizon operation is still running.")?;
     let child = command(&exe).args(&args)
         .env("HORIZON_HOME", profile_home)
