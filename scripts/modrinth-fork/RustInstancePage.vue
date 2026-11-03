@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { convertFileSrc, invoke } from '@tauri-apps/api/core'
+import { listen } from '@tauri-apps/api/event'
 import {
   BoxesIcon, ChevronRightIcon, ClockIcon, FolderOpenIcon, GlobeIcon, MoreVerticalIcon,
   PlayIcon, SettingsIcon, TerminalSquareIcon, TrashIcon,
@@ -60,6 +61,12 @@ const m = defineMessages({
   chooseResources: { id: 'fre-rust.page.choose-resources', defaultMessage: 'Choose prepared resources folder' },
   signInHorizon: { id: 'fre-rust.page.sign-in-horizon', defaultMessage: 'Sign in to Horizon with Microsoft' },
   firstRunHint: { id: 'fre-rust.page.first-run-hint', defaultMessage: 'First run: FRE LAUNCH uses cached Minecraft 26.3 or downloads missing files from Mojang through Horizon. A Microsoft login owning Java Edition may be required in Horizon once. Further launches reuse the downloaded resources.' },
+  prepHelper: { id: 'fre-rust.page.prep-helper', defaultMessage: 'Checking verified Horizon setup…' },
+  prepVersion: { id: 'fre-rust.page.prep-version', defaultMessage: 'Downloading a Horizon game version…' },
+  prepLocal: { id: 'fre-rust.page.prep-local', defaultMessage: 'Checking installed Minecraft files…' },
+  prepDownload: { id: 'fre-rust.page.prep-download', defaultMessage: 'Downloading missing verified Minecraft files from Mojang…' },
+  prepCopy: { id: 'fre-rust.page.prep-copy', defaultMessage: 'Saving game resources in the FRE LAUNCH cache…' },
+  prepReady: { id: 'fre-rust.page.prep-ready', defaultMessage: 'Minecraft resources ready.' },
   resources: { id: 'fre-rust.page.resources', defaultMessage: 'Game resources' },
   preparing: { id: 'fre-rust.page.preparing', defaultMessage: 'Checking locally available resources…' },
   generalTab: { id: 'fre-rust.page.tab.general', defaultMessage: 'General' },
@@ -83,6 +90,7 @@ const renaming = ref(false)
 const deleting = ref(false)
 const editedName = ref('')
 const setupError = ref('')
+const prepareStage = ref('')
 const settingsModal = ref<InstanceType<typeof TabbedModal>>()
 const deleteModal = ref<InstanceType<typeof ConfirmDeleteInstanceModal>>()
 const displayInstance = computed(() => profile.value ? ({
@@ -115,6 +123,15 @@ const settingsTabs = [
 const iconSrc = computed(() =>
   profile.value?.iconPath ? convertFileSrc(profile.value.iconPath) : undefined,
 )
+const prepareStageText = computed(() => {
+  const labels: Record<string, keyof typeof m> = {
+    helper: 'prepHelper', version: 'prepVersion', local: 'prepLocal',
+    download: 'prepDownload', copy: 'prepCopy', ready: 'prepReady',
+  }
+  return prepareStage.value && labels[prepareStage.value]
+    ? t(m[labels[prepareStage.value]])
+    : ''
+})
 const statusText = computed(() =>
   kind.value === 'native'
     ? runtime.value?.reason || t(m.setup)
@@ -206,6 +223,7 @@ async function autoPrepare() {
   if (kind.value !== 'native' || preparing.value) return false
   preparing.value = true
   setupError.value = ''
+  prepareStage.value = ''
   try {
     await invoke<string>('plugin:fre-rust|rust_import_resources', { source: '' })
     await refresh()
@@ -297,12 +315,24 @@ async function loadLogs() {
 watch(() => [route.params.kind, route.params.id], () => { void refresh() }, { immediate: true })
 watch(tab, next => { if (next === 'logs') void loadLogs() })
 const onRefresh = () => { void refresh() }
+let unlistenPrepareStage: (() => void) | null = null
+let stageListenerDisposed = false
 onMounted(() => {
+  stageListenerDisposed = false
+  void listen<string>('fre-rust-prepare-stage', event => {
+    if (kind.value === 'native' && preparing.value) prepareStage.value = event.payload
+  }).then(unlisten => {
+    if (stageListenerDisposed) unlisten()
+    else unlistenPrepareStage = unlisten
+  }).catch(() => { /* Stage indicators are optional, not proof of success. */ })
   window.addEventListener('fre-rust-library-refresh', onRefresh)
   window.addEventListener('fre-horizon-library-refresh', onRefresh)
 })
 onUnmounted(() => {
   generation++
+  stageListenerDisposed = true
+  unlistenPrepareStage?.()
+  unlistenPrepareStage = null
   window.removeEventListener('fre-rust-library-refresh', onRefresh)
   window.removeEventListener('fre-horizon-library-refresh', onRefresh)
 })
@@ -380,6 +410,7 @@ useRootBreadcrumb({
             </Button>
             <Button type="outlined" @click="openFolder()"><FolderOpenIcon />{{ t(m.openFolder) }}</Button>
           </div>
+          <p v-if="preparing && prepareStageText" role="status" class="m-0 text-sm text-brand">{{ prepareStageText }}</p>
           <p v-if="kind === 'native' && !profile.ready" class="m-0 text-sm text-secondary">{{ t(m.firstRunHint) }}</p>
           <p v-if="!profile.ready" class="m-0 text-sm text-secondary">{{ t(m.notDownloaded) }}</p>
           <p v-if="setupError" role="alert" class="m-0 text-sm text-red-400">{{ setupError }}</p>
