@@ -1,4 +1,4 @@
-name: FRE LAUNCH unified Rust sidebar selection settings and animation preflight
+name: FRE LAUNCH Rust sidebar and selection typed Vue preflight
 
 on:
   push:
