@@ -89,8 +89,8 @@ provide('showFreRustWizard', showFreRustWizard)""")
 
     # Keep the EXACT normal Java creation UI. Rust is a loader chip in the
     # custom stage, not a parallel "New Rust profile" creation experience.
-    exactly(app_vue, 'type="instance"\n\t\t\tshow-snapshot-toggle',
-            'type="instance"\n\t\t\t:available-loaders="[\'fabric\', \'neoforge\', \'forge\', \'quilt\', \'rust\']"\n\t\t\tshow-snapshot-toggle')
+    exactly(app_vue, 'type="instance"\n\t\t\t:on-horizon="showFreRustWizard"',
+            'type="instance"\n\t\t\t:available-loaders="[\'fabric\', \'neoforge\', \'forge\', \'quilt\', \'rust\']"\n\t\t\t:on-horizon="showFreRustWizard"')
     exactly(app_vue, '@create="handleCreate"', '@create="handleFreRustOrJavaCreate"')
     exactly(app_vue,
             "provide('showFreRustWizard', showFreRustWizard)",
