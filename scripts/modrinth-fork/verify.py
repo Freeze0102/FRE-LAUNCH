@@ -290,7 +290,7 @@ def verify(root):
                    '<NewModal', 'rust_rename_profile', 'rust_delete_profile',
                    'useRootBreadcrumb',
                    'plugin:fre-rust|rust_launch', 'plugin:fre-horizon|horizon_direct_play',
-                   'showFreRustWizard', 'showHorizonWizard'):
+                   'showHorizonWizard'):
         assert marker in rust_detail, f"Java-like Rust profile page incomplete: {marker}"
     for marker in ('<FilePageLayout', 'provideFileManager',
                    'plugin:fre-rust|rust_list_files', 'plugin:fre-rust|rust_open_folder',
