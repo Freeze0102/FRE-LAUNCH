@@ -545,6 +545,32 @@ fn find_legacy_resources() -> Result<PathBuf, String> {
     Err("No prepared Minecraft Rust resources were found. Select a folder with horizon-resources.json.".into())
 }
 
+/// Never destroy a damaged or interrupted resource cache: rename it
+/// atomically so setup can retry with a fresh directory. The backup remains
+/// under the FRE Rust data root for manual inspection.
+fn preserve_incomplete(path: &Path) -> Result<(), String> {
+    let metadata = match fs::symlink_metadata(path) {
+        Ok(metadata) => metadata,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(e) => return Err(format!("Could not inspect incomplete cache: {e}")),
+    };
+    if !metadata.file_type().is_dir() {
+        return Err("Unsafe Rust cache path: expected an ordinary directory, not a link or file.".into());
+    }
+    let parent = path.parent().ok_or("Invalid Rust cache parent")?;
+    let name = path.file_name().and_then(|s| s.to_str()).ok_or("Invalid cache name")?;
+    let time = SystemTime::now().duration_since(UNIX_EPOCH)
+        .map_err(|e| e.to_string())?.as_secs();
+    for suffix in 0..32 {
+        let backup = parent.join(format!("{name}.incomplete-{time}-{suffix}"));
+        if !backup.exists() {
+            return fs::rename(path, backup)
+                .map_err(|e| format!("Could not preserve incomplete Rust cache: {e}"));
+        }
+    }
+    Err("Too many incomplete Rust cache backups; inspect the data folder.".into())
+}
+
 #[tauri::command]
 async fn rust_import_resources<R: tauri::Runtime>(
     app: tauri::AppHandle<R>, source: String,
@@ -566,9 +592,13 @@ async fn rust_import_resources<R: tauri::Runtime>(
     if resources_valid(&destination) {
         return Ok("Already prepared; using your cached Minecraft 26.3 game files.".into());
     }
-    if destination.exists() {
-        return Err("Incomplete local Rust resource cache exists. Back it up before repairing.".into());
+    if RUNNING_PROFILES.lock().await.len() > 0 {
+        return Err("Close every running Rust game before repairing shared resources.".into());
     }
+    // Preserve a damaged cache and stale interrupted copy, then safely retry.
+    // Do not remove any of the user's original files or saved worlds.
+    preserve_incomplete(&destination)?;
+    preserve_incomplete(&base(&app)?.join("prepared.pending"))?;
     let selected = if source.trim().is_empty() {
         match find_legacy_resources() {
             Ok(existing) => existing,
