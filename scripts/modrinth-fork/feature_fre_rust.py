@@ -118,7 +118,18 @@ async function handleFreRustOrJavaCreate(config) {
         window.dispatchEvent(new Event('fre-rust-library-refresh'))
         // Engine is bundled with FRE LAUNCH. An authenticated owner's private
         // Minecraft resources may still need to be prepared or imported.
-        const status = await invoke('plugin:fre-rust|rust_runtime')
+        let status = await invoke('plugin:fre-rust|rust_runtime')
+        if (status.installed && !status.prepared) {
+            // Reuse an existing owner's prepared Horizon installation when
+            // present. No unlicensed assets are fetched or shipped.
+            try {
+                await invoke('plugin:fre-rust|rust_import_resources', { source: '' })
+                status = await invoke('plugin:fre-rust|rust_runtime')
+            } catch {
+                // No prepared local resources or ownership verification:
+                // open the in-app importer with the exact new profile.
+            }
+        }
         if (!status.prepared) showFreRustWizard(profile.id)
     } catch (error) {
         config.loading.value = false
@@ -284,6 +295,13 @@ async function handleFreRustOrJavaCreate(config) {
         messages = json.loads(locale.read_text(encoding='utf-8'))
         for key, pair in grid_translations.items():
             messages['fre-rust.grid.' + key] = {'message': pair[position]}
+        rust_requirement = (
+            'Rust Minecraft використовує окремий рушій та потребує підготовлених ресурсів Minecraft '
+            'і Microsoft-акаунта з придбаною Java Edition. Rust — не Java-збірка Fabric.',
+            'Rust Minecraft uses a separate native engine and needs your prepared Minecraft game resources '
+            'and a Microsoft account that owns Java Edition. A Rust profile is not a Fabric modpack.',
+        )
+        messages['fre-rust.create.requirement'] = {'message': rust_requirement[position]}
         locale.write_text(json.dumps(messages, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
 
     # Preserve the older Horizon adapter and its UI so an update does not
