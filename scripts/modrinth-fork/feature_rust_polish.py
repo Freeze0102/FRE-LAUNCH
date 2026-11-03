@@ -304,15 +304,15 @@ function activateCard(event: MouseEvent, card: Card) {
             "import { invoke } from '@tauri-apps/api/core'\n"
             "import { MinusIcon, SquarePlusIcon, TrashIcon } from '@modrinth/assets'")
     exactly(bar, "import { computed, ref } from 'vue'",
-            "import { computed, onMounted, onUnmounted, ref } from 'vue'")
+            "import { computed, onMounted, onUnmounted, ref } from 'vue'\nimport type { GameInstance } from '@/helpers/types'")
     exactly(bar, "const deleting = ref(false)",
             """const deleting = ref(false)
-const freRustProfiles = ref([])
+const freRustProfiles = ref<{ id: string; name: string; iconPath?: string | null }[]>([])
 let freRustRequest = 0
 async function refreshNativeRustForSelection() {
     const request = ++freRustRequest
     try {
-        const profiles = await invoke('plugin:fre-rust|rust_profiles')
+        const profiles = await invoke<{ id: string; name: string; iconPath?: string | null }[]>('plugin:fre-rust|rust_profiles')
         if (request === freRustRequest) freRustProfiles.value = profiles
     } catch { if (request === freRustRequest) freRustProfiles.value = [] }
 }
@@ -344,7 +344,7 @@ const hasRustSelection = computed(() =>
             icon_path: profile.iconPath ?? null,
             loader: 'Rust',
             game_version: '26.3',
-        })),
+        }) as unknown as GameInstance),
 ])""")
     exactly(bar,
             "const instanceIds = selectedInstanceIds.value\n\tclearLibraryInstanceSelection()",
