@@ -11,9 +11,7 @@ type NativeFile = { name: string; bytes: number; isDirectory: boolean }
 type Folder = 'root' | 'mods' | 'resourcepacks' | 'shaderpacks' | 'saves' | 'logs' | 'screenshots'
 const allowed: readonly string[] = ['root', 'mods', 'resourcepacks', 'shaderpacks', 'saves', 'logs', 'screenshots']
 const props = defineProps<{
-  kind: 'native' | 'horizon'
   profileId: string
-  horizonExecutable: string
   initialFolder?: Folder
 }>()
 const { handleError } = injectNotificationManager()
@@ -47,13 +45,9 @@ async function refresh() {
   error.value = null
   try {
     const folder = folderForPath(currentPath.value)
-    const results = props.kind === 'native'
-      ? await invoke<NativeFile[]>('plugin:fre-rust|rust_list_files', {
-        profileId: props.profileId, folder,
-      })
-      : await invoke<NativeFile[]>('plugin:fre-horizon|horizon_list_files', {
-        exePath: props.horizonExecutable, name: props.profileId, folder,
-      })
+    const results = await invoke<NativeFile[]>('plugin:fre-rust|rust_list_files', {
+      profileId: props.profileId, folder,
+    })
     if (current !== request) return
     items.value = results.map(file => ({
       name: file.name,
@@ -87,20 +81,14 @@ function notifyUnsupported() { handleError(readOnlyMessage()) }
 async function openInExplorer() {
   try {
     const folder = folderForPath(currentPath.value)
-    if (props.kind === 'native') {
-      await invoke('plugin:fre-rust|rust_open_folder', {
-        profileId: props.profileId, folder,
-      })
-    } else {
-      await invoke('plugin:fre-horizon|horizon_open_folder', {
-        exePath: props.horizonExecutable, name: props.profileId, folder,
-      })
-    }
+    await invoke('plugin:fre-rust|rust_open_folder', {
+      profileId: props.profileId, folder,
+    })
   } catch (err) {
     handleError(err instanceof Error ? err : new Error(String(err)))
   }
 }
-watch(() => [props.kind, props.profileId, props.horizonExecutable, props.initialFolder], () => {
+watch(() => [props.profileId, props.initialFolder], () => {
   currentPath.value = props.initialFolder && props.initialFolder !== 'root' ? props.initialFolder : ''
   void refresh()
 })
