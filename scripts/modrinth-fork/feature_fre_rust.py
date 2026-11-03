@@ -351,19 +351,8 @@ onUnmounted(() => {
     exactly(index,
             '\t<WelcomeScreen v-if="isReady && !hasCreatedInstance" />\n\t<div\n\t\tv-else-if="isReady"',
             '\t<WelcomeScreen v-if="isReady && !hasCreatedInstance && rustHomeReady && !hasRustProfiles" />\n\t<div\n\t\tv-else-if="isReady && (hasCreatedInstance || hasRustProfiles)"')
-    exactly(index,
-            '\t\t<LibrarySection :instances="instances" />\n\t\t<HorizonLibrary />',
-            '\t\t<LibrarySection :instances="instances" />')
-    exactly(index,
-            '\t<HorizonLibrary v-if="isReady && !hasCreatedInstance" class="px-6 pb-6" />',
-            '')
-
-    stage = root / "packages/ui/src/components/flows/creation-flow-modal/components/SetupTypeStage.vue"
-    exactly(stage, "defaultMessage: 'Horizon (Rust)'",
-            "defaultMessage: 'Minecraft (Rust)'")
-    exactly(stage,
-            "defaultMessage: 'Separate native Rust Minecraft client and versions; FRE LAUNCH launches the game directly.'",
-            "defaultMessage: 'An independent Rust game, installed and played inside FRE LAUNCH.'")
+    # No second library section or Horizon setup option is ever inserted.
+    # The original Java Home and Create layouts remain unchanged.
 
     # The Rust instance details share the launcher's UA/EN locale system.
     # Keep all UI strings localizable rather than painting Ukrainian over EN.
