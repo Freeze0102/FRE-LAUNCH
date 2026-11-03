@@ -456,6 +456,18 @@ onUnmounted(() => {
                 'Файли Rust наразі змінюються через провідник Windows.',
                 'Native Rust files are currently managed using your file explorer.',
             ),
+            'fre-rust.page.rename': ('Назва збірки', 'Instance name'),
+            'fre-rust.page.save-name': ('Зберегти назву', 'Save name'),
+            'fre-rust.page.delete': ('Видалити збірку', 'Delete instance'),
+            'fre-rust.page.install': ('Підготувати ресурси', 'Prepare game resources'),
+            'fre-rust.page.installing': ('Підготовка…', 'Preparing…'),
+            'fre-rust.page.install-failed': (
+                'Для автоматичної підготовки потрібна встановлена ліцензійна Minecraft Java Edition та активний Microsoft-акаунт.',
+                'Automatic preparation requires an owned Minecraft Java Edition installation and an active Microsoft account.',
+            ),
+            'fre-rust.page.choose-resources': ('Обрати папку ресурсів', 'Choose prepared resources folder'),
+            'fre-rust.page.resources': ('Файли гри', 'Game resources'),
+            'fre-rust.page.preparing': ('Перевірка локальних ресурсів…', 'Checking locally available resources…'),
         }
         for key, pair in detail_messages.items():
             messages[key] = {'message': pair[position]}
