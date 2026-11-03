@@ -525,3 +525,7 @@ onUnmounted(() => {
         if runtime.exists():
             raise RuntimeError("Incomplete fre-rust-runtime staging; run BUILD-FRE-RUST.ps1 again.")
         print("Native FRE Rust engine is not yet built; Play will be disabled with an explicit explanation.")
+
+    from feature_rust_polish import apply as apply_rust_polish
+    apply_rust_polish(root)
+    print("Integrated Rust instances into the existing Java quick switcher, selection and bulk delete.")
