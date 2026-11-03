@@ -1,4 +1,4 @@
-name: FRE LAUNCH final Rust native settings and Home preflight
+name: FRE LAUNCH unified Rust sidebar selection settings and animation preflight
 
 on:
   push:
