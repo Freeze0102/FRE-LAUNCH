@@ -468,6 +468,18 @@ onUnmounted(() => {
             'fre-rust.page.choose-resources': ('Обрати папку ресурсів', 'Choose prepared resources folder'),
             'fre-rust.page.resources': ('Файли гри', 'Game resources'),
             'fre-rust.page.preparing': ('Перевірка локальних ресурсів…', 'Checking locally available resources…'),
+            'fre-rust.page.tab.general': ('Загальні', 'General'),
+            'fre-rust.page.tab.installation': ('Встановлення', 'Installation'),
+            'fre-rust.page.section.instance': ('Збірка', 'Instance'),
+            'fre-rust.page.section.game': ('Гра', 'Game'),
+            'fre-rust.page.delete-notice': (
+                'Остаточно видаляє цю Rust-збірку разом зі світами. Спільні ресурси гри залишаться.',
+                'Permanently deletes this Rust instance and its worlds. Shared game resources are kept.',
+            ),
+            'fre-rust.page.not-downloaded': (
+                'Порожній профіль не встановлює Minecraft автоматично. Підготуй файли зі своєї придбаної гри.',
+                'An empty profile does not install Minecraft automatically. Prepare files from your owned game.',
+            ),
         }
         for key, pair in detail_messages.items():
             messages[key] = {'message': pair[position]}
