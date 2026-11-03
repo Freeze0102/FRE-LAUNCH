@@ -1,4 +1,4 @@
-name: FRE LAUNCH Rust native management and accessible menu preflight
+name: FRE LAUNCH final Rust native settings and Home preflight
 
 on:
   push:
