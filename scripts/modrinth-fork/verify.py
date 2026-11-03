@@ -171,6 +171,9 @@ def verify(root):
 
     # The new implementation does not invoke a foreign Minecraft launcher.
     rust_backend=(root/"apps/app/src/api/fre_rust.rs").read_text(encoding="utf-8")
+    rust_setup=(root/"apps/app/src/api/fre_rust_setup.rs").read_text(encoding="utf-8")
+    rust_mods=(root/"apps/app-frontend/src/components/ui/RustNativeMods.vue").read_text(encoding="utf-8")
+    rust_quick=(root/"apps/app-frontend/src/components/ui/QuickInstanceSwitcher.vue").read_text(encoding="utf-8")
     rust_panel=(root/"apps/app-frontend/src/components/ui/FreRustPanel.vue").read_text(encoding="utf-8")
     rust_library=(root/"apps/app-frontend/src/components/ui/FreRustLibrary.vue").read_text(encoding="utf-8")
     unified_rust=(root/"apps/app-frontend/src/components/ui/library/instance-group/RustInstanceGrid.vue").read_text(encoding="utf-8")
@@ -188,7 +191,9 @@ def verify(root):
     assert "const MAX_ICON_BYTES:" in rust_backend and "fn prepare_icon(" in rust_backend
     assert "icon_path: Option<String>" in rust_backend and "icon_bytes: Option<Vec<u8>>" in rust_backend
     assert 'profile.icon_path = ["icon.png", "icon.jpg", "icon.webp"]' in rust_backend
-    assert "fre-horizon:default" in rust_permissions["permissions"], "Existing Horizon profiles must remain accessible"
+    # Old Horizon adapter may remain installed for archival compatibility,
+    # but it must never be invoked by the active FRE Rust UI.
+    assert "fre-horizon:default" in rust_permissions["permissions"]
     assert 'pub mod fre_rust;' in (root/"apps/app/src/api/mod.rs").read_text(encoding="utf-8")
     assert "pub mod horizon;" in (root/"apps/app/src/api/mod.rs").read_text(encoding="utf-8")
     for source, markers in (
@@ -200,6 +205,7 @@ def verify(root):
             "theseus::minecraft_auth::fre_rust_default_credentials", "online_profile_fresh",
             "verify_native_client", "Sha256::new", "RUNNING_PROFILES",
             "profile_id_valid", "read_profile", "safe_game_folder", "rust_open_folder", "rust_list_files", "list_game_files", "explorer.exe",
+            "rust_import_mod", "owned_mods", "ensure_rust_icon", "default_rust_icon",
         ]),
         (rust_panel, [
             "plugin:fre-rust|rust_import_resources", "plugin:fre-rust|rust_create_profile", "plugin:fre-rust|rust_launch",
@@ -219,7 +225,7 @@ def verify(root):
         ]),
         (rust_stage, ["Minecraft (Rust)"]),
         (rust_main, [".plugin(api::fre_rust::init())", ".plugin(api::horizon::init())"]),
-        (rust_build, ['"fre-rust"', '"fre-horizon"', '"rust_create_profile"', '"rust_rename_profile"', '"rust_delete_profile"', '"rust_launch"',
+        (rust_build, ['"fre-rust"', '"fre-horizon"', '"rust_create_profile"', '"rust_rename_profile"', '"rust_delete_profile"', '"rust_import_mod"', '"rust_launch"',
             '"rust_open_folder"', '"rust_list_files"', '"horizon_open_folder"', '"horizon_list_files"']),
     ):
         for marker in markers:
@@ -232,6 +238,14 @@ def verify(root):
     assert "theseus::state::" not in rust_backend and "state.pool" not in rust_backend
     assert "use theseus::{State" not in rust_backend
     assert rust_backend.count("theseus::minecraft_auth::fre_rust_default_credentials()") == 2
+    assert 'standalone_setup::prepare(' in rust_backend
+    assert 'fre-rust-prepare.exe' in rust_setup
+    assert 'piston-meta.mojang.com' in rust_setup and 'resources.download.minecraft.net' in rust_setup
+    assert 'horizon_install_launcher' not in rust_backend and 'prepare_for_native_rust' not in rust_backend
+    assert 'native_mods_for_profile' not in rust_backend
+    for native_ui in (unified_rust, rust_detail, rust_files, rust_quick, rust_mods, rust_panel):
+        assert 'plugin:fre-horizon|' not in native_ui, "Rust UI must not require the Horizon Launcher"
+    assert 'plugin:fre-rust|rust_import_mod' in rust_mods
     for key in (
         "fre-rust.setup.title", "fre-rust.setup.create", "fre-rust.setup.error",
         "fre-rust.setup.import", "fre-rust.setup.source", "fre-rust.setup.browse",
@@ -248,14 +262,16 @@ def verify(root):
     if runtime_source.is_dir():
         assert rust_mapping["fre-rust-runtime/BUILD-INFO.json"] == "fre-rust/BUILD-INFO.json"
         assert rust_mapping["fre-rust-runtime/fre-rust-client.exe"] == "fre-rust/fre-rust-client.exe"
+        assert rust_mapping["fre-rust-runtime/fre-rust-prepare.exe"] == "fre-rust/fre-rust-prepare.exe"
+        assert rust_mapping["fre-rust-runtime/crates/horizon-prepare/src/exporters.rs"] == "fre-rust/crates/horizon-prepare/src/exporters.rs"
         assert rust_mapping.get("fre-rust-runtime/resources/") == (
             "fre-rust/resources/" if (runtime_source/"resources/horizon-resources.json").is_file() else None
         )
     else:
         assert "fre-rust-runtime/fre-rust-client.exe" not in rust_mapping
 
-    # The old Horizon profiles remain usable. The new native game never invokes
-    # the external launcher or imports existing worlds without consent.
+    # Legacy folders and adapter remain for backup only. They are NOT presented
+    # as FRE Rust profiles, and no worlds are removed or silently migrated.
     assert (root/"apps/app/src/api/horizon.rs").exists()
     assert (root/"apps/app-frontend/src/components/ui/HorizonRustPanel.vue").exists()
     legacy_library = (root/"apps/app-frontend/src/components/ui/HorizonLibrary.vue").read_text(encoding="utf-8")
@@ -277,8 +293,7 @@ def verify(root):
     # Native Rust uses the EXACT same visual card and page-level building
     # blocks as Java. No bespoke library card, modal or Java game dispatch.
     for marker in ('<InstanceCardView', ':instance="viewInstance(card)"',
-                   'plugin:fre-rust|rust_profiles', 'plugin:fre-horizon|horizon_detect_launcher',
-                   'plugin:fre-rust|rust_launch', 'plugin:fre-horizon|horizon_direct_play',
+                   'plugin:fre-rust|rust_profiles', 'plugin:fre-rust|rust_launch',
                    'data-library-instance-card', "'/rust-instance/'"):
         assert marker in unified_rust, f"Shared Java card integration missing: {marker}"
     assert '<Teleport' not in unified_rust and 'role="dialog"' not in unified_rust, (
@@ -288,12 +303,10 @@ def verify(root):
                    '<NavTabs', '<RustInstanceFiles', '<ConfirmDeleteInstanceModal',
                    '<TabbedModal', 'query="tab"', 'fre-rust-tab', 'rust_rename_profile', 'rust_delete_profile',
                    'useRootBreadcrumb',
-                   'plugin:fre-rust|rust_launch', 'plugin:fre-horizon|horizon_direct_play',
-                   'showHorizonWizard'):
+                   'plugin:fre-rust|rust_launch', 'plugin:fre-rust|rust_import_resources'):
         assert marker in rust_detail, f"Java-like Rust profile page incomplete: {marker}"
     for marker in ('<FilePageLayout', 'provideFileManager',
                    'plugin:fre-rust|rust_list_files', 'plugin:fre-rust|rust_open_folder',
-                   'plugin:fre-horizon|horizon_list_files', 'plugin:fre-horizon|horizon_open_folder',
                    'isReadOnly: () => true'):
         assert marker in rust_files, f"Rust shared file browser unavailable: {marker}"
     assert "path: '/rust-instance/:kind(native|horizon)/:id'" in rust_routes
