@@ -12,6 +12,8 @@ use std::{
 };
 use tauri::{Emitter, Manager};
 use tokio::io::AsyncWriteExt;
+#[path = "fre_rust_setup.rs"]
+mod standalone_setup;
 
 const MAX_NAME: usize = 64;
 const MAX_METADATA: u64 = 8192;
@@ -628,7 +630,7 @@ async fn rust_import_resources<R: tauri::Runtime>(
     let selected = if source.trim().is_empty() {
         match find_legacy_resources() {
             Ok(existing) => existing,
-            Err(_) => super::horizon::prepare_for_native_rust(app.clone()).await?,
+            Err(_) => standalone_setup::prepare(app.clone(), &runtime, &base(&app)?).await?,
         }
     } else {
         PathBuf::from(source.trim())
