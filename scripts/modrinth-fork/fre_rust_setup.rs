@@ -179,7 +179,11 @@ fn prepare_root(bundle: &Path, data: &Path) -> Result<PathBuf, String> {
         return Err("Unsafe native resource preparer directory.".into());
     }
     fs::create_dir_all(&root).map_err(|e| e.to_string())?;
-    for relative in ["research-lock.json", "crates/horizon-prepare/src/exporters.rs"] {
+    for relative in [
+        "research-lock.json",
+        "crates/horizon-prepare/Cargo.toml",
+        "crates/horizon-prepare/build.rs",
+    ] {
         let input = bundle.join(relative);
         let output = root.join(relative);
         let m = input.symlink_metadata().map_err(|e| format!("Missing bundled preparer source: {e}"))?;
@@ -192,6 +196,33 @@ fn prepare_root(bundle: &Path, data: &Path) -> Result<PathBuf, String> {
         }
         fs::copy(&input, &output).map_err(|e| format!("Cannot stage Rust preparer: {e}"))?;
     }
+    // Match the pinned preparer's source checksum: Cargo.toml + build.rs
+    // + all Rust src/*.rs, not merely the exporter implementation.
+    let crate_src = bundle.join("crates/horizon-prepare/src");
+    let target_src = root.join("crates/horizon-prepare/src");
+    let crate_meta = crate_src.symlink_metadata().map_err(|e| format!("Missing native source snapshot: {e}"))?;
+    if !crate_meta.file_type().is_dir() {
+        return Err("Native preparer source snapshot is not an ordinary directory.".into());
+    }
+    fs::create_dir_all(&target_src).map_err(|e| e.to_string())?;
+    let mut rust_sources = 0usize;
+    for entry in fs::read_dir(&crate_src).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let path = entry.path();
+        let meta = fs::symlink_metadata(&path).map_err(|e| e.to_string())?;
+        if !meta.file_type().is_file() || path.extension().is_none_or(|ext| ext != "rs")
+            || meta.len() > 1024 * 1024 {
+            return Err("Invalid file in bundled Rust preparer sources.".into());
+        }
+        let dst = target_src.join(entry.file_name());
+        if dst.exists() && !dst.symlink_metadata().is_ok_and(|m| m.file_type().is_file()) {
+            return Err("Unsafe native Rust source cache path.".into());
+        }
+        fs::copy(path, dst).map_err(|e| format!("Cannot stage Rust source: {e}"))?;
+        rust_sources += 1;
+        if rust_sources > 40 { return Err("Oversized native Rust source snapshot.".into()); }
+    }
+    if rust_sources < 10 { return Err("Native Rust source snapshot is incomplete.".into()); }
     let parity = "mods/horizon/src/test/java/dev/horizonlab/parity";
     bounded_copy_tree(&bundle.join(parity), &root.join(parity))?;
     Ok(root)
