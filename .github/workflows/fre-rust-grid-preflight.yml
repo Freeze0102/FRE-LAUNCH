@@ -1,4 +1,4 @@
-name: FRE LAUNCH shared Java card and full Rust profile page preflight
+name: FRE LAUNCH verified Rust Play, settings, delete and restored Home preflight
 
 on:
   push:
