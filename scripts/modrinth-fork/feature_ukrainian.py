@@ -171,35 +171,6 @@ UI = {
 "user-restrictions.scope.version-write":"Редагувати версії та додавати файли"
 }
 NEW = {
-"fre-launch.horizon.minecraft-folder":("Вибрати папку Minecraft для підготовки (необов’язково)","Choose Minecraft folder for preparation (optional)"),
-"fre-launch.horizon.title":("Horizon (Rust)","Horizon (Rust)"),
-"fre-launch.horizon.subtitle":("Окремий клієнт Minecraft на Rust. Версії, моди, світи й оновлення Horizon зберігаються окремо від Java-збірок.","A separate Rust-based Minecraft client. Horizon versions, mods, worlds and updates are managed independently of Java instances."),
-"fre-launch.horizon.requirement":("Потрібен офіційний Horizon для Windows і Minecraft: Java Edition 26.3, установлена й запущена хоча б раз. Вимоги до акаунта залежать від обраного випуску Horizon; дотримуйся його офіційних інструкцій. Java-моди Fabric/Forge не підтримуються.","Requires the official Horizon Windows launcher and Minecraft: Java Edition 26.3 installed and opened once. Account requirements depend on the selected Horizon release; follow its official instructions. Java Fabric/Forge mods are not supported."),
-"fre-launch.horizon.launcher-label":("Файл запуску Horizon","Horizon executable"),
-"fre-launch.horizon.choose-exe":("Вибрати horizon-launcher.exe","Choose horizon-launcher.exe"),
-"fre-launch.horizon.release":("Офіційне завантаження та інструкція","Official download and installation instructions"),
-"fre-launch.horizon.name":("Назва нової Horizon-збірки","New Horizon instance name"),
-"fre-launch.horizon.placeholder":("Мій Minecraft на Rust","My Rust Minecraft"),
-"fre-launch.horizon.create":("Створити Horizon-збірку","Create Horizon instance"),
-"fre-launch.horizon.creating":("Створюємо...","Creating..."),
-"fre-launch.horizon.launch-name":("Назва збірки для запуску","Instance to launch (name)"),
-"fre-launch.horizon.play":("Грати через Horizon","Play Horizon"),
-"fre-launch.horizon.playing":("Запускаємо...","Launching..."),
-"fre-launch.horizon.list":("Показати збірки Horizon","Show Horizon instances"),
-"fre-launch.horizon.logs":("Показати логи Horizon","Show Horizon logs"),
-"fre-launch.horizon.versions":("Версії Horizon","Horizon releases"),
-"fre-launch.horizon.show-versions":("Показати встановлені версії","Show installed versions"),
-"fre-launch.horizon.release-tag":("Версія Horizon або тег випуску","Horizon version or release tag"),
-"fre-launch.horizon.install-version":("Установити версію Horizon","Install this Horizon version"),
-"fre-launch.horizon.use-version":("Вибрати версію для збірки","Use version for selected instance"),
-"fre-launch.horizon.prepare":("Підготувати ресурси Minecraft 26.3","Prepare Minecraft 26.3 assets"),
-"fre-launch.horizon.first-run":("Спочатку встанови версію Horizon, потім підготуй ресурси з інсталяції Minecraft 26.3 перед запуском гри.","First install a Horizon version, then prepare game assets from a Minecraft 26.3 installation before Play."),
-"fre-launch.horizon.log-privacy":("Логи читаються тільки локально; нічого не завантажується в інтернет.","Logs are read locally only; nothing is uploaded."),
-"fre-launch.horizon.close":("Закрити","Close"),
-"fre-launch.horizon.not-configured":("Спочатку вибери виконуваний файл Horizon.","Choose the Horizon launcher executable first."),
-"fre-launch.horizon.error":("Помилка Horizon: {reason}","Horizon error: {reason}"),
-"fre-launch.horizon.about":("Horizon розробляє інша команда. FRE LAUNCH запускає його офіційні команди, але не змінює й не виправляє код гри.","Horizon is maintained by its own developers. FRE LAUNCH starts its official CLI; it does not change or repair Horizon game code."),
-"fre-launch.horizon.separate":("Наявні Java-збірки Minecraft, моди та світи залишаються без змін.","Existing Minecraft Java instances, mods and worlds remain untouched."),
 "fre-launch.cf.source":("Джерело модів","Mod source"),
 "fre-launch.cf.intro":("Моди з CurseForge можна встановлювати в ту саму збірку, що й моди з Modrinth.","Mods from CurseForge can be installed into the same game instance as Modrinth mods."),
 "fre-launch.cf.pack-intro":("Шукай модпаки CurseForge та відкривай їхні сторінки. Автоматичне встановлення ZIP-модпаків поки недоступне.","Find CurseForge modpacks and open their project pages. Installing CurseForge ZIP packs is not available yet."),
@@ -317,18 +288,6 @@ def _complete(english, ukrainian, curated, field):
             english_fallback+=1
     return added, english_fallback
 
-HORIZON_UI_NEW = {
-"fre-launch.horizon.option.title":("Minecraft на Rust","Minecraft (Rust)"),
-"fre-launch.horizon.option.description":("Власний Minecraft на Rust, вбудований у FRE LAUNCH. Без окремого лаунчера.","An independent Rust game, installed and played inside FRE LAUNCH."),
-}
-
-NEW.update({
-    'fre-launch.horizon.setup.' + name: tuple(translations)
-    for name, translations in json.loads(
-        (Path(__file__).parent / 'horizon-setup-messages.json').read_text(encoding='utf-8')
-    ).items()
-})
-
 # Distinct from Java game instance rows: Rust profiles appear as independent
 # cards sourced from the installed Horizon profile manifest.
 NEW.update({
@@ -407,11 +366,6 @@ def apply(root):
             raise RuntimeError(f"Locale name collision: {key}")
         ua[key]={"message":uk}
         ea[key]={"message":en}
-    for key,(uk,en) in HORIZON_UI_NEW.items():
-        if key in uu or key in eu:
-            raise RuntimeError(f"UI locale name collision: {key}")
-        uu[key]={"defaultMessage":uk}
-        eu[key]={"defaultMessage":en}
     # A nickname-only profile completes onboarding without a Microsoft login;
     # name this as choosing a profile, not signing into official services.
     ea["onboarding-checklist.login-minecraft"]={"message":"Set up Minecraft profile"}
