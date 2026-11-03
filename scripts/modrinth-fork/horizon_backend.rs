@@ -286,6 +286,108 @@ async fn run_cli(exe: &Path, args: &[&str], timeout: Duration) -> Result<String,
     output_string(output)
 }
 
+
+//// Verified Horizon helper: prepare proprietary Minecraft assets only on
+//// the signed-in owner's PC. Neither assets nor tokens are shipped by FRE.
+pub async fn prepare_for_native_rust<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+) -> Result<PathBuf, String> {
+    if !cfg!(all(windows, target_arch = "x86_64")) {
+        return Err("Automatic Horizon preparation requires Windows x64.".into());
+    }
+    let _ = app.emit("fre-rust-prepare-stage", "helper");
+    let exe = bootstrap::install(&launcher_directory(&app)?, |_| {}).await?;
+    let exe_path = exe.to_string_lossy().into_owned();
+    let mut status = horizon_status(exe_path.clone()).await?;
+    if status.installed_versions.is_empty() {
+        let _ = app.emit("fre-rust-prepare-stage", "version");
+        run_cli(&exe, &["install", "latest"], INSTALL_TIMEOUT).await?;
+        status = horizon_status(exe_path).await?;
+    }
+    let version = status.selected_version.as_deref()
+        .filter(|tag| status.installed_versions.iter().any(|installed| installed.as_str() == *tag))
+        .or_else(|| status.installed_versions.first().map(String::as_str))
+        .ok_or("Horizon did not install a Rust game version.")?;
+    let version = validate_version(version)?.to_owned();
+    if !status.prepared_versions.contains(&version) {
+        // Prefer existing installations; only fetch missing resources from
+        // Mojang after this attempt fails. Official Horizon verifies hashes,
+        // account ownership and downloads, and resumes its own cache.
+        let _ = app.emit("fre-rust-prepare-stage", "local");
+        if run_cli(&exe, &["prepare", "--version", &version], INSTALL_TIMEOUT).await.is_err() {
+            let _ = app.emit("fre-rust-prepare-stage", "download");
+            run_cli(&exe, &["prepare", "--download", "--version", &version], INSTALL_TIMEOUT)
+                .await.map_err(|error| format!(
+                    "Minecraft could not be prepared by Horizon: {error}. Sign in to your Minecraft-owning Microsoft account in Horizon and retry."
+                ))?;
+        }
+    }
+    let data = std::env::var_os("HORIZON_LAUNCHER_HOME")
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+        .or_else(|| std::env::var_os("APPDATA").map(|dir| PathBuf::from(dir).join("horizon-launcher")))
+        .unwrap_or(app.path().data_dir().map_err(|e| e.to_string())?.join("horizon-launcher"));
+    let release = data.join("versions").join(&version);
+    let game_version = std::fs::read(release.join("research-lock.json")).ok()
+        .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
+        .and_then(|json| json.pointer("/minecraft/version").and_then(|value| value.as_str()).map(str::to_owned))
+        .unwrap_or_else(|| "26.3".into());
+    if game_version != "26.3" {
+        return Err(format!("Horizon {version} uses Minecraft {game_version}, while this FRE Rust engine requires 26.3."));
+    }
+    let resources = release.join(".local").join("horizon-client").join("26.3");
+    if !resources.join("horizon-resources.json").is_file() {
+        return Err("Horizon finished without a valid Minecraft 26.3 resource manifest.".into());
+    }
+    Ok(resources)
+}
+
+/// Execute the official checked CLI with a native FRE profile as its
+/// Horizon home. Native mod downloads and signatures remain Horizon's
+/// responsibility; Java JARs are never installed as native mods here.
+pub async fn native_mods_for_profile<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    profile_home: &Path,
+    action: &str,
+    project: &str,
+) -> Result<String, String> {
+    if !cfg!(all(windows, target_arch = "x86_64")) {
+        return Err("Horizon native mod browsing requires Windows x64.".into());
+    }
+    let exe = bootstrap::install(&launcher_directory(&app)?, |_| {}).await?;
+    let args: Vec<&str> = match action {
+        "list" => vec!["--json", "mods", "list", "--instance", "horizon"],
+        "search" => {
+            if project.trim().is_empty() || project.chars().count() > 100 {
+                return Err("Enter a search term (up to 100 characters).".into());
+            }
+            vec!["--json", "mods", "search", project, "--kind", "mod", "--source", "horizon", "--instance", "horizon"]
+        }
+        "install" | "remove" => {
+            if project.is_empty() || project.len() > 128 ||
+                !project.bytes().all(|c| c.is_ascii_alphanumeric() || matches!(c, b'-' | b'_' | b'.')) ||
+                project == "." || project == ".." {
+                return Err("Invalid Horizon mod identifier.".into());
+            }
+            if action == "install" {
+                vec!["mods", "install", project, "--instance", "horizon", "--source", "horizon"]
+            } else {
+                vec!["mods", "remove", project, "--instance", "horizon"]
+            }
+        }
+        _ => return Err("Unsupported Horizon mod operation.".into()),
+    };
+    let _operation = OPERATION.try_lock().map_err(|_| "Another Horizon operation is still running.")?;
+    let child = command(&exe).args(&args)
+        .env("HORIZON_HOME", profile_home)
+        .kill_on_drop(true)
+        .spawn().map_err(|e| format!("Could not run the Horizon mod manager: {e}"))?;
+    let output = tokio::time::timeout(INSTALL_TIMEOUT, collect(child)).await
+        .map_err(|_| "Horizon mod operation timed out.")?
+        .map_err(|e| format!("Horizon mod operation failed: {e}"))?;
+    output_string(output)
+}
+
 #[tauri::command]
 async fn horizon_instances(exe_path: String) -> Result<String, String> {
     run_cli(&validate_launcher(&exe_path)?, &["instance", "list"], QUICK_TIMEOUT).await

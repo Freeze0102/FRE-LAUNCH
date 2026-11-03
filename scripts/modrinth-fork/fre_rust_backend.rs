@@ -10,7 +10,7 @@ use std::{
     process::Stdio,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 use tokio::io::AsyncWriteExt;
 
 const MAX_NAME: usize = 64;
@@ -59,6 +59,7 @@ pub fn init<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
             rust_delete_profile,
             rust_runtime,
             rust_import_resources,
+            rust_mods,
             rust_launch,
             rust_logs,
             rust_open_folder,
@@ -240,7 +241,7 @@ async fn rust_create_profile<R: tauri::Runtime>(
                 }
                 // A real independent game home, not a shortcut to a foreign
                 // launcher. Each instance has its own worlds and native mods.
-                for folder in ["saves", "mods", "resourcepacks", "shaderpacks", "screenshots", "logs"] {
+                for folder in ["saves", "horizon-mods", "resourcepacks", "shaderpacks", "screenshots", "logs"] {
                     if let Err(error) = fs::create_dir(dir.join(folder)) {
                         let _ = fs::remove_dir_all(&dir); // Freshly created, never user data.
                         return Err(format!("Could not initialize Rust game folders: {error}"));
@@ -383,9 +384,54 @@ fn verify_native_client(root: &Path) -> Result<(), String> {
     Ok(())
 }
 
+/// Quick integrity check for a completed Horizon preparation. A filename
+/// alone is not proof of a usable cache: partial copies and stale manifests
+/// must not make the library's Play button report Ready.
+fn resources_valid(root: &Path) -> bool {
+    use std::io::Read;
+    let manifest = root.join("horizon-resources.json");
+    let Ok(meta) = fs::symlink_metadata(&manifest) else { return false };
+    if !meta.file_type().is_file() || meta.len() == 0 || meta.len() > 2 * 1024 * 1024 {
+        return false;
+    }
+    let Ok(bytes) = fs::read(&manifest) else { return false };
+    let Ok(value) = serde_json::from_slice::<serde_json::Value>(&bytes) else { return false };
+    if value.get("minecraft").and_then(|v| v.as_str()) != Some("26.3")
+        || !value.get("schema").and_then(|v| v.as_i64()).is_some_and(|v| v > 0) {
+        return false;
+    }
+    // These hashes are recorded by Horizon's preparer and cover essential
+    // output. The official preparer verifies the rest at download/prep time.
+    for (field, relative) in [
+        ("facts_sha256", "facts.json"),
+        ("block_tags_sha256", "block-tags.json"),
+        ("collision_sha256", "cached-collision.nbt"),
+    ] {
+        let Some(expected) = value.get(field).and_then(|v| v.as_str()) else { return false };
+        if expected.len() != 64 || !expected.bytes().all(|b| b.is_ascii_hexdigit()) {
+            return false;
+        }
+        let path = root.join(relative);
+        let Ok(metadata) = fs::symlink_metadata(&path) else { return false };
+        if !metadata.file_type().is_file() { return false; }
+        let Ok(mut file) = fs::File::open(&path) else { return false };
+        let mut hasher = Sha256::new();
+        let mut buffer = [0u8; 65536];
+        loop {
+            let Ok(size) = file.read(&mut buffer) else { return false };
+            if size == 0 { break; }
+            hasher.update(&buffer[..size]);
+        }
+        if !format!("{:x}", hasher.finalize()).eq_ignore_ascii_case(expected) {
+            return false;
+        }
+    }
+    true
+}
+
 fn local_resources(data_root: &Path, bundle_root: &Path) -> PathBuf {
     let local = data_root.join("prepared");
-    if local.join("horizon-resources.json").is_file() {
+    if resources_valid(&local) {
         local
     } else {
         bundle_root.join("resources") // backwards-compatible personal installer
@@ -396,7 +442,7 @@ fn ready(root: &Path, data_root: &Path) -> RustRuntime {
     let (client, _) = runtime_files(root);
     let installed = client.is_file() && root.join("BUILD-INFO.json").is_file()
         && root.join("research-lock.json").is_file();
-    let prepared = local_resources(data_root, root).join("horizon-resources.json").is_file();
+    let prepared = resources_valid(&local_resources(data_root, root));
     let reason = if !installed {
         Some("The FRE LAUNCH Rust game was not included in this installer. Build and bundle the native client first.".into())
     } else if !prepared {
@@ -423,7 +469,7 @@ async fn rust_runtime<R: tauri::Runtime>(
 // The game engine is open source and bundled, but Mojang resources must
 // never be copied into a PUBLIC installer or downloaded from an unknown host.
 fn copy_prepared(source: &Path, target: &Path) -> Result<u64, String> {
-    if !source.join("horizon-resources.json").is_file() {
+    if !resources_valid(source) {
         return Err("Selected folder is not a prepared Minecraft Rust resource directory.".into());
     }
     if target.exists() {
@@ -468,7 +514,7 @@ fn copy_prepared(source: &Path, target: &Path) -> Result<u64, String> {
                 }
             }
         }
-        if !pending.join("horizon-resources.json").is_file() {
+        if !resources_valid(&pending) {
             return Err("Prepared resources manifest was not copied.".into());
         }
         fs::rename(&pending, target).map_err(|e| format!("Unable to finish resource import: {e}"))?;
@@ -494,9 +540,35 @@ fn find_legacy_resources() -> Result<PathBuf, String> {
         let Some(entry) = entries.next() else { break };
         let entry = entry.map_err(|e| e.to_string())?;
         let folder = entry.path().join(".local").join("horizon-client").join("26.3");
-        if folder.join("horizon-resources.json").is_file() { return Ok(folder); }
+        if resources_valid(&folder) { return Ok(folder); }
     }
     Err("No prepared Minecraft Rust resources were found. Select a folder with horizon-resources.json.".into())
+}
+
+/// Never destroy a damaged or interrupted resource cache: rename it
+/// atomically so setup can retry with a fresh directory. The backup remains
+/// under the FRE Rust data root for manual inspection.
+fn preserve_incomplete(path: &Path) -> Result<(), String> {
+    let metadata = match fs::symlink_metadata(path) {
+        Ok(metadata) => metadata,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(e) => return Err(format!("Could not inspect incomplete cache: {e}")),
+    };
+    if !metadata.file_type().is_dir() {
+        return Err("Unsafe Rust cache path: expected an ordinary directory, not a link or file.".into());
+    }
+    let parent = path.parent().ok_or("Invalid Rust cache parent")?;
+    let name = path.file_name().and_then(|s| s.to_str()).ok_or("Invalid cache name")?;
+    let time = SystemTime::now().duration_since(UNIX_EPOCH)
+        .map_err(|e| e.to_string())?.as_secs();
+    for suffix in 0..32 {
+        let backup = parent.join(format!("{name}.incomplete-{time}-{suffix}"));
+        if !backup.exists() {
+            return fs::rename(path, backup)
+                .map_err(|e| format!("Could not preserve incomplete Rust cache: {e}"));
+        }
+    }
+    Err("Too many incomplete Rust cache backups; inspect the data folder.".into())
 }
 
 #[tauri::command]
@@ -514,16 +586,57 @@ async fn rust_import_resources<R: tauri::Runtime>(
     if credentials.is_offline_profile() || credentials.online_profile_fresh().await.is_none() {
         return Err("Minecraft Java Edition ownership could not be verified.".into());
     }
+    let destination = base(&app)?.join("prepared");
+    // Idempotent: prepared assets are shared by all FRE Rust instances. A
+    // second launch never downloads or overwrites previously installed files.
+    if resources_valid(&destination) {
+        return Ok("Already prepared; using your cached Minecraft 26.3 game files.".into());
+    }
+    if RUNNING_PROFILES.lock().await.len() > 0 {
+        return Err("Close every running Rust game before repairing shared resources.".into());
+    }
+    // Preserve a damaged cache and stale interrupted copy, then safely retry.
+    // Do not remove any of the user's original files or saved worlds.
+    preserve_incomplete(&destination)?;
+    preserve_incomplete(&base(&app)?.join("prepared.pending"))?;
     let selected = if source.trim().is_empty() {
-        find_legacy_resources()?
+        match find_legacy_resources() {
+            Ok(existing) => existing,
+            Err(_) => super::horizon::prepare_for_native_rust(app.clone()).await?,
+        }
     } else {
         PathBuf::from(source.trim())
     };
     if !selected.is_dir() { return Err("Minecraft resource folder not found.".into()); }
-    let destination = base(&app)?.join("prepared");
+    let _ = app.emit("fre-rust-prepare-stage", "copy");
     let bytes = tokio::task::spawn_blocking(move || copy_prepared(&selected, &destination))
         .await.map_err(|e| e.to_string())??;
+    let _ = app.emit("fre-rust-prepare-stage", "ready");
     Ok(format!("Imported {bytes} bytes of your Minecraft resources into FRE LAUNCH."))
+}
+
+/// Search the official Horizon registry and install only its native mods.
+/// The checked official helper uses the validated FRE profile as HORIZON_HOME.
+#[tauri::command]
+async fn rust_mods<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    profile_id: String,
+    action: String,
+    project: Option<String>,
+) -> Result<String, String> {
+    let dir = profile_dir(&base(&app)?, &profile_id)?;
+    read_profile(&dir, &profile_id).ok_or("Rust profile does not exist.")?;
+    let dir = dir.canonicalize().map_err(|e| e.to_string())?;
+    if !dir.join("profile.json").is_file() && !dir.join("profile.json.backup").is_file() {
+        return Err("The Rust profile metadata is missing.".into());
+    }
+    if action != "search" && action != "list" &&
+        RUNNING_PROFILES.lock().await.contains(&profile_id) {
+        return Err("Close this Rust game before changing its mods.".into());
+    }
+    super::horizon::native_mods_for_profile(
+        app, &dir, &action, project.as_deref().unwrap_or(""),
+    ).await
 }
 
 #[tauri::command]
@@ -648,7 +761,12 @@ fn safe_game_folder(dir: &Path, folder: &str) -> Result<PathBuf, String> {
         return Err("Unsupported Rust game folder.".into());
     }
     let base = dir.canonicalize().map_err(|e| e.to_string())?;
-    let target = if folder == "root" { base.clone() } else { base.join(folder) };
+    let target = if folder == "root" { base.clone() } else if folder == "mods" { base.join("horizon-mods") } else { base.join(folder) };
+    // Profiles created before Horizon mod support have only a legacy 'mods'
+    // folder. Create the correct empty native folder without moving user data.
+    if folder == "mods" && !target.exists() {
+        fs::create_dir(&target).map_err(|e| format!("Could not create Horizon mods folder: {e}"))?;
+    }
     let resolved = target.canonicalize().map_err(|e| e.to_string())?;
     if !resolved.starts_with(&base) || !resolved.is_dir() {
         return Err("Cannot open a folder outside the Rust game profile.".into());
@@ -743,7 +861,7 @@ mod tests {
     fn only_profile_game_folders_are_openable() {
         let root = std::env::temp_dir().join(format!("fre-rust-folders-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
-        std::fs::create_dir_all(root.join("mods")).unwrap();
+        std::fs::create_dir_all(root.join("horizon-mods")).unwrap();
         assert!(safe_game_folder(&root, "root").is_ok());
         assert!(safe_game_folder(&root, "mods").is_ok());
         assert!(safe_game_folder(&root, "..").is_err());
@@ -756,9 +874,9 @@ mod tests {
     fn lists_only_allowed_local_files_without_following_links() {
         let root = tempfile::tempdir().unwrap();
         let dir = root.path();
-        fs::create_dir_all(dir.join("mods")).unwrap();
-        fs::write(dir.join("mods").join("native-mod.bin"), b"test").unwrap();
-        fs::create_dir_all(dir.join("mods").join("subfolder")).unwrap();
+        fs::create_dir_all(dir.join("horizon-mods")).unwrap();
+        fs::write(dir.join("horizon-mods").join("native-mod.bin"), b"test").unwrap();
+        fs::create_dir_all(dir.join("horizon-mods").join("subfolder")).unwrap();
         let items = list_game_files(dir, "mods").unwrap();
         assert_eq!(items.len(), 2);
         assert_eq!(items[0].name, "subfolder");
@@ -812,6 +930,46 @@ mod tests {
         fs::write(directory.path().join("fre-rust-client.exe"), b"MZ tampered").unwrap();
         assert!(verify_native_client(directory.path()).is_err());
     }
+    #[test]
+    fn cached_rust_resources_require_correct_version_and_file_hashes() {
+        let temp = tempfile::tempdir().unwrap();
+        let files = [
+            ("facts_sha256", "facts.json", &b"facts"[..]),
+            ("block_tags_sha256", "block-tags.json", &b"tags"[..]),
+            ("collision_sha256", "cached-collision.nbt", &b"collision"[..]),
+        ];
+        let mut manifest = serde_json::json!({"schema": 7, "minecraft": "26.3"});
+        for (key, name, bytes) in files {
+            fs::write(temp.path().join(name), bytes).unwrap();
+            manifest[key] = serde_json::Value::String(format!("{:x}", Sha256::digest(bytes)));
+        }
+        fs::write(
+            temp.path().join("horizon-resources.json"),
+            serde_json::to_vec(&manifest).unwrap(),
+        ).unwrap();
+        assert!(resources_valid(temp.path()), "a verified resource cache can be reused");
+        fs::write(temp.path().join("facts.json"), b"corrupt").unwrap();
+        assert!(!resources_valid(temp.path()), "a corrupt file cannot appear playable");
+        fs::write(temp.path().join("facts.json"), b"facts").unwrap();
+        assert!(resources_valid(temp.path()));
+        manifest["minecraft"] = "26.4".into();
+        fs::write(temp.path().join("horizon-resources.json"), serde_json::to_vec(&manifest).unwrap()).unwrap();
+        assert!(!resources_valid(temp.path()), "a resource set for another game version is not valid");
+    }
+
+    #[test]
+    fn incomplete_resources_are_preserved_for_retry() {
+        let temp = tempfile::tempdir().unwrap();
+        let old = temp.path().join("prepared");
+        fs::create_dir(&old).unwrap();
+        fs::write(old.join("world.txt"), b"do not delete").unwrap();
+        preserve_incomplete(&old).unwrap();
+        assert!(!old.exists());
+        let backups: Vec<_> = fs::read_dir(temp.path()).unwrap().flatten().collect();
+        assert_eq!(backups.len(), 1);
+        assert_eq!(fs::read(backups[0].path().join("world.txt")).unwrap(), b"do not delete");
+    }
+
     #[test]
     fn missing_game_is_not_reported_as_ready() {
         let folder = tempfile::tempdir().unwrap();

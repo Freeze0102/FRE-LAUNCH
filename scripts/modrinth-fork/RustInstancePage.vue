@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { convertFileSrc, invoke } from '@tauri-apps/api/core'
+import { listen } from '@tauri-apps/api/event'
 import {
   BoxesIcon, ChevronRightIcon, ClockIcon, FolderOpenIcon, GlobeIcon, MoreVerticalIcon,
   PlayIcon, SettingsIcon, TerminalSquareIcon, TrashIcon,
@@ -13,6 +14,7 @@ import { computed, inject, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import RustInstanceFiles from '@/components/ui/RustInstanceFiles.vue'
+import RustNativeMods from '@/components/ui/RustNativeMods.vue'
 import ConfirmDeleteInstanceModal from '@/components/ui/modal/ConfirmDeleteInstanceModal.vue'
 import type { GameInstance } from '@/helpers/types'
 import { useRootBreadcrumb } from '@/shared/breadcrumbs'
@@ -54,9 +56,17 @@ const m = defineMessages({
   saveName: { id: 'fre-rust.page.save-name', defaultMessage: 'Save name' },
   delete: { id: 'fre-rust.page.delete', defaultMessage: 'Delete instance' },
   install: { id: 'fre-rust.page.install', defaultMessage: 'Install game resources' },
-  installing: { id: 'fre-rust.page.installing', defaultMessage: 'Installing…' },
+  installing: { id: 'fre-rust.page.installing', defaultMessage: 'Preparing Minecraft…' },
   installFailed: { id: 'fre-rust.page.install-failed', defaultMessage: 'Automatic preparation needs an installed, legally owned Minecraft Java Edition and an active Microsoft account.' },
   chooseResources: { id: 'fre-rust.page.choose-resources', defaultMessage: 'Choose prepared resources folder' },
+  signInHorizon: { id: 'fre-rust.page.sign-in-horizon', defaultMessage: 'Sign in to Horizon with Microsoft' },
+  firstRunHint: { id: 'fre-rust.page.first-run-hint', defaultMessage: 'First run: FRE LAUNCH uses cached Minecraft 26.3 or downloads missing files from Mojang through Horizon. A Microsoft login owning Java Edition may be required in Horizon once. Further launches reuse the downloaded resources.' },
+  prepHelper: { id: 'fre-rust.page.prep-helper', defaultMessage: 'Checking verified Horizon setup…' },
+  prepVersion: { id: 'fre-rust.page.prep-version', defaultMessage: 'Downloading a Horizon game version…' },
+  prepLocal: { id: 'fre-rust.page.prep-local', defaultMessage: 'Checking installed Minecraft files…' },
+  prepDownload: { id: 'fre-rust.page.prep-download', defaultMessage: 'Downloading missing verified Minecraft files from Mojang…' },
+  prepCopy: { id: 'fre-rust.page.prep-copy', defaultMessage: 'Saving game resources in the FRE LAUNCH cache…' },
+  prepReady: { id: 'fre-rust.page.prep-ready', defaultMessage: 'Minecraft resources ready.' },
   resources: { id: 'fre-rust.page.resources', defaultMessage: 'Game resources' },
   preparing: { id: 'fre-rust.page.preparing', defaultMessage: 'Checking locally available resources…' },
   generalTab: { id: 'fre-rust.page.tab.general', defaultMessage: 'General' },
@@ -64,7 +74,7 @@ const m = defineMessages({
   instanceSection: { id: 'fre-rust.page.section.instance', defaultMessage: 'Instance' },
   gameSection: { id: 'fre-rust.page.section.game', defaultMessage: 'Game' },
   deleteNotice: { id: 'fre-rust.page.delete-notice', defaultMessage: 'Permanently deletes this Rust instance and its worlds. Shared game resources are kept.' },
-  notDownloaded: { id: 'fre-rust.page.not-downloaded', defaultMessage: 'Official game assets cannot be created by an empty profile. Set up game files from your owned installation.' },
+  notDownloaded: { id: 'fre-rust.page.not-downloaded', defaultMessage: 'If local Minecraft files are missing, Horizon downloads the verified Minecraft assets from Mojang for an authenticated owner.' },
 })
 
 const kind = computed<'native' | 'horizon'>(() => route.params.kind === 'horizon' ? 'horizon' : 'native')
@@ -80,6 +90,7 @@ const renaming = ref(false)
 const deleting = ref(false)
 const editedName = ref('')
 const setupError = ref('')
+const prepareStage = ref('')
 const settingsModal = ref<InstanceType<typeof TabbedModal>>()
 const deleteModal = ref<InstanceType<typeof ConfirmDeleteInstanceModal>>()
 const displayInstance = computed(() => profile.value ? ({
@@ -112,6 +123,15 @@ const settingsTabs = [
 const iconSrc = computed(() =>
   profile.value?.iconPath ? convertFileSrc(profile.value.iconPath) : undefined,
 )
+const prepareStageText = computed(() => {
+  const labels: Record<string, keyof typeof m> = {
+    helper: 'prepHelper', version: 'prepVersion', local: 'prepLocal',
+    download: 'prepDownload', copy: 'prepCopy', ready: 'prepReady',
+  }
+  return prepareStage.value && labels[prepareStage.value]
+    ? t(m[labels[prepareStage.value]])
+    : ''
+})
 const statusText = computed(() =>
   kind.value === 'native'
     ? runtime.value?.reason || t(m.setup)
@@ -203,6 +223,7 @@ async function autoPrepare() {
   if (kind.value !== 'native' || preparing.value) return false
   preparing.value = true
   setupError.value = ''
+  prepareStage.value = ''
   try {
     await invoke<string>('plugin:fre-rust|rust_import_resources', { source: '' })
     await refresh()
@@ -211,6 +232,17 @@ async function autoPrepare() {
   } catch (err) {
     setupError.value = err instanceof Error ? err.message : String(err)
     return false
+  } finally { preparing.value = false }
+}
+async function signInHorizon() {
+  if (preparing.value) return
+  preparing.value = true
+  setupError.value = ''
+  try {
+    const exePath = await invoke<string>('plugin:fre-horizon|horizon_install_launcher')
+    await invoke('plugin:fre-horizon|horizon_open_launcher', { exePath })
+  } catch (err) {
+    setupError.value = err instanceof Error ? err.message : String(err)
   } finally { preparing.value = false }
 }
 async function chooseResources() {
@@ -283,12 +315,24 @@ async function loadLogs() {
 watch(() => [route.params.kind, route.params.id], () => { void refresh() }, { immediate: true })
 watch(tab, next => { if (next === 'logs') void loadLogs() })
 const onRefresh = () => { void refresh() }
+let unlistenPrepareStage: (() => void) | null = null
+let stageListenerDisposed = false
 onMounted(() => {
+  stageListenerDisposed = false
+  void listen<string>('fre-rust-prepare-stage', event => {
+    if (kind.value === 'native' && preparing.value) prepareStage.value = event.payload
+  }).then(unlisten => {
+    if (stageListenerDisposed) unlisten()
+    else unlistenPrepareStage = unlisten
+  }).catch(() => { /* Stage indicators are optional, not proof of success. */ })
   window.addEventListener('fre-rust-library-refresh', onRefresh)
   window.addEventListener('fre-horizon-library-refresh', onRefresh)
 })
 onUnmounted(() => {
   generation++
+  stageListenerDisposed = true
+  unlistenPrepareStage?.()
+  unlistenPrepareStage = null
   window.removeEventListener('fre-rust-library-refresh', onRefresh)
   window.removeEventListener('fre-horizon-library-refresh', onRefresh)
 })
@@ -358,11 +402,16 @@ useRootBreadcrumb({
             <Button v-if="kind === 'native' && !profile.ready" :disabled="preparing" @click="autoPrepare">
               {{ preparing ? t(m.installing) : t(m.install) }}
             </Button>
+            <Button v-if="kind === 'native' && !profile.ready" type="outlined" :disabled="preparing" @click="signInHorizon">
+              {{ t(m.signInHorizon) }}
+            </Button>
             <Button v-if="kind === 'native' && !profile.ready" type="outlined" :disabled="preparing" @click="chooseResources">
               {{ t(m.chooseResources) }}
             </Button>
             <Button type="outlined" @click="openFolder()"><FolderOpenIcon />{{ t(m.openFolder) }}</Button>
           </div>
+          <p v-if="preparing && prepareStageText" role="status" class="m-0 text-sm text-brand">{{ prepareStageText }}</p>
+          <p v-if="kind === 'native' && !profile.ready" class="m-0 text-sm text-secondary">{{ t(m.firstRunHint) }}</p>
           <p v-if="!profile.ready" class="m-0 text-sm text-secondary">{{ t(m.notDownloaded) }}</p>
           <p v-if="setupError" role="alert" class="m-0 text-sm text-red-400">{{ setupError }}</p>
         </div>
@@ -436,6 +485,7 @@ useRootBreadcrumb({
     <Transition name="fre-rust-tab" mode="out-in">
     <div :key="tab" class="min-h-0 flex-1 overflow-y-auto p-6 pt-4">
       <div v-if="tab === 'content'" class="flex flex-col gap-3">
+        <RustNativeMods v-if="kind === 'native'" :profile-id="id" />
         <p class="m-0 text-sm text-secondary">{{ t(m.contentNote) }}</p>
         <RustInstanceFiles
           :key="kind + id + ':mods'"

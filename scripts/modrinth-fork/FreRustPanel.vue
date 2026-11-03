@@ -21,12 +21,13 @@ const m = defineMessages({
   missing: { id: 'fre-rust.setup.missing', defaultMessage: 'Native Rust game is not installed in this FRE LAUNCH build.' },
   ready: { id: 'fre-rust.setup.ready', defaultMessage: 'Minecraft resources prepared' },
   notReady: { id: 'fre-rust.setup.not-ready', defaultMessage: 'Minecraft resources not prepared' },
-  details: { id: 'fre-rust.setup.details', defaultMessage: 'The Rust engine is part of FRE LAUNCH. Import the prepared game resources from your own Minecraft Java Edition installation; private resources are never included in public updates.' },
+  details: { id: 'fre-rust.setup.details', defaultMessage: 'On first use, FRE LAUNCH reuses your local Minecraft 26.3 or downloads verified owned game assets via Horizon and Mojang. Subsequent launches use cached files.' },
   source: { id: 'fre-rust.setup.source', defaultMessage: 'Prepared game resources folder (optional; leave blank for automatic detection)' },
   browse: { id: 'fre-rust.setup.browse', defaultMessage: 'Choose folder' },
-  import: { id: 'fre-rust.setup.import', defaultMessage: 'Import Minecraft resources' },
-  importing: { id: 'fre-rust.setup.importing', defaultMessage: 'Importing game resources...' },
-  importHelp: { id: 'fre-rust.setup.import-help', defaultMessage: 'Import a prepared resource folder containing horizon-resources.json. Your original files and worlds are not moved or deleted.' },
+  import: { id: 'fre-rust.setup.import', defaultMessage: 'Prepare or download Minecraft' },
+  importing: { id: 'fre-rust.setup.importing', defaultMessage: 'Preparing Minecraft…' },
+  importHelp: { id: 'fre-rust.setup.import-help', defaultMessage: 'Leave the path empty for automatic setup. A Microsoft account owning Java Edition may need to sign in to Horizon once. A manual prepared folder is optional.' },
+  signInHorizon: { id: 'fre-rust.setup.sign-in-horizon', defaultMessage: 'Microsoft sign-in for Horizon' },
   none: { id: 'fre-rust.setup.none', defaultMessage: 'No Rust profiles yet.' },
   logs: { id: 'fre-rust.setup.logs', defaultMessage: 'Show game log' },
   files: { id: 'fre-rust.setup.files', defaultMessage: 'Files' },
@@ -118,6 +119,17 @@ async function chooseSourceFolder() {
   }
 }
 
+async function signInHorizon() {
+  if (pending.value) return
+  pending.value = 'import'
+  error.value = ''
+  try {
+    const exePath = await invoke<string>('plugin:fre-horizon|horizon_install_launcher')
+    await invoke('plugin:fre-horizon|horizon_open_launcher', { exePath })
+  } catch (e) { error.value = t(m.error, { reason: reason(e) }) }
+  finally { pending.value = null }
+}
+
 async function importResources() {
   if (pending.value || !runtime.value?.installed || runtime.value.prepared) return
   pending.value = 'import'
@@ -200,6 +212,9 @@ defineExpose({ show, hide })
             {{ pending === 'import' ? t(m.importing) : t(m.import) }}
           </button>
         </form>
+        <button type="button" class="mt-3 cursor-pointer rounded-lg border border-solid border-surface-4 bg-button-bg px-4 py-2 text-sm font-semibold text-contrast disabled:opacity-40" :disabled="!!pending" @click="signInHorizon">
+          {{ t(m.signInHorizon) }}
+        </button>
       </div>
 
       <form class="mt-5 flex flex-wrap gap-2" @submit.prevent="create">
