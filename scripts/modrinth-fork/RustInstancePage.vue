@@ -2,11 +2,11 @@
 import { convertFileSrc, invoke } from '@tauri-apps/api/core'
 import {
   BoxesIcon, ClockIcon, FolderOpenIcon, GlobeIcon, MoreVerticalIcon,
-  PlayIcon, SettingsIcon, TagIcon as AssetTagIcon, TerminalSquareIcon,
+  PlayIcon, SettingsIcon, TerminalSquareIcon,
 } from '@modrinth/assets'
 import {
   Avatar, Button, commonMessages, defineMessages, IconButton, NavTabs,
-  PageHeader, PageHeaderActions, PageHeaderMetadata, PageHeaderMetadataItem,
+  PageHeader, PageHeaderActions, PageHeaderMetadata, PageHeaderMetadataItem, TagIcon,
   TeleportOverflowMenu, useVIntl, injectNotificationManager,
 } from '@modrinth/ui'
 import { computed, inject, onMounted, onUnmounted, ref, watch } from 'vue'
@@ -214,7 +214,7 @@ useRootBreadcrumb({
         </template>
         <template #metadata>
           <PageHeaderMetadata>
-            <PageHeaderMetadataItem :icon="AssetTagIcon">
+            <PageHeaderMetadataItem :icon="TagIcon">
               Rust {{ profile.version }}
             </PageHeaderMetadataItem>
             <PageHeaderMetadataItem :icon="ClockIcon">
