@@ -376,6 +376,7 @@ struct GameBuildInfo {
     engine_license: String,
     source_commit: String,
     game_exe_sha256: String,
+    prepare_exe_sha256: String,
 }
 
 /// Validate the local, pinned open-source engine before it ever starts.
@@ -394,6 +395,8 @@ fn verify_native_client(root: &Path) -> Result<(), String> {
         || info.source_commit != "975c07d9151847e6af13afc4b5ab37b6bbe78ef5"
         || info.game_exe_sha256.len() != 64
         || !info.game_exe_sha256.bytes().all(|b| b.is_ascii_hexdigit())
+        || info.prepare_exe_sha256.len() != 64
+        || !info.prepare_exe_sha256.bytes().all(|b| b.is_ascii_hexdigit())
     {
         return Err("Rust engine build provenance is invalid.".into());
     }
@@ -409,6 +412,21 @@ fn verify_native_client(root: &Path) -> Result<(), String> {
     let digest = format!("{:x}", hasher.finalize());
     if !digest.eq_ignore_ascii_case(&info.game_exe_sha256) {
         return Err("Rust game executable checksum mismatch; reinstall a trusted FRE LAUNCH build.".into());
+    }
+    let preparer_path = root.join("fre-rust-prepare.exe");
+    let meta = preparer_path.symlink_metadata().map_err(|_| "Bundled Rust resource preparer is missing.")?;
+    if !meta.file_type().is_file() {
+        return Err("Unsafe bundled resource preparer file.".into());
+    }
+    let mut preparer = fs::File::open(preparer_path).map_err(|e| e.to_string())?;
+    let mut preparer_hash = Sha256::new();
+    loop {
+        let count = preparer.read(&mut buf).map_err(|e| e.to_string())?;
+        if count == 0 { break; }
+        preparer_hash.update(&buf[..count]);
+    }
+    if !format!("{:x}", preparer_hash.finalize()).eq_ignore_ascii_case(&info.prepare_exe_sha256) {
+        return Err("Native resource preparer checksum mismatch; reinstall FRE LAUNCH.".into());
     }
     Ok(())
 }
@@ -470,7 +488,12 @@ fn local_resources(data_root: &Path, bundle_root: &Path) -> PathBuf {
 fn ready(root: &Path, data_root: &Path) -> RustRuntime {
     let (client, _) = runtime_files(root);
     let installed = client.is_file() && root.join("BUILD-INFO.json").is_file()
-        && root.join("research-lock.json").is_file();
+        && root.join("research-lock.json").is_file()
+        && root.join("fre-rust-prepare.exe").is_file()
+        && root.join("crates/horizon-prepare/Cargo.toml").is_file()
+        && root.join("crates/horizon-prepare/build.rs").is_file()
+        && root.join("crates/horizon-prepare/src/lib.rs").is_file()
+        && root.join("mods/horizon/src/test/java/dev/horizonlab/parity/VanillaHeightmapOracle.java").is_file();
     let prepared = resources_valid(&local_resources(data_root, root));
     let reason = if !installed {
         Some("The FRE LAUNCH Rust game was not included in this installer. Build and bundle the native client first.".into())
@@ -482,7 +505,7 @@ fn ready(root: &Path, data_root: &Path) -> RustRuntime {
     RustRuntime {
         installed,
         prepared,
-        version: "Minecraft 26.3",
+        version: "26.3",
         reason,
     }
 }
