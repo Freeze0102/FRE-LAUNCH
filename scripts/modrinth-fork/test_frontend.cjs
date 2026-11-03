@@ -520,3 +520,30 @@ test('Modrinth/CurseForge chooser no longer overlaps the negative-margin sticky 
   assert.doesNotMatch(layout, /sticky top-0 z-20 -mx-6 -mt-6/)
   assert.match(layout, /sticky top-0 z-20 -mx-6 mb-4/)
 });
+
+
+test('Rust cards follow standard Java library grouping and remain visible without Java profiles', () => {
+  const pathToGroups = path.join(source, 'apps/app-frontend/src/components/ui/library/rust-library-group.ts')
+  const tsSource = fs.readFileSync(pathToGroups, 'utf8')
+  const compiled = ts.transpileModule(tsSource, {
+    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
+  }).outputText
+  const exported = {}
+  new Function('exports', compiled)(exported)
+  for (const [mode, id] of [
+    ['Group', 'group:none'],
+    ['None', 'None:None'],
+    ['Loader', 'Loader:Rust'],
+    ['Game version', 'Game version:26.3'],
+    ['Instance type', 'Instance type:Rust'],
+  ]) {
+    assert.equal(exported.rustLibraryGroupId(mode), id)
+  }
+  const library = fs.readFileSync(path.join(source, 'apps/app-frontend/src/components/ui/library/index.vue'), 'utf8')
+  const group = fs.readFileSync(path.join(source, 'apps/app-frontend/src/components/ui/library/instance-group/index.vue'), 'utf8')
+  assert.match(library, /rustMatchesSearch/)
+  assert.match(library, /rustLibraryGroupId\(displayState.value.group\)/)
+  assert.match(library, /visible.push\(\{/)
+  assert.match(group, /const isRustGridGroup = computed/)
+  assert.match(group, /v-if="isRustGridGroup"/)
+});
