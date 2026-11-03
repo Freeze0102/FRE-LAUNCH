@@ -31,7 +31,6 @@ const route = useRoute()
 const router = useRouter()
 const { formatMessage: t } = useVIntl()
 const { handleError } = injectNotificationManager()
-const showRustWizard = inject<(id?: string) => void>('showFreRustWizard', () => {})
 const showHorizonWizard = inject<(id?: string) => void>('showHorizonWizard', () => {})
 const m = defineMessages({
   content: { id: 'app.instance.tab.content', defaultMessage: 'Content' },
@@ -159,9 +158,9 @@ async function refresh() {
     if (current === generation) loading.value = false
   }
 }
-function settings() {
+function settings(clearError = true) {
   editedName.value = profile.value?.name ?? ''
-  setupError.value = ''
+  if (clearError === true) setupError.value = ''
   settingsModal.value?.show()
 }
 async function renameProfile() {
@@ -226,7 +225,7 @@ async function play() {
   // and report the REAL blocker if none is available.
   if (!profile.value.ready && kind.value === 'native') {
     if (!await autoPrepare()) {
-      settings()
+      settings(false)
       return
     }
   } else if (!profile.value.ready) {
