@@ -1,4 +1,4 @@
-name: FRE LAUNCH Rust loader Create and CurseForge UI preflight
+name: FRE LAUNCH Rust loader Create, icons and Browse source check
 
 on:
   push:
