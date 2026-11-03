@@ -295,15 +295,17 @@ pub async fn prepare_for_native_rust<R: tauri::Runtime>(
     if !cfg!(all(windows, target_arch = "x86_64")) {
         return Err("Automatic Horizon preparation requires Windows x64.".into());
     }
+    let _ = app.emit("fre-rust-prepare-stage", "helper");
     let exe = bootstrap::install(&launcher_directory(&app)?, |_| {}).await?;
     let exe_path = exe.to_string_lossy().into_owned();
     let mut status = horizon_status(exe_path.clone()).await?;
     if status.installed_versions.is_empty() {
+        let _ = app.emit("fre-rust-prepare-stage", "version");
         run_cli(&exe, &["install", "latest"], INSTALL_TIMEOUT).await?;
         status = horizon_status(exe_path).await?;
     }
     let version = status.selected_version.as_deref()
-        .filter(|tag| status.installed_versions.iter().any(|installed| installed == tag))
+        .filter(|tag| status.installed_versions.iter().any(|installed| installed.as_str() == *tag))
         .or_else(|| status.installed_versions.first().map(String::as_str))
         .ok_or("Horizon did not install a Rust game version.")?;
     let version = validate_version(version)?.to_owned();
@@ -311,7 +313,9 @@ pub async fn prepare_for_native_rust<R: tauri::Runtime>(
         // Prefer existing installations; only fetch missing resources from
         // Mojang after this attempt fails. Official Horizon verifies hashes,
         // account ownership and downloads, and resumes its own cache.
+        let _ = app.emit("fre-rust-prepare-stage", "local");
         if run_cli(&exe, &["prepare", "--version", &version], INSTALL_TIMEOUT).await.is_err() {
+            let _ = app.emit("fre-rust-prepare-stage", "download");
             run_cli(&exe, &["prepare", "--download", "--version", &version], INSTALL_TIMEOUT)
                 .await.map_err(|error| format!(
                     "Minecraft could not be prepared by Horizon: {error}. Sign in to your Minecraft-owning Microsoft account in Horizon and retry."
