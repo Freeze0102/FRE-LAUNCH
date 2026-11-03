@@ -263,7 +263,10 @@ def verify(root):
         assert rust_mapping["fre-rust-runtime/BUILD-INFO.json"] == "fre-rust/BUILD-INFO.json"
         assert rust_mapping["fre-rust-runtime/fre-rust-client.exe"] == "fre-rust/fre-rust-client.exe"
         assert rust_mapping["fre-rust-runtime/fre-rust-prepare.exe"] == "fre-rust/fre-rust-prepare.exe"
-        assert rust_mapping["fre-rust-runtime/crates/horizon-prepare/src/exporters.rs"] == "fre-rust/crates/horizon-prepare/src/exporters.rs"
+        assert rust_mapping["fre-rust-runtime/crates/horizon-prepare/"] == "fre-rust/crates/horizon-prepare/"
+        assert (runtime_source/"crates/horizon-prepare/Cargo.toml").is_file()
+        assert (runtime_source/"crates/horizon-prepare/build.rs").is_file()
+        assert len(list((runtime_source/"crates/horizon-prepare/src").glob("*.rs"))) >= 10
         assert rust_mapping.get("fre-rust-runtime/resources/") == (
             "fre-rust/resources/" if (runtime_source/"resources/horizon-resources.json").is_file() else None
         )
