@@ -468,6 +468,12 @@ onUnmounted(() => {
             ),
             'fre-rust.page.choose-resources': ('Обрати папку ресурсів', 'Choose prepared resources folder'),
             'fre-rust.page.sign-in-horizon': ('Увійти у Horizon через Microsoft', 'Sign in to Horizon with Microsoft'),
+            'fre-rust.page.prep-helper': ('Перевіряємо Horizon…', 'Checking verified Horizon setup…'),
+            'fre-rust.page.prep-version': ('Завантажуємо ігрову версію Horizon…', 'Downloading a Horizon game version…'),
+            'fre-rust.page.prep-local': ('Перевіряємо встановлені файли Minecraft…', 'Checking installed Minecraft files…'),
+            'fre-rust.page.prep-download': ('Завантажуємо перевірені файли Minecraft із Mojang…', 'Downloading missing verified Minecraft files from Mojang…'),
+            'fre-rust.page.prep-copy': ('Зберігаємо ресурси гри в кеш FRE LAUNCH…', 'Saving game resources in the FRE LAUNCH cache…'),
+            'fre-rust.page.prep-ready': ('Ресурси Minecraft підготовлено.', 'Minecraft resources ready.'),
             'fre-rust.page.first-run-hint': (
                 'Перший запуск: FRE LAUNCH використає наявні файли Minecraft 26.3 або завантажить відсутні з Mojang через Horizon. Може знадобитися одноразовий вхід у Horizon під акаунтом із придбаною Java Edition. Наступні запуски використовують кеш.',
                 'First run: FRE LAUNCH uses cached Minecraft 26.3 or downloads missing files from Mojang through Horizon. A Microsoft login owning Java Edition may be required in Horizon once. Further launches reuse the cached resources.',
