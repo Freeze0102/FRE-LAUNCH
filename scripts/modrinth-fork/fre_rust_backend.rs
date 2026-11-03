@@ -934,9 +934,9 @@ mod tests {
     fn cached_rust_resources_require_correct_version_and_file_hashes() {
         let temp = tempfile::tempdir().unwrap();
         let files = [
-            ("facts_sha256", "facts.json", b"facts".as_slice()),
-            ("block_tags_sha256", "block-tags.json", b"tags".as_slice()),
-            ("collision_sha256", "cached-collision.nbt", b"collision".as_slice()),
+            ("facts_sha256", "facts.json", &b"facts"[..]),
+            ("block_tags_sha256", "block-tags.json", &b"tags"[..]),
+            ("collision_sha256", "cached-collision.nbt", &b"collision"[..]),
         ];
         let mut manifest = serde_json::json!({"schema": 7, "minecraft": "26.3"});
         for (key, name, bytes) in files {
