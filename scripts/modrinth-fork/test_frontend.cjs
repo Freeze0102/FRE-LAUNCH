@@ -481,3 +481,42 @@ test('Existing Horizon profile becomes a Rust tile with direct Play and no new l
   assert.ok(calls.some(x => x.command === 'plugin:fre-horizon|horizon_direct_play'
     && x.args.name === 'survival' && x.args.exePath === 'C:\\Horizon\\horizon.exe'))
 })
+
+
+test('Rust appears as native loader in the ordinary Create instance dialog', () => {
+  const creation = fs.readFileSync(path.join(source, 'packages/ui/src/components/flows/creation-flow-modal/components/CustomSetupStage.vue'), 'utf8')
+  const context = fs.readFileSync(path.join(source, 'packages/ui/src/components/flows/creation-flow-modal/creation-flow-context.ts'), 'utf8')
+  const app = fs.readFileSync(path.join(source, 'apps/app-frontend/src/App.vue'), 'utf8')
+  const stage = fs.readFileSync(path.join(source, 'packages/ui/src/components/flows/creation-flow-modal/components/SetupTypeStage.vue'), 'utf8')
+  assert.match(app, /:available-loaders="\['fabric', 'neoforge', 'forge', 'quilt', 'rust'\]"/)
+  assert.match(app, /@create="handleFreRustOrJavaCreate"/)
+  assert.match(app, /if \(config\.selectedLoader\.value !== 'rust'\)\s*\{\s*return handleCreate\(config\)/)
+  assert.match(app, /plugin:fre-rust\|rust_create_profile/)
+  assert.match(app, /iconBytes/)
+  assert.match(creation, /if \(selectedLoader\.value === 'rust'\) return \[\{ value: '26\.3', label: '26\.3' \}\]/)
+  assert.match(creation, /fre-rust\.create\.requirement/)
+  assert.match(context, /selectedLoader\.value === 'rust' \|\|\s*projectInstall\.value !== null/)
+  assert.doesNotMatch(stage, /@click="ctx\.onHorizon\?\.\(\)"/)
+})
+
+test('Rust profile icons preserve ordinary creation dialog selection', () => {
+  const backend = fs.readFileSync(path.join(source, 'apps/app/src/api/fre_rust.rs'), 'utf8')
+  const tiles = fs.readFileSync(path.join(__dirname, 'RustInstanceGrid.vue'), 'utf8')
+  assert.match(backend, /icon_path: Option<String>/)
+  assert.match(backend, /icon_bytes: Option<Vec<u8>>/)
+  assert.match(backend, /fn valid_icon\(/)
+  assert.match(backend, /profile\.icon_path = \["icon\.png", "icon\.jpg", "icon\.webp"\]/)
+  assert.match(tiles, /convertFileSrc\(card\.iconPath\)/)
+  assert.match(tiles, /<Avatar/)
+  assert.match(tiles, /:tint-by="card\.key"/)
+})
+
+test('Modrinth/CurseForge chooser no longer overlaps the negative-margin sticky Browse header', () => {
+  const browser = fs.readFileSync(path.join(source, 'apps/app-frontend/src/pages/Browse.vue'), 'utf8')
+  const layout = fs.readFileSync(path.join(source, 'packages/ui/src/layouts/shared/browse-tab/layout.vue'), 'utf8')
+  assert.match(browser, /relative flex min-h-14 w-full shrink-0 flex-wrap/)
+  assert.match(browser, /Modrinth<\/button>/)
+  assert.match(browser, /CurseForge<\/button>/)
+  assert.doesNotMatch(layout, /sticky top-0 z-20 -mx-6 -mt-6/)
+  assert.match(layout, /sticky top-0 z-20 -mx-6 mb-4/)
+});
