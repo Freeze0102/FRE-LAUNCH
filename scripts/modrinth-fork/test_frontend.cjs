@@ -687,3 +687,31 @@ test('Native Rust-only onboarding uses the original checklist but counts a Rust 
   assert.match(provider, /fre-rust-library-refresh/)
   assert.doesNotMatch(provider, /showChecklist: computed\(\(\) => false/)
 });
+
+test('Rust resource setup and native Horizon mod browser compile as Vue SFCs', () => {
+  const compiler = rootRequire('@vue/compiler-sfc')
+  for (const file of ['RustNativeMods.vue', 'RustInstancePage.vue', 'FreRustPanel.vue']) {
+    const sourceText = fs.readFileSync(path.join(__dirname, file), 'utf8')
+    const { descriptor, errors } = compiler.parse(sourceText, { filename: file })
+    assert.deepEqual(errors, [], file + ' parse failed')
+    assert.ok(descriptor.scriptSetup, file + ' missing script')
+    assert.ok(descriptor.template, file + ' missing template')
+    assert.doesNotThrow(() => compiler.compileScript(descriptor, { id: file }), file + ' script failed')
+    const result = compiler.compileTemplate({
+      source: descriptor.template.content, filename: file, id: file,
+    })
+    assert.deepEqual(result.errors, [], file + ' template failed')
+  }
+  const api = fs.readFileSync(path.join(source, 'apps/app/src/api/fre_rust.rs'), 'utf8')
+  const horizon = fs.readFileSync(path.join(source, 'apps/app/src/api/horizon.rs'), 'utf8')
+  const nativeMods = fs.readFileSync(path.join(source, 'apps/app-frontend/src/components/ui/RustNativeMods.vue'), 'utf8')
+  const page = fs.readFileSync(path.join(source, 'apps/app-frontend/src/pages/RustInstancePage.vue'), 'utf8')
+  assert.match(api, /fn resources_valid\(/)
+  assert.match(api, /async fn rust_mods/)
+  assert.match(api, /preserve_incomplete\(&destination\)/)
+  assert.match(api, /horizon::prepare_for_native_rust/)
+  assert.match(horizon, /"prepare", "--download", "--version"/)
+  assert.match(horizon, /native_mods_for_profile/)
+  assert.match(nativeMods, /plugin:fre-rust\|rust_mods/)
+  assert.match(page, /<RustNativeMods v-if="kind === 'native'"/)
+})
