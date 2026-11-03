@@ -55,6 +55,8 @@ pub fn init<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
         .invoke_handler(tauri::generate_handler![
             rust_profiles,
             rust_create_profile,
+            rust_rename_profile,
+            rust_delete_profile,
             rust_runtime,
             rust_import_resources,
             rust_launch,
@@ -247,6 +249,88 @@ async fn rust_create_profile<R: tauri::Runtime>(
         }
     }
     Err("Could not allocate a new Rust profile identifier.".into())
+}
+
+// The library's normal Rename and Delete actions operate ONLY on the
+// selected native profile. Never feed a Rust ID to the Java profile manager.
+#[tauri::command]
+async fn rust_rename_profile<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    profile_id: String,
+    name: String,
+) -> Result<RustProfile, String> {
+    let _guard = PROFILE_CREATION.lock().await;
+    let name = name.trim().to_owned();
+    if !name_valid(&name) {
+        return Err("Profile name must contain 1–64 characters without control characters.".into());
+    }
+    if RUNNING_PROFILES.lock().await.contains(&profile_id) {
+        return Err("Stop this Rust game before changing its settings.".into());
+    }
+    let root = base(&app)?;
+    let dir = profile_dir(&root, &profile_id)?;
+    let mut profile = read_profile(&dir, &profile_id)
+        .ok_or("Rust profile no longer exists.")?;
+    if list(&root)?.iter().any(|p| p.id != profile_id && p.name.eq_ignore_ascii_case(&name)) {
+        return Err("Another Rust profile already uses this name.".into());
+    }
+    if profile.name == name {
+        return Ok(profile);
+    }
+    profile.name = name;
+    // Preserve the old metadata across an interrupted write. Only the
+    // selected profile's own JSON is replaced; worlds and mods are untouched.
+    let target = dir.join("profile.json");
+    let staged = dir.join("profile.json.pending");
+    let backup = dir.join("profile.json.backup");
+    if staged.exists() || backup.exists() {
+        return Err("A previous profile settings update needs recovery. Do not overwrite its backup.".into());
+    }
+    let content = serde_json::to_vec_pretty(&profile).map_err(|e| e.to_string())?;
+    fs::OpenOptions::new().create_new(true).write(true).open(&staged)
+        .and_then(|mut file| {
+            use std::io::Write;
+            file.write_all(&content)?;
+            file.sync_all()
+        })
+        .map_err(|e| format!("Could not stage Rust profile settings: {e}"))?;
+    if let Err(err) = fs::rename(&target, &backup) {
+        let _ = fs::remove_file(&staged);
+        return Err(format!("Could not preserve old Rust profile settings: {err}"));
+    }
+    if let Err(err) = fs::rename(&staged, &target) {
+        let _ = fs::rename(&backup, &target);
+        return Err(format!("Could not save Rust profile settings: {err}"));
+    }
+    let _ = fs::remove_file(&backup);
+    Ok(profile)
+}
+
+#[tauri::command]
+async fn rust_delete_profile<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    profile_id: String,
+) -> Result<(), String> {
+    let _guard = PROFILE_CREATION.lock().await;
+    if RUNNING_PROFILES.lock().await.contains(&profile_id) {
+        return Err("Stop this Rust game before deleting its profile and worlds.".into());
+    }
+    let root = base(&app)?;
+    let dir = profile_dir(&root, &profile_id)?;
+    read_profile(&dir, &profile_id).ok_or("The Rust profile no longer exists.")?;
+    let profiles = root.join("profiles").canonicalize()
+        .map_err(|e| format!("Could not resolve the Rust profile library: {e}"))?;
+    let owned = dir.canonicalize()
+        .map_err(|e| format!("Could not resolve the selected Rust profile: {e}"))?;
+    if owned.parent() != Some(profiles.as_path()) || !owned.is_dir() {
+        return Err("Refusing to remove a folder outside the Rust profile library.".into());
+    }
+    if fs::symlink_metadata(&dir).map_err(|e| e.to_string())?.file_type().is_symlink() {
+        return Err("Refusing to delete a Rust profile through a symbolic link.".into());
+    }
+    // This operation follows the same explicit irreversible confirmation as
+    // Java's ConfirmDeleteInstanceModal. It never removes shared game resources.
+    fs::remove_dir_all(&dir).map_err(|e| format!("Could not delete Rust profile: {e}"))
 }
 
 fn runtime_files(root: &Path) -> (PathBuf, PathBuf) {
