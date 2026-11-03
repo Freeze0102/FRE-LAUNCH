@@ -21,19 +21,12 @@ import { useRootBreadcrumb } from '@/shared/breadcrumbs'
 
 type NativeProfile = { id: string; name: string; created: number; iconPath?: string | null }
 type Runtime = { installed: boolean; prepared: boolean; version: string; reason: string | null }
-type HorizonStatus = {
-  instances: { id: string; name: string; version: string | null; selected: boolean }[]
-  installedVersions: string[]
-  preparedVersions: string[]
-  selectedVersion: string | null
-}
 type Profile = { id: string; name: string; iconPath?: string | null; version: string; ready: boolean }
 
 const route = useRoute()
 const router = useRouter()
 const { formatMessage: t } = useVIntl()
 const { handleError } = injectNotificationManager()
-const showHorizonWizard = inject<(id?: string) => void>('showHorizonWizard', () => {})
 const m = defineMessages({
   content: { id: 'app.instance.tab.content', defaultMessage: 'Content' },
   files: { id: 'app.instance.tab.files', defaultMessage: 'Files' },
@@ -80,7 +73,6 @@ const m = defineMessages({
 const kind = computed<'native' | 'horizon'>(() => route.params.kind === 'horizon' ? 'horizon' : 'native')
 const id = computed(() => String(route.params.id ?? ''))
 const profile = ref<Profile | null>(null)
-const horizonExecutable = ref('')
 const runtime = ref<Runtime | null>(null)
 const error = ref('')
 const loading = ref(false)
@@ -150,34 +142,18 @@ async function refresh() {
   loading.value = true
   error.value = ''
   try {
-    if (kind.value === 'native') {
-      const [profiles, status] = await Promise.all([
-        invoke<NativeProfile[]>('plugin:fre-rust|rust_profiles'),
-        invoke<Runtime>('plugin:fre-rust|rust_runtime'),
-      ])
-      if (current !== generation) return
-      runtime.value = status
-      const found = profiles.find(item => item.id === id.value)
-      if (!found) throw new Error(t(m.unavailable))
-      profile.value = {
-        id: found.id, name: found.name, iconPath: found.iconPath,
-        version: status.version || '26.3', ready: status.installed && status.prepared,
-      }
-    } else {
-      const exePath = await invoke<string | null>('plugin:fre-horizon|horizon_detect_launcher')
-      if (!exePath) throw new Error('Horizon executable not found')
-      const status = await invoke<HorizonStatus>('plugin:fre-horizon|horizon_status', { exePath })
-      if (current !== generation) return
-      const found = status.instances.find(item => item.id === id.value)
-      if (!found) throw new Error(t(m.unavailable))
-      const version = found.version && found.version !== 'latest'
-        ? found.version
-        : status.selectedVersion || status.installedVersions[0] || '26.3'
-      horizonExecutable.value = exePath
-      profile.value = {
-        id: found.id, name: found.name, version,
-        ready: status.installedVersions.includes(version) && status.preparedVersions.includes(version),
-      }
+    if (kind.value !== 'native') throw new Error(t(m.unavailable))
+    const [profiles, status] = await Promise.all([
+      invoke<NativeProfile[]>('plugin:fre-rust|rust_profiles'),
+      invoke<Runtime>('plugin:fre-rust|rust_runtime'),
+    ])
+    if (current !== generation) return
+    runtime.value = status
+    const found = profiles.find(item => item.id === id.value)
+    if (!found) throw new Error(t(m.unavailable))
+    profile.value = {
+      id: found.id, name: found.name, iconPath: found.iconPath,
+      version: status.version || '26.3', ready: status.installed && status.prepared,
     }
     if (tab.value === 'logs') void loadLogs()
   } catch (err) {
@@ -234,17 +210,6 @@ async function autoPrepare() {
     return false
   } finally { preparing.value = false }
 }
-async function signInHorizon() {
-  if (preparing.value) return
-  preparing.value = true
-  setupError.value = ''
-  try {
-    const exePath = await invoke<string>('plugin:fre-horizon|horizon_install_launcher')
-    await invoke('plugin:fre-horizon|horizon_open_launcher', { exePath })
-  } catch (err) {
-    setupError.value = err instanceof Error ? err.message : String(err)
-  } finally { preparing.value = false }
-}
 async function chooseResources() {
   if (kind.value !== 'native' || preparing.value) return
   const { open } = await import('@tauri-apps/plugin-dialog')
@@ -270,19 +235,10 @@ async function play() {
       settings(false)
       return
     }
-  } else if (!profile.value.ready) {
-    showHorizonWizard(id.value)
-    return
   }
   launching.value = true
   try {
-    if (kind.value === 'native') {
-      await invoke('plugin:fre-rust|rust_launch', { profileId: id.value })
-    } else {
-      await invoke('plugin:fre-horizon|horizon_direct_play', {
-        exePath: horizonExecutable.value, name: id.value,
-      })
-    }
+    await invoke('plugin:fre-rust|rust_launch', { profileId: id.value })
   } catch (err) {
     handleError(err instanceof Error ? err : new Error(String(err)))
   } finally {
@@ -291,13 +247,7 @@ async function play() {
 }
 async function openFolder(folder = 'root') {
   try {
-    if (kind.value === 'native') {
-      await invoke('plugin:fre-rust|rust_open_folder', { profileId: id.value, folder })
-    } else {
-      await invoke('plugin:fre-horizon|horizon_open_folder', {
-        exePath: horizonExecutable.value, name: id.value, folder,
-      })
-    }
+    await invoke('plugin:fre-rust|rust_open_folder', { profileId: id.value, folder })
   } catch (err) {
     handleError(err instanceof Error ? err : new Error(String(err)))
   }
@@ -305,9 +255,7 @@ async function openFolder(folder = 'root') {
 async function loadLogs() {
   logs.value = ''
   try {
-    logs.value = kind.value === 'native'
-      ? await invoke<string>('plugin:fre-rust|rust_logs', { profileId: id.value })
-      : await invoke<string>('plugin:fre-horizon|horizon_logs', { exePath: horizonExecutable.value })
+    logs.value = await invoke<string>('plugin:fre-rust|rust_logs', { profileId: id.value })
   } catch {
     logs.value = ''
   }
@@ -326,7 +274,6 @@ onMounted(() => {
     else unlistenPrepareStage = unlisten
   }).catch(() => { /* Stage indicators are optional, not proof of success. */ })
   window.addEventListener('fre-rust-library-refresh', onRefresh)
-  window.addEventListener('fre-horizon-library-refresh', onRefresh)
 })
 onUnmounted(() => {
   generation++
@@ -334,7 +281,6 @@ onUnmounted(() => {
   unlistenPrepareStage?.()
   unlistenPrepareStage = null
   window.removeEventListener('fre-rust-library-refresh', onRefresh)
-  window.removeEventListener('fre-horizon-library-refresh', onRefresh)
 })
 useRootBreadcrumb({
   slot: 'instance',
@@ -402,9 +348,7 @@ useRootBreadcrumb({
             <Button v-if="kind === 'native' && !profile.ready" :disabled="preparing" @click="autoPrepare">
               {{ preparing ? t(m.installing) : t(m.install) }}
             </Button>
-            <Button v-if="kind === 'native' && !profile.ready" type="outlined" :disabled="preparing" @click="signInHorizon">
-              {{ t(m.signInHorizon) }}
-            </Button>
+
             <Button v-if="kind === 'native' && !profile.ready" type="outlined" :disabled="preparing" @click="chooseResources">
               {{ t(m.chooseResources) }}
             </Button>
@@ -491,7 +435,7 @@ useRootBreadcrumb({
           :key="kind + id + ':mods'"
           :kind="kind"
           :profile-id="id"
-          :horizon-executable="horizonExecutable"
+          :horizon-executable="''"
           initial-folder="mods"
         />
       </div>
@@ -500,7 +444,7 @@ useRootBreadcrumb({
         :key="kind + id + ':files'"
         :kind="kind"
         :profile-id="id"
-        :horizon-executable="horizonExecutable"
+        :horizon-executable="''"
         initial-folder="root"
       />
       <RustInstanceFiles
@@ -508,7 +452,7 @@ useRootBreadcrumb({
         :key="kind + id + ':worlds'"
         :kind="kind"
         :profile-id="id"
-        :horizon-executable="horizonExecutable"
+        :horizon-executable="''"
         initial-folder="saves"
       />
       <div v-else-if="tab === 'logs'" class="flex flex-col gap-4">
