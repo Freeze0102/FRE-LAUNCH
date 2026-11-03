@@ -105,7 +105,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: preview-pending
-          key: frelaunch-0510-compiled-nsis-${{ hashFiles('scripts/modrinth-fork/*.py', 'scripts/modrinth-fork/*.rs', 'scripts/modrinth-fork/*.vue', 'scripts/modrinth-fork/*.cjs', 'scripts/modrinth-fork/*.json', 'FRE-MODRINTH-LOCAL.ps1', 'update-channel.json') }}
+          key: frelaunch-0510-compiled-nsis-${{ hashFiles('scripts/modrinth-fork/*.py', 'scripts/modrinth-fork/*.rs', 'scripts/modrinth-fork/*.vue', 'scripts/modrinth-fork/*.ts', 'scripts/modrinth-fork/*.cjs', 'scripts/modrinth-fork/*.json', 'FRE-MODRINTH-LOCAL.ps1', 'update-channel.json') }}
 
       - name: Restore pinned native Rust engine if previously compiled
         id: rust-engine-cache
@@ -218,7 +218,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: preview-pending
-          key: frelaunch-0510-compiled-nsis-${{ hashFiles('scripts/modrinth-fork/*.py', 'scripts/modrinth-fork/*.rs', 'scripts/modrinth-fork/*.vue', 'scripts/modrinth-fork/*.cjs', 'scripts/modrinth-fork/*.json', 'FRE-MODRINTH-LOCAL.ps1', 'update-channel.json') }}
+          key: frelaunch-0510-compiled-nsis-${{ hashFiles('scripts/modrinth-fork/*.py', 'scripts/modrinth-fork/*.rs', 'scripts/modrinth-fork/*.vue', 'scripts/modrinth-fork/*.ts', 'scripts/modrinth-fork/*.cjs', 'scripts/modrinth-fork/*.json', 'FRE-MODRINTH-LOCAL.ps1', 'update-channel.json') }}
 
       - name: Verify compiled preview cache and check file integrity
         shell: pwsh
