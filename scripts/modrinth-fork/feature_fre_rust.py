@@ -419,8 +419,8 @@ onUnmounted(() => {
             'fre-rust.page.install': ('Підготувати ресурси', 'Prepare game resources'),
             'fre-rust.page.installing': ('Підготовка…', 'Preparing…'),
             'fre-rust.page.install-failed': (
-                'Для автоматичної підготовки потрібна встановлена ліцензійна Minecraft Java Edition та активний Microsoft-акаунт.',
-                'Automatic preparation requires an owned Minecraft Java Edition installation and an active Microsoft account.',
+                'Для автоматичної підготовки потрібен Microsoft-акаунт із придбаною Minecraft Java Edition у FRE LAUNCH. Для підготовлювача ресурсів може знадобитися Java 25.',
+                'Automatic preparation requires a Minecraft Java Edition account in FRE LAUNCH. The native resource preparer may require Java 25.',
             ),
             'fre-rust.page.choose-resources': ('Обрати папку ресурсів', 'Choose prepared resources folder'),
             'fre-rust.page.sign-in-horizon': ('Вхід через FRE LAUNCH', 'Sign in with FRE LAUNCH'),
