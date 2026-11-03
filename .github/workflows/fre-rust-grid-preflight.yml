@@ -1,4 +1,4 @@
-name: FRE LAUNCH Rust loader and all Java grouping regression preflight
+name: FRE LAUNCH shared Java card and full Rust profile page preflight
 
 on:
   push:
