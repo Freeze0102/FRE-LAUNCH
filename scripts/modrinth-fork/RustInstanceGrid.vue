@@ -14,13 +14,6 @@ import type { GameInstance } from '@/helpers/types'
 // bulk-delete routines or instance query APIs.
 type NativeProfile = { id: string; name: string; created: number; iconPath?: string | null }
 type Runtime = { installed: boolean; prepared: boolean; version: string; reason: string | null }
-type HorizonProfile = { id: string; name: string; version: string | null; selected: boolean }
-type HorizonStatus = {
-  instances: HorizonProfile[]
-  installedVersions: string[]
-  preparedVersions: string[]
-  selectedVersion: string | null
-}
 type Card = {
   key: string
   id: string
@@ -54,7 +47,6 @@ const messages = defineMessages({
 })
 const nativeProfiles = ref<NativeProfile[]>([])
 const runtime = ref<Runtime | null>(null)
-const horizonStatus = ref<HorizonStatus | null>(null)
 const busy = ref<string | null>(null)
 const actionsMenu = ref<InstanceType<typeof ContextMenu>>()
 const deleteModal = ref<InstanceType<typeof ConfirmDeleteInstanceModal>>()
@@ -73,25 +65,8 @@ const cards = computed<Card[]>(() => {
     ready: runtime.value?.installed === true && runtime.value?.prepared === true,
     created: profile.created,
   }))
-  const legacy = (horizonStatus.value?.instances || [])
-    .filter(profile => profile.id === 'horizon' || /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(profile.id))
-    .map(profile => {
-      const version = profile.version && profile.version !== 'latest'
-        ? profile.version
-        : horizonStatus.value?.selectedVersion || horizonStatus.value?.installedVersions[0] || ''
-      return {
-        key: 'horizon:' + profile.id,
-        id: profile.id,
-        name: profile.name,
-        kind: 'horizon' as const,
-        version: version || '26.3',
-        ready: !!version
-          && horizonStatus.value!.installedVersions.includes(version)
-          && horizonStatus.value!.preparedVersions.includes(version),
-      }
-    })
   const term = props.search.trim().toLocaleLowerCase()
-  return [...native, ...legacy].filter(card =>
+  return native.filter(card =>
     !term || card.name.toLocaleLowerCase().includes(term) ||
     'rust'.includes(term) || 'раст'.includes(term),
   )
@@ -112,16 +87,7 @@ async function refresh() {
   } catch (err) {
     if (request === requestId) handleError(err instanceof Error ? err : new Error(String(err)))
   }
-  try {
-    const path = await invoke<string | null>('plugin:fre-horizon|horizon_detect_launcher')
-    if (request !== requestId) return
-    horizonStatus.value = path
-      ? await invoke<HorizonStatus>('plugin:fre-horizon|horizon_status', { exePath: path })
-      : null
-  } catch {
-    // Horizon.exe not found must never hide the main Java/Rust library.
-    if (request === requestId) horizonStatus.value = null
-  }
+
 }
 
 // InstanceCardView is the SAME card renderer used by Fabric, Forge and
@@ -156,15 +122,7 @@ function openCard(card: Card) {
 }
 async function openFolder(card: Card) {
   try {
-    if (card.kind === 'native') {
-      await invoke('plugin:fre-rust|rust_open_folder', { profileId: card.id, folder: 'root' })
-    } else {
-      const exePath = await invoke<string | null>('plugin:fre-horizon|horizon_detect_launcher')
-      if (!exePath) throw new Error('Horizon executable not found')
-      await invoke('plugin:fre-horizon|horizon_open_folder', {
-        exePath, name: card.id, folder: 'root',
-      })
-    }
+    await invoke('plugin:fre-rust|rust_open_folder', { profileId: card.id, folder: 'root' })
   } catch (err) {
     handleError(err instanceof Error ? err : new Error(String(err)))
   }
@@ -204,34 +162,22 @@ async function play(card: Card) {
   if (busy.value) return
   busy.value = card.key
   try {
-    if (card.kind === 'native') {
-      if (!card.ready) {
-        // A first Play uses the existing cache or prepares verified game
-        // assets through Horizon and Mojang for a signed-in owner.
-        try {
-          await invoke<string>('plugin:fre-rust|rust_import_resources', { source: '' })
-          await refresh()
-        } catch (err) {
-          openCard(card)
-          handleError(err instanceof Error ? err : new Error(String(err)))
-          return
-        }
-      }
-      const status = await invoke<Runtime>('plugin:fre-rust|rust_runtime')
-      if (!status.installed || !status.prepared) {
+    if (!card.ready) {
+      try {
+        await invoke<string>('plugin:fre-rust|rust_import_resources', { source: '' })
+        await refresh()
+      } catch (err) {
         openCard(card)
+        handleError(err instanceof Error ? err : new Error(String(err)))
         return
       }
-      await invoke<string>('plugin:fre-rust|rust_launch', { profileId: card.id })
-    } else {
-      if (!card.ready) { openCard(card); return }
-      const exePath = await invoke<string | null>('plugin:fre-horizon|horizon_detect_launcher')
-      if (!exePath) throw new Error('Horizon executable not found')
-      await invoke<string>('plugin:fre-horizon|horizon_direct_play', {
-        exePath,
-        name: card.id,
-      })
     }
+    const status = await invoke<Runtime>('plugin:fre-rust|rust_runtime')
+    if (!status.installed || !status.prepared) {
+      openCard(card)
+      return
+    }
+    await invoke<string>('plugin:fre-rust|rust_launch', { profileId: card.id })
   } catch (err) {
     handleError(err instanceof Error ? err : new Error(String(err)))
   } finally {
@@ -241,13 +187,11 @@ async function play(card: Card) {
 const onRefresh = () => { void refresh() }
 onMounted(() => {
   window.addEventListener('fre-rust-library-refresh', onRefresh)
-  window.addEventListener('fre-horizon-library-refresh', onRefresh)
   void refresh()
 })
 onUnmounted(() => {
   requestId++
   window.removeEventListener('fre-rust-library-refresh', onRefresh)
-  window.removeEventListener('fre-horizon-library-refresh', onRefresh)
   emit('count-change', 0)
 })
 </script>
