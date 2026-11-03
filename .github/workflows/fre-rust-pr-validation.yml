@@ -78,6 +78,14 @@ jobs:
           node scripts/modrinth-fork/test_frontend.cjs FRE-Modrinth-Source
           if ($LASTEXITCODE -ne 0) { throw 'Rust Vue regression tests failed' }
 
+      - name: Build required Vite frontend assets for Tauri codegen
+        shell: pwsh
+        working-directory: FRE-Modrinth-Source
+        run: |
+          pnpm.cmd --filter '@modrinth/app-frontend' run build
+          if ($LASTEXITCODE -ne 0) { throw 'Frontend Vite build failed' }
+          if (!(Test-Path 'apps/app-frontend/dist/index.html')) { throw 'Tauri frontendDist missing after Vite build' }
+
       - name: Check Tauri Rust backend compilation
         shell: pwsh
         working-directory: FRE-Modrinth-Source
