@@ -1,11 +1,16 @@
-FRE LAUNCH v0.5.10 unsigned Windows preview — final unified native Rust UI.
-2026-11-03 after Rust polish preflight #41638950710 SUCCESS (31/31 tests, Vue TypeScript, production Vite, verified source patches).
-Includes:
-- Rust native and legacy Horizon records in same Java-style quick instance switcher/sidebar.
-- Selection checkbox and shared Java selection state for native Rust cards, safe mixed Rust+Java bulk deletion with the native rust_delete_profile command, Java IDs never sent to native engine.
-- Standard Java-style tabbed Rust settings, Play, game files, delete confirmation, transitions and original onboarding checks.
-- Remove redundant standalone CurseForge link: normal Browse Content source selector stays.
-- No claim of downloading proprietary game assets. Current engine can import verified prepared resources from an authenticated owner's existing Minecraft installation; clean one-click Mojang game asset installation is not yet implemented.
-- Do not touch existing world files, Java profiles, updater public key or signed v0.5.9 stable release.
-Require actual Windows Tauri compilation, pinned MIT engine signature/license, SHA256 of all binaries, Defender scan, NSIS silent-install & launcher smoke before uploading artifact.
-No signing secret; preview is not an automatic updater release.
+FRE LAUNCH v0.5.10 unsigned Windows preview — NEW build from latest main (2026-11-03).
+
+Requested by launcher owner after successful Windows validation on PR #25 and main push #41675243571.
+Must rebuild from current main, including:
+- First-run Rust 26.3 resources preparation via official Horizon CLI/Mojang for an authenticated Java Edition owner.
+- Native Horizon mods UI in Rust Content tab; compiled native .hnmod still requires separate native-build and is not auto-activated.
+- Resource cache SHA-256 verification and non-destructive recovery of incomplete prepared files.
+- Rust instance sidebar, selection/rename/delete, Java-style settings, switching and real Play.
+- Modrinth/CurseForge Java browsing integration and Ukrainian/English locales.
+
+This preview is an UNSIGNED TEST INSTALLER, not a stable signed in-app update.
+Do not change or remove earlier v0.5.8/v0.5.9 installations, worlds or profiles.
+Do not package private Mojang assets, account tokens or local cache into the installer.
+Use pinned MIT Horizon engine; verify digest and license, Windows Vue/Tauri compilation,
+Defender scan, executable SHA-256, NSIS install and desktop startup smoke before uploading.
+Do not disable Defender or fake scan results.
