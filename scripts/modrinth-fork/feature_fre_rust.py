@@ -497,7 +497,7 @@ onUnmounted(() => {
     # artifacts. Missing assets are an explicit Runtime: Not installed state
     # in the UI, NEVER a fake Play button.
     runtime = here / "fre-rust-runtime"
-    binaries = ("fre-rust-client.exe", "research-lock.json", "LICENSE.txt")
+    binaries = ("fre-rust-client.exe", "fre-rust-prepare.exe", "research-lock.json", "LICENSE.txt")
     valid = all((runtime / f).is_file() for f in binaries) and (runtime / "BUILD-INFO.json").is_file()
     if valid:
         # These may be private Minecraft resources. Prevent symlink escapes
@@ -516,6 +516,13 @@ onUnmounted(() => {
         checksum = hasher.hexdigest()
         if checksum.lower() != str(info.get("game_exe_sha256", "")).lower():
             raise RuntimeError("Native Rust game SHA-256 is wrong: rebuild; do not bundle.")
+        preparer_checksum = hashlib.sha256((runtime / "fre-rust-prepare.exe").read_bytes()).hexdigest()
+        if preparer_checksum.lower() != str(info.get("prepare_exe_sha256", "")).lower():
+            raise RuntimeError("Native Rust preparer SHA-256 mismatch: rebuild; do not bundle.")
+        parity = runtime / "mods/horizon/src/test/java/dev/horizonlab/parity/VanillaHeightmapOracle.java"
+        exporter = runtime / "crates/horizon-prepare/src/exporters.rs"
+        if not parity.is_file() or not exporter.is_file():
+            raise RuntimeError("Bundled independent Rust preparer lacks exporter source.")
         if info.get("engine_license") != "MIT":
             raise RuntimeError("Native Rust game license metadata changed.")
         if not (runtime / "LICENSE.txt").read_text(encoding="utf-8").startswith("MIT License"):
@@ -531,6 +538,9 @@ onUnmounted(() => {
             raise RuntimeError("Unexpected Tauri bundle.resources configuration.")
         for file in binaries + ("BUILD-INFO.json",):
             resources[f"fre-rust-runtime/{file}"] = f"fre-rust/{file}"
+        # These are original MIT exporter sources, not Mojang game files.
+        resources["fre-rust-runtime/mods/horizon/src/test/java/dev/horizonlab/parity/"] = "fre-rust/mods/horizon/src/test/java/dev/horizonlab/parity/"
+        resources["fre-rust-runtime/crates/horizon-prepare/src/exporters.rs"] = "fre-rust/crates/horizon-prepare/src/exporters.rs"
         # PUBLIC releases carry the MIT engine only. Mojang resources are
         # imported locally by the authenticated owner after installation.
         if (runtime / "resources/horizon-resources.json").is_file():
@@ -538,7 +548,7 @@ onUnmounted(() => {
         elif (runtime / "resources").exists():
             raise RuntimeError("Incomplete private Minecraft resource set.")
         conf.write_text(json.dumps(settings, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-        print("Bundled native FRE LAUNCH Rust engine; private resources stay on the user's PC.")
+        print("Bundled independent native FRE Rust engine + resource preparer; private Minecraft assets stay on the owner's PC.")
     else:
         if runtime.exists():
             raise RuntimeError("Incomplete fre-rust-runtime staging; run BUILD-FRE-RUST.ps1 again.")
