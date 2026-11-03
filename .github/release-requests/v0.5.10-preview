@@ -1,7 +1,10 @@
-FRE LAUNCH v0.5.10 unsigned Windows preview: unified Rust library cards.
-Verified BEFORE this full build:
-- Dedicated Windows frontend preflight run 41495245345 SUCCESS (22/22 tests, source integration, Vite production, TypeScript).
-- Follow-up UA/EN localization preflight run 41496005130 SUCCESS (same real pinned source and regression tests).
-- Previously working Windows preview 41486855288 built NSIS, passed Microsoft Defender and clean-install startup.
-New main branch changes remove separate Horizon/Rust sections and render saved native Rust and valid existing Horizon profiles as ordinary in-grid instance cards. A card opens Rust-specific Files, settings, or Play, never runs through Java's loader; missing Horizon binary no longer creates a phantom global error. Own Minecraft resources are still required before the native client may launch.
-Require preflight, clean Microsoft Defender scans, verified artifacts, NSIS smoke test. Save compiled binaries in CI cache before AV/smoke. This is not an authorized signed v0.5.10 automatic update.
+FRE LAUNCH v0.5.10 unsigned Windows preview — 2026-11-03 integrated Rust loader correction.
+Acceptance:
+- Rust 26.3 appears as a loader in the SAME ordinary Create instance dialog, retaining name, auto-generated/uploaded icons and version chooser.
+- Rust profiles are created by the native Rust backend, never by Java Theseus; they open as regular-looking cards inside the main library and their files/management are available.
+- Rust cards survive Java library grouping changes and zero Java instances; no duplicate standalone Rust or Horizon library sections.
+- Modrinth / CurseForge top selector is not obscured by the sticky Browse install header.
+- Private Minecraft Rust resource preparation and Microsoft ownership validation stay mandatory; the native engine is bundled but no unlicensed game resources are fetched.
+Verified in GitHub Actions run 41600088048: pinned source patching success, Vue TypeScript success, production Vite bundle success, all 26/26 regression tests passed. Prior Windows preview run 41496542387 compiled Windows and passed Defender and clean-installer smoke.
+This one controlled full Windows preview must pass actual Rust compilation, NSIS package build, Microsoft Defender scans of installer + launcher + engine, SHA-256 manifest and clean install-launch smoke before any artifact is uploaded.
+Never claim signed auto-update; original Tauri signing key remains unavailable. No branch, main only.
