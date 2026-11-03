@@ -10,7 +10,7 @@ import {
   PageHeader, PageHeaderActions, PageHeaderMetadata, PageHeaderMetadataItem, TagIcon,
   TeleportOverflowMenu, useVIntl, injectNotificationManager,
 } from '@modrinth/ui'
-import { computed, inject, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import RustInstanceFiles from '@/components/ui/RustInstanceFiles.vue'
@@ -52,12 +52,12 @@ const m = defineMessages({
   installing: { id: 'fre-rust.page.installing', defaultMessage: 'Preparing Minecraft…' },
   installFailed: { id: 'fre-rust.page.install-failed', defaultMessage: 'Automatic preparation needs an installed, legally owned Minecraft Java Edition and an active Microsoft account.' },
   chooseResources: { id: 'fre-rust.page.choose-resources', defaultMessage: 'Choose prepared resources folder' },
-  signInHorizon: { id: 'fre-rust.page.sign-in-horizon', defaultMessage: 'Sign in to Horizon with Microsoft' },
-  firstRunHint: { id: 'fre-rust.page.first-run-hint', defaultMessage: 'First run: FRE LAUNCH uses cached Minecraft 26.3 or downloads missing files from Mojang through Horizon. A Microsoft login owning Java Edition may be required in Horizon once. Further launches reuse the downloaded resources.' },
-  prepHelper: { id: 'fre-rust.page.prep-helper', defaultMessage: 'Checking verified Horizon setup…' },
-  prepVersion: { id: 'fre-rust.page.prep-version', defaultMessage: 'Downloading a Horizon game version…' },
-  prepLocal: { id: 'fre-rust.page.prep-local', defaultMessage: 'Checking installed Minecraft files…' },
+  firstRunHint: { id: 'fre-rust.page.first-run-hint', defaultMessage: 'FRE LAUNCH prepares Minecraft 26.3 using your own Microsoft Minecraft account, verified Mojang downloads and its bundled native game. No separate launcher is required.' },
+  prepHelper: { id: 'fre-rust.page.prep-helper', defaultMessage: 'Checking native FRE LAUNCH setup…' },
+  prepVersion: { id: 'fre-rust.page.prep-version', defaultMessage: 'Checking Rust game version…' },
+  prepLocal: { id: 'fre-rust.page.prep-local', defaultMessage: 'Checking local Minecraft resources…' },
   prepDownload: { id: 'fre-rust.page.prep-download', defaultMessage: 'Downloading missing verified Minecraft files from Mojang…' },
+  prepPrepare: { id: 'fre-rust.page.prep-prepare', defaultMessage: 'Building verified native Minecraft resources…' },
   prepCopy: { id: 'fre-rust.page.prep-copy', defaultMessage: 'Saving game resources in the FRE LAUNCH cache…' },
   prepReady: { id: 'fre-rust.page.prep-ready', defaultMessage: 'Minecraft resources ready.' },
   resources: { id: 'fre-rust.page.resources', defaultMessage: 'Game resources' },
@@ -67,7 +67,7 @@ const m = defineMessages({
   instanceSection: { id: 'fre-rust.page.section.instance', defaultMessage: 'Instance' },
   gameSection: { id: 'fre-rust.page.section.game', defaultMessage: 'Game' },
   deleteNotice: { id: 'fre-rust.page.delete-notice', defaultMessage: 'Permanently deletes this Rust instance and its worlds. Shared game resources are kept.' },
-  notDownloaded: { id: 'fre-rust.page.not-downloaded', defaultMessage: 'If local Minecraft files are missing, Horizon downloads the verified Minecraft assets from Mojang for an authenticated owner.' },
+  notDownloaded: { id: 'fre-rust.page.not-downloaded', defaultMessage: 'If the resource cache is missing, FRE LAUNCH downloads verified Minecraft assets from Mojang after verifying account ownership.' },
 })
 
 const kind = computed<'native' | 'horizon'>(() => route.params.kind === 'horizon' ? 'horizon' : 'native')
@@ -118,7 +118,7 @@ const iconSrc = computed(() =>
 const prepareStageText = computed(() => {
   const labels: Record<string, keyof typeof m> = {
     helper: 'prepHelper', version: 'prepVersion', local: 'prepLocal',
-    download: 'prepDownload', copy: 'prepCopy', ready: 'prepReady',
+    download: 'prepDownload', prepare: 'prepPrepare', copy: 'prepCopy', ready: 'prepReady',
   }
   return prepareStage.value && labels[prepareStage.value]
     ? t(m[labels[prepareStage.value]])
