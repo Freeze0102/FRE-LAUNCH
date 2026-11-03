@@ -252,7 +252,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <ContextMenu ref="actionsMenu" />
+  <ContextMenu ref="actionsMenu" :label="formatMessage(messages.settings)" />
   <ConfirmDeleteInstanceModal
     ref="deleteModal"
     :instances="deleteInstance ? [deleteInstance] : []"
