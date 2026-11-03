@@ -225,7 +225,7 @@ def verify(root):
             "handleFreRustOrJavaCreate", "plugin:fre-rust|rust_create_profile",
             ":available-loaders=", "'rust'", "@create=\"handleFreRustOrJavaCreate\"",
         ]),
-        (rust_stage, ["Minecraft (Rust)"]),
+        (rust_stage, ["customSetupTitle"]),
         (rust_main, [".plugin(api::fre_rust::init())"]),
         (rust_build, ['"fre-rust"', '"rust_create_profile"', '"rust_rename_profile"', '"rust_delete_profile"', '"rust_import_mod"', '"rust_launch"',
             '"rust_open_folder"', '"rust_list_files"']),
@@ -322,7 +322,9 @@ def verify(root):
     for marker in ("selectedLoader.value === 'rust'", "value: '26.3'", "fre-rust.create.requirement"):
         assert marker in rust_custom_setup, f"Rust version chooser must use actual native game: {marker}"
     assert "selectedLoader.value === 'rust'" in rust_context, "Native loader must hide Java loader-version selection"
-    assert "ctx.onHorizon?.()" not in rust_stage, "Native Rust should be selected as a loader in the normal Create screen"
+    assert "ctx.onHorizon?.()" not in rust_stage, "No separate Horizon installation option is allowed"
+    assert "HorizonRustPanel" not in rust_app and "on-horizon=" not in rust_app
+    assert "horizon" not in (root / "apps/app/src/api/mod.rs").read_text(encoding="utf-8")
     assert "fre-rust.create.requirement" in app_uk and "fre-rust.create.requirement" in app_en
     assert '<HorizonLibrary' not in rust_index and '<FreRustLibrary' not in rust_index, (
         "Do not render separate Horizon or Rust libraries"
