@@ -29,12 +29,20 @@ function component(file, invoke, instances = [], options = {}) {
     '@tauri-apps/plugin-opener': { openUrl: options.openUrl || (async () => {}) },
     '@tauri-apps/plugin-dialog': { open: options.open || (async () => null) },
     '@/helpers/instance': { list: async () => instances, add_project_from_path: options.addProjectFromPath || (async () => {}) },
-    '@modrinth/ui': { defineMessages: x => x, useVIntl: () => ({ formatMessage: (m, args = {}) =>
-      m.defaultMessage.replace(/\{(\w+)\}/g, (_, k) => String(args[k])) }) },
+    '@modrinth/assets': { PlayIcon: {} },
+    '@modrinth/ui': {
+      defineMessages: x => x,
+      useVIntl: () => ({ formatMessage: (m, args = {}) =>
+        m.defaultMessage.replace(/\{(\w+)\}/g, (_, k) => String(args[k])) }),
+      injectNotificationManager: () => ({ handleError: options.handleError || (() => {}) }),
+      IconButton: {},
+    },
+    'vue-router': { useRouter: () => ({ push: options.push || (async () => {}) }) },
+    '@/components/ui/library/instance-group/instance-card-view.vue': {},
     vue: { ...vue, onMounted: f => mounted.push(f), onUnmounted: f => unmounted.push(f) },
   }
   const names = file === 'RustInstanceGrid.vue'
-    ? 'cards,nativeProfiles,runtime,horizonStatus,error,refresh,openCard,closeCard,play,loadFiles,openExplorer,selected,files,cardStyle,manage'
+    ? 'cards,nativeProfiles,runtime,horizonStatus,refresh,openCard,play,cardStyle,viewInstance,detailUrl,busy'
     : file === 'CurseForgeBrowser.vue'
     ? 'instanceId,searchText,apiKey,results,searched,loading,notice,error,installing,doSearch,install'
     : file === 'FreRustPanel.vue'
@@ -400,67 +408,79 @@ test('Leaving an instance catalog resets context without stale breadcrumb handle
 })
 
 
-test('Native Rust profiles are library tiles, not another library section', async () => {
+test('Native Rust profiles use Java InstanceCardView and navigate to the real page', async () => {
   const profile = { id: '12345678', name: 'Survival Rust', created: 1 }
-  const emitted = []
-  const c = component('RustInstanceGrid.vue', async (command) => {
+  const emitted = [], navigated = []
+  const c = component('RustInstanceGrid.vue', async command => {
     if (command.endsWith('|rust_profiles')) return [profile]
     if (command.endsWith('|rust_runtime')) return { installed: true, prepared: true, version: '26.3', reason: null }
     if (command.endsWith('|horizon_detect_launcher')) return null
-    throw Error('Unexpected command ' + command)
-  }, [], { props: { startIndex: 1, columnCount: 4, cardWidth: 140, cardHeight: 180, gap: 12, compact: false, search: '' },
-    emit: (event, count) => emitted.push({ event, count }) })
+    throw Error(command)
+  }, [], {
+    props: { startIndex: 1, columnCount: 4, cardWidth: 140, cardHeight: 180, gap: 12, compact: false, search: '' },
+    emit: (event, count) => emitted.push({ event, count }),
+    push: async url => navigated.push(url),
+  })
   await c.state.refresh()
   assert.equal(c.state.cards.value.length, 1)
   assert.deepEqual(c.state.cards.value.map(x => [x.kind, x.name, x.ready]), [['native', 'Survival Rust', true]])
+  assert.equal(c.state.viewInstance(c.state.cards.value[0]).loader, 'Rust')
   assert.deepEqual(c.state.cardStyle(0), { position: 'absolute', width: '140px', left: '152px', top: '0px', height: '180px' })
+  c.state.openCard(c.state.cards.value[0])
+  assert.deepEqual(navigated, ['/rust-instance/native/12345678'])
   assert.ok(emitted.some(e => e.event === 'count-change' && e.count === 1))
-  const file = fs.readFileSync(path.join(__dirname, 'RustInstanceGrid.vue'), 'utf8')
-  assert.match(file, /data-library-instance-card/)
-  assert.match(file, /@click\.stop="openCard\(card\)"/)
-  assert.doesNotMatch(file, /Horizon — existing profiles|Minecraft on Rust<\/h2>/)
+  const grid = fs.readFileSync(path.join(__dirname, 'RustInstanceGrid.vue'), 'utf8')
+  assert.match(grid, /<InstanceCardView/)
+  assert.doesNotMatch(grid, /<Teleport|role="dialog"|<article/)
 })
 
-test('Missing Horizon executable does not hide native Rust or display a false global error', async () => {
-  const c = component('RustInstanceGrid.vue', async (command) => {
+test('Missing Horizon executable never obscures native Rust or invents a second library', async () => {
+  const navigated = []
+  const c = component('RustInstanceGrid.vue', async command => {
     if (command.endsWith('|rust_profiles')) return [{ id: '22', name: 'My Rust', created: 0 }]
-    if (command.endsWith('|rust_runtime')) return { installed: true, prepared: false, version: '26.3', reason: 'Import owned game resources' }
+    if (command.endsWith('|rust_runtime')) return { installed: true, prepared: false, version: '26.3', reason: 'Not prepared' }
     if (command.endsWith('|horizon_detect_launcher')) throw Error('os error 3')
-    throw Error('Unexpected command ' + command)
-  }, [], { props: { startIndex: 0, columnCount: 1, cardWidth: 140, cardHeight: 180, gap: 12, compact: false, search: '' } })
+    throw Error(command)
+  }, [], {
+    props: { startIndex: 0, columnCount: 1, cardWidth: 140, cardHeight: 180, gap: 12, compact: false, search: '' },
+    push: async url => navigated.push(url),
+  })
   await c.state.refresh()
   assert.equal(c.state.cards.value.length, 1)
   assert.equal(c.state.cards.value[0].ready, false)
-  assert.equal(c.state.error.value, '')
   await c.state.play(c.state.cards.value[0])
-  assert.match(c.state.error.value, /Import owned game resources/)
+  assert.deepEqual(navigated, ['/rust-instance/native/22'])
 })
 
-test('Rust profile Files and Launch always use selected Rust ID, never Java instance', async () => {
+test('Native Rust uses native game launch, page-specific Files and settings, never Java instance API', async () => {
   const calls = []
   const c = component('RustInstanceGrid.vue', async (command, args) => {
     calls.push({ command, args })
     if (command.endsWith('|rust_profiles')) return [{ id: '77', name: 'Rust', created: 0 }]
     if (command.endsWith('|rust_runtime')) return { installed: true, prepared: true, version: '26.3', reason: null }
     if (command.endsWith('|horizon_detect_launcher')) return null
-    if (command.endsWith('|rust_list_files')) return []
     if (command.endsWith('|rust_launch')) return 'started'
-    if (command.endsWith('|rust_open_folder')) return
     throw Error('Unexpected command ' + command)
   }, [], { props: { startIndex: 0, columnCount: 1, cardWidth: 140, cardHeight: 180, gap: 12, compact: false, search: '' } })
   await c.state.refresh()
-  const profile = c.state.cards.value[0]
-  c.state.openCard(profile)
-  await c.state.loadFiles('mods')
-  await c.state.openExplorer()
-  await c.state.play(profile)
-  assert.ok(calls.some(x => x.command === 'plugin:fre-rust|rust_list_files' && x.args.profileId === '77' && x.args.folder === 'mods'))
-  assert.ok(calls.some(x => x.command === 'plugin:fre-rust|rust_open_folder' && x.args.profileId === '77'))
+  await c.state.play(c.state.cards.value[0])
   assert.ok(calls.some(x => x.command === 'plugin:fre-rust|rust_launch' && x.args.profileId === '77'))
+  assert.ok(!calls.some(x => x.command.includes('instance|') || x.command.includes('plugin:profile')))
+  const page = fs.readFileSync(path.join(__dirname, 'RustInstancePage.vue'), 'utf8')
+  const files = fs.readFileSync(path.join(__dirname, 'RustInstanceFiles.vue'), 'utf8')
+  assert.match(page, /<PageHeader/)
+  assert.match(page, /<PageHeaderActions/)
+  assert.match(page, /<NavTabs/)
+  assert.match(page, /<RustInstanceFiles/)
+  assert.match(page, /plugin:fre-rust\|rust_launch/)
+  assert.match(page, /showFreRustWizard/)
+  assert.match(files, /<FilePageLayout/)
+  assert.match(files, /plugin:fre-rust\|rust_list_files/)
+  assert.match(files, /plugin:fre-rust\|rust_open_folder/)
 })
 
-test('Existing Horizon profile becomes a Rust tile with direct Play and no new launcher library', async () => {
-  const calls = []
+test('Existing Horizon profile uses same Java card and native direct play', async () => {
+  const calls = [], navigated = []
   const c = component('RustInstanceGrid.vue', async (command, args) => {
     calls.push({ command, args })
     if (command.endsWith('|rust_profiles')) return []
@@ -472,16 +492,18 @@ test('Existing Horizon profile becomes a Rust tile with direct Play and no new l
     }
     if (command.endsWith('|horizon_direct_play')) return 'started'
     throw Error('Unexpected command ' + command)
-  }, [], { props: { startIndex: 1, columnCount: 3, cardWidth: 140, cardHeight: 180, gap: 12, compact: false, search: '' } })
+  }, [], {
+    props: { startIndex: 1, columnCount: 3, cardWidth: 140, cardHeight: 180, gap: 12, compact: false, search: '' },
+    push: async url => navigated.push(url),
+  })
   await c.state.refresh()
-  assert.equal(c.state.cards.value.length, 1)
   assert.equal(c.state.cards.value[0].kind, 'horizon')
-  assert.equal(c.state.cards.value[0].ready, true)
+  c.state.openCard(c.state.cards.value[0])
+  assert.deepEqual(navigated, ['/rust-instance/horizon/survival'])
   await c.state.play(c.state.cards.value[0])
-  assert.ok(calls.some(x => x.command === 'plugin:fre-horizon|horizon_direct_play'
-    && x.args.name === 'survival' && x.args.exePath === 'C:\\Horizon\\horizon.exe'))
+  assert.ok(calls.some(x => x.command === 'plugin:fre-horizon|horizon_direct_play' &&
+    x.args.name === 'survival' && x.args.exePath === 'C:\\Horizon\\horizon.exe'))
 })
-
 
 test('Rust appears as native loader in the ordinary Create instance dialog', () => {
   const creation = fs.readFileSync(path.join(source, 'packages/ui/src/components/flows/creation-flow-modal/components/CustomSetupStage.vue'), 'utf8')
@@ -506,9 +528,9 @@ test('Rust profile icons preserve ordinary creation dialog selection', () => {
   assert.match(backend, /icon_bytes: Option<Vec<u8>>/)
   assert.match(backend, /fn valid_icon\(/)
   assert.match(backend, /profile\.icon_path = \["icon\.png", "icon\.jpg", "icon\.webp"\]/)
-  assert.match(tiles, /convertFileSrc\(card\.iconPath\)/)
-  assert.match(tiles, /<Avatar/)
-  assert.match(tiles, /:tint-by="card\.key"/)
+  assert.match(tiles, /icon_path: card.iconPath/)
+  assert.match(tiles, /<InstanceCardView/)
+  assert.match(tiles, /:instance="viewInstance\(card\)"/)
 })
 
 test('Modrinth/CurseForge chooser no longer overlaps the negative-margin sticky Browse header', () => {
