@@ -16,7 +16,7 @@ const MANIFEST_URL: &str = "https://piston-meta.mojang.com/mc/game/version_manif
 const MAX_JSON: usize = 12 * 1024 * 1024;
 const MAX_GAME_FILE: u64 = 200 * 1024 * 1024;
 const MAX_ASSET: u64 = 32 * 1024 * 1024;
-const MAX_SOURCE_FILES: usize = 256;
+const MAX_SOURCE_FILES: usize = 512;
 
 fn sha1_hex(bytes: &[u8]) -> String {
     format!("{:x}", Sha1::digest(bytes))
