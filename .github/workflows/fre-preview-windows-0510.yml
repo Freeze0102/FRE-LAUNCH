@@ -207,7 +207,10 @@ jobs:
           $engine = 'scripts/modrinth-fork/fre-rust-runtime/fre-rust-client.exe'
           if (-not (Test-Path -LiteralPath $engine -PathType Leaf)) { throw 'Native Rust client missing from bundle' }
           Copy-Item -LiteralPath $engine -Destination 'preview-pending/fre-rust-client.exe'
-          $hashes = foreach ($name in @('FRE-LAUNCH-v0.5.10-Windows-x64-Setup.exe', 'FRE LAUNCH.exe', 'fre-rust-client.exe')) {
+          $preparer = 'scripts/modrinth-fork/fre-rust-runtime/fre-rust-prepare.exe'
+          if (-not (Test-Path -LiteralPath $preparer -PathType Leaf)) { throw 'Native resource preparer missing from build' }
+          Copy-Item -LiteralPath $preparer -Destination 'preview-pending/fre-rust-prepare.exe'
+          $hashes = foreach ($name in @('FRE-LAUNCH-v0.5.10-Windows-x64-Setup.exe', 'FRE LAUNCH.exe', 'fre-rust-client.exe', 'fre-rust-prepare.exe')) {
             $digest = (Get-FileHash -LiteralPath (Join-Path 'preview-pending' $name) -Algorithm SHA256).Hash
             "$name|$digest"
           }
@@ -226,7 +229,7 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $manifest = 'preview-pending/SHA256-MANIFEST.txt'
           if (-not (Test-Path -LiteralPath $manifest -PathType Leaf)) { throw 'Preview digest manifest missing' }
-          $expectedNames = @('FRE-LAUNCH-v0.5.10-Windows-x64-Setup.exe', 'FRE LAUNCH.exe', 'fre-rust-client.exe')
+          $expectedNames = @('FRE-LAUNCH-v0.5.10-Windows-x64-Setup.exe', 'FRE LAUNCH.exe', 'fre-rust-client.exe', 'fre-rust-prepare.exe')
           $entries = @(Get-Content -LiteralPath $manifest)
           if ($entries.Count -ne $expectedNames.Count) { throw 'Incorrect preview digest manifest' }
           foreach ($i in 0..($expectedNames.Count - 1)) {
@@ -246,7 +249,8 @@ jobs:
           $files = @(
             'preview-pending/FRE-LAUNCH-v0.5.10-Windows-x64-Setup.exe',
             'preview-pending/FRE LAUNCH.exe',
-            'preview-pending/fre-rust-client.exe'
+            'preview-pending/fre-rust-client.exe',
+            'preview-pending/fre-rust-prepare.exe'
           )
           & ./.github/scripts/scan-preview-defender.ps1 -Paths $files
 
