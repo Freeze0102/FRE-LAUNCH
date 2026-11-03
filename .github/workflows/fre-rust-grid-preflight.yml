@@ -1,4 +1,4 @@
-name: FRE LAUNCH verified Rust Play, settings, delete and restored Home preflight
+name: FRE LAUNCH Rust management and Play corrected preflight
 
 on:
   push:
