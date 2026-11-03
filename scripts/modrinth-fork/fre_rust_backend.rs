@@ -685,6 +685,11 @@ fn safe_game_folder(dir: &Path, folder: &str) -> Result<PathBuf, String> {
     }
     let base = dir.canonicalize().map_err(|e| e.to_string())?;
     let target = if folder == "root" { base.clone() } else if folder == "mods" { base.join("horizon-mods") } else { base.join(folder) };
+    // Profiles created before Horizon mod support have only a legacy 'mods'
+    // folder. Create the correct empty native folder without moving user data.
+    if folder == "mods" && !target.exists() {
+        fs::create_dir(&target).map_err(|e| format!("Could not create Horizon mods folder: {e}"))?;
+    }
     let resolved = target.canonicalize().map_err(|e| e.to_string())?;
     if !resolved.starts_with(&base) || !resolved.is_dir() {
         return Err("Cannot open a folder outside the Rust game profile.".into());
