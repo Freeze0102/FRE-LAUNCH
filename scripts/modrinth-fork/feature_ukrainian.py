@@ -289,10 +289,10 @@ def _complete(english, ukrainian, curated, field):
     return added, english_fallback
 
 # Distinct from Java game instance rows: Rust profiles appear as independent
-# cards sourced from the installed Horizon profile manifest.
+# cards use FRE-owned local profile records, not a second launcher.
 NEW.update({
-"fre-launch.rust.library.title":("Horizon — раніше створені збірки","Horizon — existing profiles"),
-"fre-launch.rust.library.subtitle":("Окремі збірки Horizon з власними світами, налаштуваннями й файлами гри.","Horizon profiles are separate game installations with their own worlds, options and game files."),
+"fre-launch.rust.library.title":("Rust — мої збірки","Rust — my instances"),
+"fre-launch.rust.library.subtitle":("Збірки Minecraft на Rust із власними світами та налаштуваннями у FRE LAUNCH.","Rust Minecraft instances with separate worlds and settings in FRE LAUNCH."),
 "fre-launch.rust.library.version":("Версія {version}","Version {version}"),
 "fre-launch.rust.library.play":("Грати","Play"),
 "fre-launch.rust.library.playing":("Запускаємо…","Starting..."),
@@ -300,13 +300,13 @@ NEW.update({
 "fre-launch.rust.library.files":("Файли","Files"),
 "fre-launch.rust.library.add":("Нова Rust-збірка","New Rust profile"),
 "fre-launch.rust.library.needs-prepare":("Потрібно встановити гру або підготувати ресурси","Installation or resources required"),
-"fre-launch.rust.library.empty":("Збірок Horizon не знайдено. Відкрий налаштування, щоб додати збірку.", "No Horizon profiles found. Open the manager to add one."),
+"fre-launch.rust.library.empty":("Збірок Minecraft на Rust поки немає.", "No Rust Minecraft instances yet."),
 "fre-launch.rust.library.ready":("Готово до запуску","Ready to play"),
-"fre-launch.rust.library.error":("Horizon: {reason}","Horizon: {reason}"),
+"fre-launch.rust.library.error":("Rust: {reason}","Rust: {reason}"),
 })
 
 
-# The native FRE LAUNCH game is distinct from the historical Horizon adapter.
+# Rust game is integrated into FRE LAUNCH's native profile library.
 NEW.update({
 "fre-rust.setup.title":("Minecraft на Rust — FRE LAUNCH", "Minecraft on Rust — FRE LAUNCH"),
 "fre-rust.setup.intro":("Твої власні Rust-збірки. FRE LAUNCH запускає Minecraft напряму, без іншого лаунчера.", "Your own Rust Minecraft profiles, installed and launched directly by FRE LAUNCH. No second launcher."),
@@ -320,13 +320,13 @@ NEW.update({
 "fre-rust.setup.missing":("У цій збірці FRE LAUNCH ще немає Rust-гри.", "Native Rust game is not installed in this FRE LAUNCH build."),
 "fre-rust.setup.ready":("Ресурси Minecraft готові", "Minecraft resources prepared"),
 "fre-rust.setup.not-ready":("Ресурси Minecraft не підготовлені", "Minecraft resources not prepared"),
-"fre-rust.setup.details":("Під час першого використання FRE LAUNCH використовує локальну Minecraft 26.3 або завантажує перевірені файли гри через Horizon з Mojang. Наступні запуски використовують кеш.", "On first use, FRE LAUNCH reuses your local Minecraft 26.3 or downloads verified owned game assets via Horizon and Mojang. Subsequent launches use cached files."),
+"fre-rust.setup.details":("FRE LAUNCH сам підготує Minecraft 26.3 через власний кеш і перевірені ресурси Mojang для власника Java Edition. Інший лаунчер не потрібен.", "FRE LAUNCH prepares Minecraft 26.3 using its own cache and verified Mojang assets for a Java Edition owner. No second launcher is needed."),
 "fre-rust.setup.source":("Папка підготованих ресурсів (необов'язково — залиш порожнім для автопошуку)", "Prepared game resources folder (optional; leave blank for automatic detection)"),
 "fre-rust.setup.browse":("Вибрати папку", "Choose folder"),
 "fre-rust.setup.import":("Підготувати або завантажити Minecraft", "Prepare or download Minecraft"),
 "fre-rust.setup.importing":("Підготовка Minecraft…", "Preparing Minecraft…"),
-"fre-rust.setup.import-help":("Залиш поле порожнім для автоматичного встановлення. Може знадобитися одноразовий вхід у Horizon через Microsoft-акаунт із придбаною Java Edition. Ручний вибір папки необов'язковий.", "Leave the path empty for automatic setup. A Microsoft account owning Java Edition may need to sign in to Horizon once. A manual prepared folder is optional."),
-"fre-rust.setup.sign-in-horizon":("Увійти в Horizon через Microsoft", "Microsoft sign-in for Horizon"),
+"fre-rust.setup.import-help":("Використай свій Microsoft-акаунт із Minecraft Java Edition у FRE LAUNCH. Якщо є підготовлені ресурси, їх також можна імпортувати.", "Use your Minecraft Java Edition Microsoft account in FRE LAUNCH. You can also import previously prepared resources."),
+"fre-rust.setup.sign-in-horizon":("Увійти через FRE LAUNCH", "Sign in with FRE LAUNCH"),
 "fre-rust.setup.none":("Rust-збірок ще немає.", "No Rust profiles yet."),
 "fre-rust.setup.logs":("Показати лог гри", "Show game log"),
 "fre-rust.setup.files":("Файли", "Files"),
@@ -344,7 +344,7 @@ NEW.update({
 "fre-rust.library.playing":("Запускаємо…", "Starting..."),
 "fre-rust.library.manage":("Налаштувати", "Manage"),
 "fre-rust.library.files":("Файли", "Files"),
-"fre-rust.library.mods-info":("Rust-гра використовує нативні моди Horizon; Java-моди CurseForge (.jar) не підтримуються.", "Rust Minecraft uses native Horizon mods; CurseForge Java .jar mods are not supported."),
+"fre-rust.library.mods-info":("Minecraft на Rust використовує нативні моди .hmod; Java-моди (.jar) несумісні.", "Rust Minecraft uses native .hmod content mods; Java .jar mods are incompatible."),
 "fre-rust.library.error":("Rust-гра: {reason}", "Rust game: {reason}"),
 })
 
