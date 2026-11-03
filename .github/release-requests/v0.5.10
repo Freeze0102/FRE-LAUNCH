@@ -4,3 +4,6 @@ Source: latest main commit, including in-app Java Modrinth/CurseForge catalog an
 Build: Vue/Tauri native Windows installer, updater signature, regression tests, Defender scan, and installed-launcher smoke test.
 Publish: only if the existing FRE_LAUNCH_SECURITY_APPROVED repository variable is true AND all checks pass.
 Do not upload, substitute, or reuse old binaries; never publish the flagged legacy v0.5.5 installer.
+
+Review-build requested: 2026-11-03 (post-PR #24 Rust onboarding, Vite/Tauri CI fix).
+Publish: disabled for push-triggered builds; upload reviewed signed NSIS EXE only after all checks and Defender pass.
