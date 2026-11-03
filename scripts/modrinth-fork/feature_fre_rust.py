@@ -48,9 +48,8 @@ pub async fn fre_rust_default_credentials() -> crate::Result<Option<Credentials>
 pub async fn get_default_user()""",
     )
 
-    # Existing Horizon profiles already work for some players. Keep their
-    # launcher, profile folders and library card instead of silently replacing
-    # them with a new incompatible native profile format.
+    # Keep the user's previous Horizon files untouched, but expose only
+    # FRE-owned native Rust instances; never require a second launcher.
     exactly(app / "src/api/mod.rs",
             "pub mod horizon;",
             "pub mod horizon;\npub mod fre_rust;")
@@ -74,12 +73,16 @@ pub async fn get_default_user()""",
     app_vue = frontend / "src/App.vue"
     exactly(app_vue,
             "import HorizonRustPanel from '@/components/ui/HorizonRustPanel.vue'",
-            "import HorizonRustPanel from '@/components/ui/HorizonRustPanel.vue'\nimport FreRustPanel from '@/components/ui/FreRustPanel.vue'")
+            "import FreRustPanel from '@/components/ui/FreRustPanel.vue'")
     exactly(app_vue, "const horizonWizard = ref(null)",
-            "const horizonWizard = ref(null)\nconst freRustWizard = ref(null)")
-    exactly(app_vue, "provide('showHorizonWizard', showHorizonWizard)",
-            """provide('showHorizonWizard', showHorizonWizard)
-function showFreRustWizard(profileId) {
+            "const freRustWizard = ref(null)")
+    exactly(app_vue,
+            """function showHorizonWizard(instanceId) {
+    installationModal.value?.hide()
+    horizonWizard.value?.show(instanceId)
+}
+provide('showHorizonWizard', showHorizonWizard)""",
+            """function showFreRustWizard(profileId) {
     installationModal.value?.hide()
     freRustWizard.value?.show(profileId)
 }
@@ -89,7 +92,7 @@ provide('showFreRustWizard', showFreRustWizard)""")
     exactly(app_vue, ':on-horizon="showHorizonWizard"',
             ':on-horizon="showFreRustWizard"')
     exactly(app_vue, '<HorizonRustPanel ref="horizonWizard" />',
-            '<HorizonRustPanel ref="horizonWizard" />\n\t\t<FreRustPanel ref="freRustWizard" />')
+            '<FreRustPanel ref="freRustWizard" />')
 
     # Keep the EXACT normal Java creation UI. Rust is a loader chip in the
     # custom stage, not a parallel "New Rust profile" creation experience.
@@ -279,17 +282,6 @@ async function refreshRustNames() {
         const profiles = await invoke<{ name: string }[]>('plugin:fre-rust|rust_profiles')
         names.push(...profiles.map(profile => profile.name))
     } catch { /* A missing native plugin must not hide Java instances. */ }
-    try {
-        const exe = await invoke<string | null>('plugin:fre-horizon|horizon_detect_launcher')
-        if (exe) {
-            const state = await invoke<{ instances: { id: string; name: string }[] }>(
-                'plugin:fre-horizon|horizon_status', { exePath: exe },
-            )
-            names.push(...state.instances
-                .filter(profile => profile.id === 'horizon' || /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(profile.id))
-                .map(profile => profile.name))
-        }
-    } catch { /* No Horizon executable is not a Java library error. */ }
     if (generation === rustRefreshGeneration) rustProfileNames.value = names
 }
 const refreshRustLibrary = () => { void refreshRustNames() }
@@ -355,17 +347,6 @@ async function checkRustHome() {
         const profiles = await invoke<{ id: string }[]>('plugin:fre-rust|rust_profiles')
         found = profiles.length > 0
     } catch { /* Keep the standard Java Home when native Rust is not available. */ }
-    if (!found) {
-        try {
-            const exe = await invoke<string | null>('plugin:fre-horizon|horizon_detect_launcher')
-            if (exe) {
-                const state = await invoke<{ instances: { id: string }[] }>(
-                    'plugin:fre-horizon|horizon_status', { exePath: exe },
-                )
-                found = state.instances.length > 0
-            }
-        } catch { /* A removed Horizon binary is not a reason to change Home. */ }
-    }
     if (request === rustHomeGeneration) {
         hasRustProfiles.value = found
         rustHomeReady.value = true
@@ -510,8 +491,8 @@ onUnmounted(() => {
             messages[key] = {'message': pair[position]}
         locale.write_text(json.dumps(messages, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
 
-    # Preserve the older Horizon adapter and its UI so an update does not
-    # strand already installed Rust profiles. No automatic world migration.
+    # Legacy data stays on disk but is no longer shown as a playable FRE
+    # profile. No automatic deletion or unsafe world migration.
     # Bundle the native game only when the local build has prepared real
     # artifacts. Missing assets are an explicit Runtime: Not installed state
     # in the UI, NEVER a fake Play button.
