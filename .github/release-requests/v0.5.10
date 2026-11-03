@@ -7,3 +7,6 @@ Do not upload, substitute, or reuse old binaries; never publish the flagged lega
 
 Review-build requested: 2026-11-03 (post-PR #24 Rust onboarding, Vite/Tauri CI fix).
 Publish: disabled for push-triggered builds; upload reviewed signed NSIS EXE only after all checks and Defender pass.
+
+Signed v0.5.10 RE-REVIEW requested 2026-11-03 after owner configured FRE_TAURI_SIGNING_PRIVATE_KEY in GitHub Actions Secrets (unencrypted key, no password).
+Build current main; validate signing against unchanged update-channel.json public key. Upload signed review artifacts only; publishing remains disabled by the workflow's manual approval gate.
