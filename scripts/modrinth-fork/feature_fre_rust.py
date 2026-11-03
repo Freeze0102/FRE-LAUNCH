@@ -87,6 +87,96 @@ provide('showFreRustWizard', showFreRustWizard)""")
     exactly(app_vue, '<HorizonRustPanel ref="horizonWizard" />',
             '<HorizonRustPanel ref="horizonWizard" />\n\t\t<FreRustPanel ref="freRustWizard" />')
 
+    # Keep the EXACT normal Java creation UI. Rust is a loader chip in the
+    # custom stage, not a parallel "New Rust profile" creation experience.
+    exactly(app_vue, 'type="instance"\n\t\t\tshow-snapshot-toggle',
+            'type="instance"\n\t\t\t:available-loaders="[\'fabric\', \'neoforge\', \'forge\', \'quilt\', \'rust\']"\n\t\t\tshow-snapshot-toggle')
+    exactly(app_vue, '@create="handleCreate"', '@create="handleFreRustOrJavaCreate"')
+    exactly(app_vue,
+            "provide('showFreRustWizard', showFreRustWizard)",
+            """provide('showFreRustWizard', showFreRustWizard)
+
+// A Rust profile has its own native game format. Do not pass it into the
+// Java/Theseus instance creator even though it uses the same creation UI.
+async function handleFreRustOrJavaCreate(config) {
+    if (config.selectedLoader.value !== 'rust') {
+        return handleCreate(config)
+    }
+    try {
+        const version = config.selectedGameVersion.value
+        if (version !== '26.3') throw new Error('This Rust game build only supports Minecraft 26.3.')
+        const name = (config.instanceName.value.trim() || config.autoInstanceName.value).trim()
+        if (!name) throw new Error('Enter a name for the Rust profile.')
+        const icon = config.instanceIcon.value
+        const iconBytes = icon ? Array.from(new Uint8Array(await icon.arrayBuffer())) : null
+        const profile = await invoke('plugin:fre-rust|rust_create_profile', {
+            name,
+            iconPath: icon ? null : config.instanceIconPath.value,
+            iconBytes,
+        })
+        installationModal.value?.hide()
+        window.dispatchEvent(new Event('fre-rust-library-refresh'))
+        // Engine is bundled with FRE LAUNCH. An authenticated owner's private
+        // Minecraft resources may still need to be prepared or imported.
+        const status = await invoke('plugin:fre-rust|rust_runtime')
+        if (!status.prepared) showFreRustWizard(profile.id)
+    } catch (error) {
+        config.loading.value = false
+        handleError(error)
+    }
+}""")
+
+    # The cross-platform creation flow must never request a fake Rust version
+    # from Modrinth's Java-loader API. This binary currently supports 26.3.
+    flow_context = root / 'packages/ui/src/components/flows/creation-flow-modal/creation-flow-context.ts'
+    exactly(flow_context,
+            "selectedLoader.value === 'vanilla' ||\n\t\t\tprojectInstall.value !== null,",
+            "selectedLoader.value === 'vanilla' ||\n\t\t\tselectedLoader.value === 'rust' ||\n\t\t\tprojectInstall.value !== null,")
+    exactly(flow_context,
+            "if (!loader || loader === 'vanilla') return",
+            "if (!loader || loader === 'vanilla' || loader === 'rust') return")
+    custom_stage = root / 'packages/ui/src/components/flows/creation-flow-modal/components/CustomSetupStage.vue'
+    exactly(custom_stage,
+            "if (!loader || loader === 'vanilla') return false",
+            "if (!loader || loader === 'vanilla' || loader === 'rust') return false")
+    exactly(custom_stage,
+            "// For loaders with per-version data, only show game versions that have builds",
+            """// Native Rust Minecraft is not a Java mod loader. Only advertise the
+    // version actually supported by the bundled native runtime.
+    if (selectedLoader.value === 'rust') return [{ value: '26.3', label: '26.3' }]
+
+    // For loaders with per-version data, only show game versions that have builds""")
+    exactly(custom_stage,
+            "if (!loader || !gameVersion || loader === 'vanilla') return",
+            "if (!loader || !gameVersion || loader === 'vanilla' || loader === 'rust') return")
+    exactly(custom_stage,
+            "\t\t<!-- Game version -->",
+            """\t\t<p v-if="ctx.flowType === 'instance' && selectedLoader === 'rust'" class="m-0 text-sm text-secondary">
+            {{ formatMessage(messages.nativeRustRequirement) }}
+        </p>
+\t\t<!-- Game version -->""")
+    exactly(custom_stage,
+            "\tuploadIcon: {",
+            """\tnativeRustRequirement: {
+        id: 'fre-rust.create.requirement',
+        defaultMessage: 'Rust Minecraft uses a separate native engine and needs your prepared Minecraft game resources and a Microsoft account that owns Java Edition. A Rust profile is not a Fabric modpack.',
+    },
+\tuploadIcon: {""")
+
+    # The earlier separate entry in setup-type is superseded by the regular
+    # custom loader chips; existing Horizon management routes remain intact.
+    setup_stage = root / 'packages/ui/src/components/flows/creation-flow-modal/components/SetupTypeStage.vue'
+    exactly(setup_stage,
+            '''\t\t\t\t<BigOptionButton
+\t\t\t\t\tv-if="ctx.onHorizon"
+\t\t\t\t\t:icon="BoxesIcon"
+\t\t\t\t\t:title="formatMessage(messages.horizonTitle)"
+\t\t\t\t\t:description="formatMessage(messages.horizonDescription)"
+\t\t\t\t\t@click="ctx.onHorizon?.()"
+\t\t\t\t/>\n''',
+            '')
+
+
     # Keep independent Rust backend data, but show each profile in the SAME
     # virtualized card grid as Java instances. Never masquerade as GameInstance:
     # that would run a Rust profile through the Java loader and risk user data.
