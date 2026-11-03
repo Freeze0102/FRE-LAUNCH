@@ -530,6 +530,10 @@ async fn rust_import_resources<R: tauri::Runtime>(
 async fn rust_launch<R: tauri::Runtime>(
     app: tauri::AppHandle<R>, profile_id: String,
 ) -> Result<String, String> {
+    // Hold the same profile lifecycle lock as Rename/Delete until this
+    // launch has registered its running instance. Otherwise a concurrent
+    // confirmed Delete could remove the world during account refresh.
+    let _profile_guard = PROFILE_CREATION.lock().await;
     let root = base(&app)?;
     let dir = profile_dir(&root, &profile_id)?;
     let profile = read_profile(&dir, &profile_id)
