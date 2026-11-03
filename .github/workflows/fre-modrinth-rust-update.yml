@@ -126,8 +126,11 @@ jobs:
           if (!$exe) { throw 'Vue/Tauri desktop executable missing' }
           Start-MpScan -ScanType CustomScan -ScanPath $exe.FullName -ErrorAction Stop
           $rustExe = (Resolve-Path 'scripts/modrinth-fork/fre-rust-runtime/fre-rust-client.exe').Path
+          $prepareExe = (Resolve-Path 'scripts/modrinth-fork/fre-rust-runtime/fre-rust-prepare.exe').Path
           Start-MpScan -ScanType CustomScan -ScanPath $rustExe -ErrorAction Stop
+          Start-MpScan -ScanType CustomScan -ScanPath $prepareExe -ErrorAction Stop
           if (!(Test-Path -LiteralPath $rustExe)) { throw 'Rust game executable was quarantined' }
+          if (!(Test-Path -LiteralPath $prepareExe)) { throw 'Native Rust resource preparer was quarantined' }
           if (@(Get-MpThreatDetection).Count) { throw 'Defender reported a malware detection: release blocked' }
           Write-Host "Scanned executable: $($exe.Name)"
           Write-Host "Scanned installer: $($installer.Name)"
