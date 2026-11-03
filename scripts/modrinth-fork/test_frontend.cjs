@@ -29,7 +29,24 @@ function component(file, invoke, instances = [], options = {}) {
     '@tauri-apps/plugin-opener': { openUrl: options.openUrl || (async () => {}) },
     '@tauri-apps/plugin-dialog': { open: options.open || (async () => null) },
     '@/helpers/instance': { list: async () => instances, add_project_from_path: options.addProjectFromPath || (async () => {}) },
-    '@modrinth/assets': { PlayIcon: {} },
+    '@modrinth/assets': { PlayIcon: {}, CheckIcon: {}, SettingsIcon: {}, TrashIcon: {}, FolderOpenIcon: {} },
+    '@/components/ui/library/use-library': {
+      getLibraryInstanceSelectionKey: ({ instanceId, groupId }) => JSON.stringify([groupId, instanceId]),
+      useLibrary: () => {
+        const selectedLibraryInstances = options.selection || vue.ref(new Map())
+        return {
+          selectedLibraryInstances,
+          isLibraryInstanceSelectionActive: vue.computed(() => selectedLibraryInstances.value.size > 0),
+          toggleLibraryInstanceSelection: ({ instanceId, groupId }) => {
+            const key = JSON.stringify([groupId, instanceId])
+            const next = new Map(selectedLibraryInstances.value)
+            if (next.has(key)) next.delete(key)
+            else next.set(key, { instanceId, groupId })
+            selectedLibraryInstances.value = next
+          },
+        }
+      },
+    },
     '@modrinth/ui': {
       defineMessages: x => x,
       useVIntl: () => ({ formatMessage: (m, args = {}) =>
@@ -42,7 +59,7 @@ function component(file, invoke, instances = [], options = {}) {
     vue: { ...vue, onMounted: f => mounted.push(f), onUnmounted: f => unmounted.push(f) },
   }
   const names = file === 'RustInstanceGrid.vue'
-    ? 'cards,nativeProfiles,runtime,horizonStatus,refresh,openCard,play,cardStyle,viewInstance,detailUrl,busy'
+    ? 'cards,nativeProfiles,runtime,horizonStatus,refresh,openCard,play,cardStyle,viewInstance,detailUrl,busy,selectCard,isSelected,activateCard'
     : file === 'CurseForgeBrowser.vue'
     ? 'instanceId,searchText,apiKey,results,searched,loading,notice,error,installing,doSearch,install'
     : file === 'FreRustPanel.vue'
@@ -607,4 +624,49 @@ test('Native Rust profile has safe real Rename/Delete permissions and same Java 
   assert.match(grid, /<ConfirmDeleteInstanceModal/)
   assert.match(page, /@delete="deleteProfile"/)
   assert.match(grid, /@delete="confirmedDelete"/)
+});
+
+
+test('Rust instance participates in the real Java library selection without routing its ID to Java', async () => {
+  const selection = vue.ref(new Map())
+  const paths = []
+  const c = component('RustInstanceGrid.vue', async command => {
+    if (command.endsWith('|rust_profiles')) return [{ id: '55', name: 'Rust saved world', created: 1 }]
+    if (command.endsWith('|rust_runtime')) return { installed: true, prepared: true, version: '26.3', reason: null }
+    if (command.endsWith('|horizon_detect_launcher')) return null
+    throw Error(command)
+  }, [], {
+    props: { startIndex: 0, groupId: 'group:none', columnCount: 2, cardWidth: 160, cardHeight: 200, gap: 12, compact: false, search: '' },
+    selection,
+    push: async url => paths.push(url),
+  })
+  await c.state.refresh()
+  const card = c.state.cards.value[0]
+  assert.equal(c.state.isSelected(card), false)
+  c.state.selectCard(card)
+  assert.equal(c.state.isSelected(card), true)
+  assert.deepEqual([...selection.value.values()], [{ instanceId: 'rust:55', groupId: 'group:none' }])
+  c.state.selectCard(card)
+  assert.equal(c.state.isSelected(card), false)
+  c.state.activateCard({ shiftKey: true }, card)
+  assert.equal(c.state.isSelected(card), true)
+  assert.deepEqual(paths, [])
+  c.state.activateCard({ shiftKey: false }, card)
+  assert.deepEqual(paths, [])
+  const source = fs.readFileSync(path.join(__dirname, 'feature_rust_polish.py'), 'utf8')
+  assert.match(source, /instanceId\.startsWith\('rust:'\)/)
+  assert.match(source, /plugin:fre-rust\|rust_delete_profile/)
+  assert.match(source, /selection => !deletedInstanceIds\.has\(selection\.instanceId\)/)
+  assert.match(source, /<ConfirmDeleteInstanceModal/)
+});
+
+test('Native Rust reuses Java quick switcher with real game route and avoids Java run/remove', () => {
+  const mixin = fs.readFileSync(path.join(__dirname, 'feature_rust_polish.py'), 'utf8')
+  assert.match(mixin, /QuickInstanceSwitcher\.vue/)
+  assert.match(mixin, /freRustInstances\.value/)
+  assert.match(mixin, /freRustDetailUrl\(instance\)/)
+  assert.match(mixin, /plugin:fre-rust\|rust_launch/)
+  assert.match(mixin, /plugin:fre-rust\|rust_import_resources/)
+  assert.match(mixin, /plugin:fre-rust\|rust_delete_profile/)
+  assert.match(mixin, /getInstanceIconUrl\(instance\.icon_path\)/)
 });
