@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { invoke } from '@tauri-apps/api/core'
-import { defineMessages, useVIntl } from '@modrinth/ui'
+import { convertFileSrc, invoke } from '@tauri-apps/api/core'
+import { Avatar, defineMessages, useVIntl } from '@modrinth/ui'
 import { computed, inject, onMounted, onUnmounted, ref, watch } from 'vue'
 
-type NativeProfile = { id: string; name: string; created: number }
+type NativeProfile = { id: string; name: string; created: number; iconPath?: string | null }
 type Runtime = { installed: boolean; prepared: boolean; version: string; reason: string | null }
 type HorizonProfile = { id: string; name: string; version: string | null; selected: boolean }
 type HorizonStatus = {
@@ -17,6 +17,7 @@ type Card = {
   id: string
   name: string
   kind: 'native' | 'horizon'
+  iconPath?: string | null
   version: string
   ready: boolean
 }
@@ -84,6 +85,7 @@ const cards = computed<Card[]>(() => {
     id: profile.id,
     name: profile.name,
     kind: 'native' as const,
+    iconPath: profile.iconPath,
     version: runtime.value?.version || 'Rust',
     ready: runtime.value?.installed === true && runtime.value?.prepared === true,
   }))
@@ -279,7 +281,16 @@ onUnmounted(() => {
           class="relative flex shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-surface-3 text-contrast"
           :class="props.compact ? 'size-11' : 'aspect-square w-full'"
         >
-          <span class="select-none font-bold tracking-tight text-secondary" :class="props.compact ? 'text-xl' : 'text-6xl'">R</span>
+          <Avatar
+            class="pointer-events-none"
+            :class="props.compact ? '!rounded-lg' : '!rounded-2xl'"
+            :src="card.iconPath ? convertFileSrc(card.iconPath) : undefined"
+            :tint-by="card.key"
+            size="100%"
+            alt=""
+            no-shadow
+            pad-transparent-corners
+          />
           <button
             type="button"
             :aria-label="t(m.start, { name: card.name })"
