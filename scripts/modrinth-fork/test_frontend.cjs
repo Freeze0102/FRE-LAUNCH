@@ -670,5 +670,7 @@ test('Native Rust reuses Java quick switcher with real game route and avoids Jav
   assert.match(mixin, /plugin:fre-rust\|rust_launch/)
   assert.match(mixin, /plugin:fre-rust\|rust_import_resources/)
   assert.match(mixin, /plugin:fre-rust\|rust_delete_profile/)
-  assert.match(mixin, /getInstanceIconUrl\(instance\.icon_path\)/)
+  const quick = fs.readFileSync(path.join(source, 'apps/app-frontend/src/components/ui/QuickInstanceSwitcher.vue'), 'utf8')
+  assert.match(quick, /getInstanceIconUrl\(instance\.icon_path\)/)
+  assert.match(quick, /freRustDetailUrl\(instance\)/)
 });
