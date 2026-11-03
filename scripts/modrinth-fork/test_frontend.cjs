@@ -431,6 +431,9 @@ test('Native Rust profiles use Java InstanceCardView and navigate to the real pa
   assert.ok(emitted.some(e => e.event === 'count-change' && e.count === 1))
   const grid = fs.readFileSync(path.join(__dirname, 'RustInstanceGrid.vue'), 'utf8')
   assert.match(grid, /<InstanceCardView/)
+  assert.match(grid, /<ContextMenu/)
+  assert.match(grid, /<ConfirmDeleteInstanceModal/)
+  assert.match(grid, /plugin:fre-rust\|rust_delete_profile/)
   assert.doesNotMatch(grid, /<Teleport|role="dialog"|<article/)
 })
 
@@ -470,6 +473,12 @@ test('Native Rust uses native game launch, page-specific Files and settings, nev
   const files = fs.readFileSync(path.join(__dirname, 'RustInstanceFiles.vue'), 'utf8')
   assert.match(page, /<PageHeader/)
   assert.match(page, /<PageHeaderActions/)
+  assert.match(page, /<ConfirmDeleteInstanceModal/)
+  assert.match(page, /<NewModal/)
+  assert.match(page, /plugin:fre-rust\|rust_rename_profile/)
+  assert.match(page, /plugin:fre-rust\|rust_delete_profile/)
+  assert.match(page, /plugin:fre-rust\|rust_import_resources/)
+  assert.match(page, /launching \? t\(m.starting\) : t\(m.play\)/)
   assert.match(page, /<NavTabs/)
   assert.match(page, /<RustInstanceFiles/)
   assert.match(page, /plugin:fre-rust\|rust_launch/)
@@ -568,4 +577,32 @@ test('Rust cards follow standard Java library grouping and remain visible withou
   assert.match(library, /visible.push\(\{/)
   assert.match(group, /const isRustGridGroup = computed/)
   assert.match(group, /v-if="isRustGridGroup"/)
+});
+
+
+test('Home preserves original Welcome behavior while Rust-only profiles open the normal library', () => {
+  const home = fs.readFileSync(path.join(source, 'apps/app-frontend/src/pages/Index.vue'), 'utf8')
+  assert.match(home, /import WelcomeScreen from '@\/components\/ui\/WelcomeScreen.vue'/)
+  assert.match(home, /<WelcomeScreen v-if="isReady && !hasCreatedInstance && rustHomeReady && !hasRustProfiles"/)
+  assert.match(home, /v-else-if="isReady && \(hasCreatedInstance \|\| hasRustProfiles\)"/)
+  assert.match(home, /<LibrarySection :instances="instances" \/>/)
+  assert.doesNotMatch(home, /<HorizonLibrary|<FreRustLibrary/)
+})
+
+test('Native Rust profile has safe real Rename/Delete permissions and same Java confirmation', () => {
+  const backend = fs.readFileSync(path.join(source, 'apps/app/src/api/fre_rust.rs'), 'utf8')
+  const build = fs.readFileSync(path.join(source, 'apps/app/build.rs'), 'utf8')
+  const page = fs.readFileSync(path.join(__dirname, 'RustInstancePage.vue'), 'utf8')
+  const grid = fs.readFileSync(path.join(__dirname, 'RustInstanceGrid.vue'), 'utf8')
+  assert.match(backend, /async fn rust_rename_profile/)
+  assert.match(backend, /async fn rust_delete_profile/)
+  assert.match(backend, /profile_id_valid\(id: &str\)/)
+  assert.match(backend, /RUNNING_PROFILES\.lock\(\)\.await\.contains\(&profile_id\)/)
+  assert.match(backend, /fs::remove_dir_all\(&dir\)/)
+  assert.match(build, /"rust_rename_profile"/)
+  assert.match(build, /"rust_delete_profile"/)
+  assert.match(page, /<ConfirmDeleteInstanceModal/)
+  assert.match(grid, /<ConfirmDeleteInstanceModal/)
+  assert.match(page, /@delete="deleteProfile"/)
+  assert.match(grid, /@delete="confirmedDelete"/)
 });
