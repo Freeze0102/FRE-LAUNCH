@@ -112,7 +112,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: scripts/modrinth-fork/fre-rust-runtime
-          key: frelaunch-windows-x64-rust-975c07d9151847e6af13afc4b5ab37b6bbe78ef5-v1
+          key: frelaunch-windows-x64-rust-975c07d9151847e6af13afc4b5ab37b6bbe78ef5-v2
 
       - name: Build MIT-only native game engine
         if: steps.preview-cache.outputs.cache-hit != 'true' && steps.rust-engine-cache.outputs.cache-hit != 'true'
@@ -130,7 +130,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: scripts/modrinth-fork/fre-rust-runtime
-          key: frelaunch-windows-x64-rust-975c07d9151847e6af13afc4b5ab37b6bbe78ef5-v1
+          key: frelaunch-windows-x64-rust-975c07d9151847e6af13afc4b5ab37b6bbe78ef5-v2
 
       - name: Verify fresh or cached native engine digest and license
         if: steps.preview-cache.outputs.cache-hit != 'true'
