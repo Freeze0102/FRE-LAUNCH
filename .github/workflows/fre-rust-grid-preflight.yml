@@ -1,4 +1,4 @@
-name: FRE LAUNCH Rust sidebar and selection typed Vue preflight
+name: FRE LAUNCH final native Rust quick switcher and 30 patched-source tests
 
 on:
   push:
