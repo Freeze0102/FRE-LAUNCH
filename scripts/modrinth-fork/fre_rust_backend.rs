@@ -16,6 +16,31 @@ use tokio::io::AsyncWriteExt;
 const MAX_NAME: usize = 64;
 const MAX_METADATA: u64 = 8192;
 const MAX_ICON_BYTES: usize = 2 * 1024 * 1024;
+/// Original FRE LAUNCH 64x64 icon bundled as inert PNG; used for both new and
+/// pre-icon native profiles. Never loads a foreign icon or executable.
+const DEFAULT_RUST_ICON: &str = "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAACk0lEQVR42u2bP04CQRTGH5O5gFpporHWGDiBFl6AWNhQEI2dxlBo6R9CZ6yIdkbiBYxX0BNgSKyJBZ1cAQudzbjuv9l9b94sO68iQGC+33zvY2fYqS2sLs/AoFa2N8Dlmrx9GL2/lgWA66KLwEgEECX86/3TadFL9TUjELEAdPGui84CIw6CmFfx4bHHtfE/B6g3lll4khvCThBVEK9rCjtBlD3p85SuVZQt5bEy4Q+AebZ+WisI7gEdvl6xfr/kFv5y8RQ8ftzpWh9HbbO1O7Npf114uJq9tjUQ6mdRcsx4XKnXbDpC2hKfJDwJBDUEyT3raSCo3SBdFG6zLaSrwm2BkFx9jgECA4J0edZt5IMsm3DstpBlFI4JwghAfzSA6+MuuFoKRH80gNOtAxoHXN//UHYRhBqbSRmtBofTMZzsnQVfpq7duavZawfizy9vYDgd04aggnD3fAuN+ysYTscsmdDstaGxuB4Iz1OF9gMUiMbiei77FbV7UfEo1wG6G2zkgw66iHD0K8EwCOy2wLC7lcUQdj5QCUfJAOp8wOpztv2AvPmA3efsO0JZ84Ha7mwA0vKBQzh5BpjkA5d4NgAKggLBJZ4VgCvlAXgAHoAH4AF4ABUuo0vhx50uHP1uPT8c3TknptXZD8ZJthZQH+4SiDzCCy+GXABRRDjaalAHYRNCq7Pvxp+jtvMBY9bJ9gMo2wJbOAkAChBUwkkBYOUDVp8nApi8fcDK9gYs1dfI7hU0zQfqWddvnbe2J5ilLaiFW2+BLCBs2j2qghMjXHeM90cDAIDMNzRg2j8SAAcEWxV1iEqEn6hC6VpF1AtRZ+/mZfbDEx15bnCe2iHt7KBIs0iZ3ZDl4KQ/OusPT1f8+Pw3bJmhbZZ5SacAAAAASUVORK5CYII=";
+fn default_rust_icon() -> Result<Vec<u8>, String> {
+    use base64::Engine;
+    base64::engine::general_purpose::STANDARD.decode(DEFAULT_RUST_ICON)
+        .map_err(|_| "Bundled FRE Rust icon is invalid.".into())
+}
+fn ensure_rust_icon(dir: &Path) -> Option<String> {
+    let target = dir.join("icon.png");
+    if !target.exists() {
+        let bytes = default_rust_icon().ok()?;
+        if let Ok(mut file) = fs::OpenOptions::new().write(true).create_new(true).open(&target) {
+            use std::io::Write;
+            if file.write_all(&bytes).is_err() {
+                drop(file);
+                let _ = fs::remove_file(&target);
+                return None;
+            }
+        }
+    }
+    target.symlink_metadata().ok()
+        .filter(|meta| meta.file_type().is_file())
+        .map(|_| target.to_string_lossy().into_owned())
+}
 // Creation must be serialized: two simultaneous requests cannot create
 // duplicate visible profile names or compete for the same metadata.
 static PROFILE_CREATION: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
@@ -125,7 +150,8 @@ fn read_profile(dir: &Path, id: &str) -> Option<RustProfile> {
     profile.icon_path = ["icon.png", "icon.jpg", "icon.webp"].iter()
         .map(|name| dir.join(name))
         .find(|file| file.symlink_metadata().is_ok_and(|m| m.file_type().is_file()))
-        .map(|file| file.to_string_lossy().into_owned());
+        .map(|file| file.to_string_lossy().into_owned())
+        .or_else(|| ensure_rust_icon(dir));
     Some(profile)
 }
 
@@ -179,7 +205,7 @@ fn prepare_icon(icon_path: Option<&str>, icon_bytes: Option<Vec<u8>>)
         }
         fs::read(path).map_err(|e| format!("Cannot read profile icon: {e}"))?
     } else {
-        return Ok(None);
+        default_rust_icon()?
     };
     let extension = valid_icon(&bytes)?;
     Ok(Some((bytes, extension)))
@@ -916,7 +942,9 @@ mod tests {
         assert!(valid_icon(&vec![0; MAX_ICON_BYTES + 1]).is_err());
         assert_eq!(valid_icon(b"\x89PNG\r\n\x1a\nDATA").unwrap(), "png");
         assert_eq!(valid_icon(b"RIFFSIZEWEBP1234").unwrap(), "webp");
-        assert!(prepare_icon(None, None).unwrap().is_none());
+        let auto = prepare_icon(None, None).unwrap().unwrap();
+        assert_eq!(auto.1, "png");
+        assert!(auto.0.starts_with(b"\x89PNG\r\n\x1a\n"));
     }
     #[test]
     fn refuses_modified_or_unknown_rust_executable() {
