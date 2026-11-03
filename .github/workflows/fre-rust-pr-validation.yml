@@ -1,14 +1,10 @@
 name: FRE Rust first-run PR validation
+# Deliberately no push trigger: large Windows compilation runs only on PRs
+# or explicit manual dispatch to preserve GitHub Actions usage.
 # Branch-only validation for the Rust onboarding change. Does not sign, publish
 # or download any proprietary Minecraft resources.
 on:
   pull_request:
-    branches:
-      - main
-    paths:
-      - '.github/workflows/fre-rust-pr-validation.yml'
-      - 'scripts/modrinth-fork/**'
-  push:
     branches:
       - main
     paths:
