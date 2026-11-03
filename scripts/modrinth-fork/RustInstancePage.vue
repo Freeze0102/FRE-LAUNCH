@@ -366,7 +366,7 @@ useRootBreadcrumb({
               v-tooltip="t(m.settings)"
               size="xl"
               native-type="button"
-              @click="settings"
+              @click="settings()"
             >
               <SettingsIcon />
             </IconButton>
