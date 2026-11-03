@@ -191,11 +191,13 @@ def verify(root):
     assert "const MAX_ICON_BYTES:" in rust_backend and "fn prepare_icon(" in rust_backend
     assert "icon_path: Option<String>" in rust_backend and "icon_bytes: Option<Vec<u8>>" in rust_backend
     assert 'profile.icon_path = ["icon.png", "icon.jpg", "icon.webp"]' in rust_backend
-    # Old Horizon adapter may remain installed for archival compatibility,
-    # but it must never be invoked by the active FRE Rust UI.
-    assert "fre-horizon:default" in rust_permissions["permissions"]
+    # No external Horizon Launcher plugin, account, installer, or CLI is
+    # generated. Legacy user data on disk is never automatically removed.
+    assert "fre-horizon:default" not in rust_permissions["permissions"]
     assert 'pub mod fre_rust;' in (root/"apps/app/src/api/mod.rs").read_text(encoding="utf-8")
-    assert "pub mod horizon;" in (root/"apps/app/src/api/mod.rs").read_text(encoding="utf-8")
+    assert 'pub mod horizon;' not in (root/"apps/app/src/api/mod.rs").read_text(encoding="utf-8")
+    assert not (root/"apps/app/src/api/horizon.rs").exists()
+    assert not (root/"apps/app-frontend/src/components/ui/HorizonRustPanel.vue").exists()
     for source, markers in (
         (rust_backend, [
             'Builder::new("fre-rust")', "async fn rust_create_profile",
@@ -224,9 +226,9 @@ def verify(root):
             ":available-loaders=", "'rust'", "@create=\"handleFreRustOrJavaCreate\"",
         ]),
         (rust_stage, ["Minecraft (Rust)"]),
-        (rust_main, [".plugin(api::fre_rust::init())", ".plugin(api::horizon::init())"]),
-        (rust_build, ['"fre-rust"', '"fre-horizon"', '"rust_create_profile"', '"rust_rename_profile"', '"rust_delete_profile"', '"rust_import_mod"', '"rust_launch"',
-            '"rust_open_folder"', '"rust_list_files"', '"horizon_open_folder"', '"horizon_list_files"']),
+        (rust_main, [".plugin(api::fre_rust::init())"]),
+        (rust_build, ['"fre-rust"', '"rust_create_profile"', '"rust_rename_profile"', '"rust_delete_profile"', '"rust_import_mod"', '"rust_launch"',
+            '"rust_open_folder"', '"rust_list_files"']),
     ):
         for marker in markers:
             assert marker in source, f"Standalone Rust Minecraft integration missing: {marker}"
@@ -276,11 +278,8 @@ def verify(root):
     else:
         assert "fre-rust-runtime/fre-rust-client.exe" not in rust_mapping
 
-    # Legacy folders and adapter remain for backup only. They are NOT presented
-    # as FRE Rust profiles, and no worlds are removed or silently migrated.
-    assert (root/"apps/app/src/api/horizon.rs").exists()
-    assert (root/"apps/app-frontend/src/components/ui/HorizonRustPanel.vue").exists()
-    legacy_library = (root/"apps/app-frontend/src/components/ui/HorizonLibrary.vue").read_text(encoding="utf-8")
+    # Only FRE native profiles are displayed; no legacy launcher adapter.
+    assert 'plugin:fre-horizon|' not in unified_rust + rust_detail + rust_files
     # Same virtualized grid and card positions: Rust cards follow Java cards
     # inside the ungrouped library, not in a second section below the list.
     for marker in ('<RustInstanceGrid', ':start-index="instanceGroup.instances.length"',
@@ -315,7 +314,7 @@ def verify(root):
                    'plugin:fre-rust|rust_list_files', 'plugin:fre-rust|rust_open_folder',
                    'isReadOnly: () => true'):
         assert marker in rust_files, f"Rust shared file browser unavailable: {marker}"
-    assert "path: '/rust-instance/:kind(native|horizon)/:id'" in rust_routes
+    assert "path: '/rust-instance/:kind(native)/:id'" in rust_routes
     assert "component: () => import('@/pages/RustInstancePage.vue')" in rust_routes
     assert "plugin:profile|launch" not in rust_detail and "plugin:profile|launch" not in unified_rust
     rust_custom_setup=(root/"packages/ui/src/components/flows/creation-flow-modal/components/CustomSetupStage.vue").read_text(encoding="utf-8")
@@ -346,9 +345,6 @@ def verify(root):
     assert 'v-else-if="isReady && (hasCreatedInstance || hasRustProfiles)"' in rust_index, (
         "Native Rust-only users must still see the library"
     )
-    assert 'plugin:fre-horizon|horizon_open_folder' in legacy_library
-    assert 'v-if="profiles.length || executable || error"' in legacy_library, "Legacy Horizon component preserved for existing users"
-    assert 'fre-launch.rust.library.empty' in legacy_library
     assert 'v-if="profiles.length > 0"' not in rust_library, "Native Rust library must expose Create before first profile"
     assert "horizon-launcher.exe" not in rust_backend
     assert "horizon-launcher.exe" not in rust_panel
@@ -399,14 +395,11 @@ def verify(root):
     assert 'MAX_UPDATE_BYTES' in updater
     assert (root / 'apps/app/src/api/fre_rust.rs').is_file()
     assert 'rust_launch' in (root / 'apps/app/build.rs').read_text(encoding="utf-8")
-    assert 'horizon_install_launcher' in (root / 'apps/app/build.rs').read_text(encoding="utf-8"), 'Horizon compatibility must survive an update'
-    horizon_api = (root / 'apps/app/src/api/horizon.rs').read_text(encoding="utf-8")
-    assert 'horizon_open_folder' in horizon_api and 'horizon_list_files' in horizon_api
-    assert '0x00000008 | 0x00000200' in horizon_api, 'Horizon client must detach from terminal and Ctrl+C'
+    assert 'horizon_install_launcher' not in (root / 'apps/app/build.rs').read_text(encoding="utf-8")
     assert 'rust_open_folder' in (root / 'apps/app/src/api/fre_rust.rs').read_text(encoding="utf-8")
     assert 'rust_list_files' in (root / 'apps/app/src/api/fre_rust.rs').read_text(encoding="utf-8")
-    # Independent FRE Rust first-run: owned assets fetched from Mojang, not
-    # another launcher. Retain compatibility backend on disk only.
+    # Independent FRE Rust first-run downloads only verified game assets
+    # through the account connected to FRE LAUNCH, without a second launcher.
     native_backend = (root / 'apps/app/src/api/fre_rust.rs').read_text(encoding="utf-8")
     standalone_setup = (root / 'apps/app/src/api/fre_rust_setup.rs').read_text(encoding="utf-8")
     for marker in ('standalone_setup::prepare(app.clone()', 'join("prepared")',
