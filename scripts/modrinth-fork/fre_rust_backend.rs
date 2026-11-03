@@ -106,7 +106,11 @@ fn read_profile(dir: &Path, id: &str) -> Option<RustProfile> {
     {
         return None;
     }
-    let metadata = dir.join("profile.json");
+    // If a settings write was interrupted between moving the original
+    // metadata into its backup and installing the replacement, keep the
+    // original profile visible until the user can retry recovery.
+    let current = dir.join("profile.json");
+    let metadata = if current.exists() { current } else { dir.join("profile.json.backup") };
     if metadata.symlink_metadata().ok()?.file_type().is_symlink() {
         return None;
     }
