@@ -22,6 +22,12 @@ def apply(root: Path):
     frontend = root / "apps/app-frontend"
 
     shutil.copyfile(here / "fre_rust_backend.rs", app / "src/api/fre_rust.rs")
+    shutil.copyfile(here / "fre_rust_setup.rs", app / "src/api/fre_rust_setup.rs")
+    # The independent first-run downloader uses Mojang HTTPS and pinned SHA-1,
+    # not a second launcher, its CLI, or a separate Microsoft account.
+    exactly(app / "Cargo.toml", "sha2 = { workspace = true }",
+            'reqwest = { workspace = true, features = ["rustls-tls", "stream"] }\n'
+            'sha1 = { workspace = true }\nsha2 = { workspace = true }')
     shutil.copyfile(here / "FreRustPanel.vue", frontend / "src/components/ui/FreRustPanel.vue")
     shutil.copyfile(here / "FreRustLibrary.vue", frontend / "src/components/ui/FreRustLibrary.vue")
     shutil.copyfile(here / "RustInstanceGrid.vue", frontend / "src/components/ui/library/instance-group/RustInstanceGrid.vue")
