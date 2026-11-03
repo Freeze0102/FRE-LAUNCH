@@ -116,6 +116,18 @@ watch(() => route.query.source, (source) => {
     freContentSource.value = source === 'curseforge' ? 'curseforge' : 'modrinth'
 })''')
 
+    # The Browse install header used a negative top margin intended for
+    # Modrinth-only pages. Our Modrinth/CurseForge selector sits immediately
+    # above it, so the sticky header overlapped and cut off half the selector.
+    # Keep it in normal flow and let the sticky header work below the tabs.
+    browse_layout = root / "packages/ui/src/layouts/shared/browse-tab/layout.vue"
+    exactly(browse_layout,
+            'class="sticky top-0 z-20 -mx-6 -mt-6 mb-4 rounded-tl-[--radius-xl]',
+            'class="sticky top-0 z-20 -mx-6 mb-4 rounded-tl-[--radius-xl]')
+    exactly(browse,
+            'class="flex flex-wrap items-center gap-2 rounded-xl border border-solid border-surface-4 bg-bg-raised p-2"',
+            'class="relative flex min-h-14 w-full shrink-0 flex-wrap items-center gap-2 rounded-xl border border-solid border-surface-4 bg-bg-raised p-2"')
+
     # A Java instance's own detail screen offers CurseForge in the same
     # content-management context. It opens the catalog with its exact ID,
     # so the user cannot accidentally install to the wrong game profile.
