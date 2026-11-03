@@ -1,5 +1,9 @@
-FRE LAUNCH v0.5.10 unsigned Windows preview: reuse real Java instance card, full-page header, native page tabs and shared FilePageLayout for Rust.
-2026-11-03. Verified GitHub Actions preflight 41612985196 SUCCESS: pinned Modrinth source patches, verify.py, TypeScript Vue, Vite production frontend and 26/26 frontend regression tests all passed. No Rust engine compiled in preflight.
-Only the VISUAL Java components are reused for Rust native and Horizon; Rust launch, setup, profile data and file operations still use native Rust/Horizon commands, never the Java instance API.
-Previously signed release v0.5.9 remains unchanged. Updater secret is unavailable; this workflow must remain an UNSIGNED standalone preview only. Do not publish an auto-update or change the updater public key without the user recovering or replacing the signing key.
-This preview must pass actual Windows native launcher compilation, pinned Rust engine cache digest/license, SHA-256 manifest of final EXEs, Microsoft Defender scanning and clean-install launch smoke test before artifact upload.
+FRE LAUNCH unsigned Windows preview (not a signed updater) — 2026-11-03 Rust instance UI and profile management corrections.
+Acceptance and rationale:
+- Restore exact original Home/Welcome conditions for Java, but keep standard library accessible for Rust-only profiles.
+- Rust/Horizon profiles display through the real InstanceCardView (same as Fabric), route to full profile PageHeader/NavTabs/Files/Worlds/Logs and never enter Java profile backend.
+- Rust profile context menu is the actual shared ContextMenu; deletion uses the genuine ConfirmDeleteInstanceModal both on card and profile, and a backend-only validated rust_delete_profile command. Rust Rename uses rust_rename_profile, preserving worlds, rejecting symlinks/path traversal, and serializes against launch to prevent deleting a running world.
+- Single Play attempts already-prepared local Minecraft resources and native launch; no fake progress or claim of official Mojang downloads. Requires authenticated account and owned Java Edition assets. Offline local nickname is not ownership verification.
+- Test via pinned Vue/TypeScript and 28/28 frontend regressions, preflight GitHub Actions #41623905661 completed SUCCESS. This green result does not prove new Rust commands compile; this release attempt MUST test that and does not publish unreviewed artifacts.
+- Full Windows Tauri build, exact pinned MIT engine, Defender scans of all binaries, SHA-256 manifest and clean NSIS install-launch smoke MUST PASS before artifact upload. No signing key is available; do NOT publish a signed release or auto-update.
+- Keep old Java profiles, native saves, game resources, updater publicKey and stable v0.5.9 unchanged.
