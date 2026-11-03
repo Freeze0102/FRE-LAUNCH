@@ -56,16 +56,16 @@ pub async fn fre_rust_default_credentials() -> crate::Result<Option<Credentials>
 pub async fn get_default_user()""",
     )
 
-    # Keep the user's previous Horizon files untouched, but expose only
-    # FRE-owned native Rust instances; never require a second launcher.
+    # FRE Rust is registered directly in Tauri, with no Horizon Launcher
+    # plugin or foreign account workflow; old data folders remain untouched.
     exactly(app / "src/api/mod.rs",
-            "pub mod horizon;",
-            "pub mod horizon;\npub mod fre_rust;")
+            "pub mod files;\npub mod friends;",
+            "pub mod files;\npub mod fre_rust;\npub mod friends;")
     exactly(app / "src/main.rs",
-            "        .plugin(api::horizon::init())",
-            "        .plugin(api::horizon::init())\n        .plugin(api::fre_rust::init())")
+            "        .plugin(api::instance::init())",
+            "        .plugin(api::instance::init())\n        .plugin(api::fre_rust::init())")
     exactly(app / "build.rs",
-            '            .plugin(\n                "fre-horizon",',
+            '            .plugin(\n                "instance",',
             '''            .plugin(
                 "fre-rust",
                 InlinedPlugin::new()
@@ -73,39 +73,37 @@ pub async fn get_default_user()""",
                     .default_permission(DefaultPermissionRule::AllowAllCommands),
             )
             .plugin(
-                "fre-horizon",''')
+                "instance",''')
     exactly(app / "capabilities/plugins.json",
-            '"fre-horizon:default",',
-            '"fre-horizon:default",\n\t\t"fre-rust:default",')
+            '"instance:default",',
+            '"instance:default",\n\t\t"fre-rust:default",')
 
     app_vue = frontend / "src/App.vue"
     exactly(app_vue,
-            "import HorizonRustPanel from '@/components/ui/HorizonRustPanel.vue'",
-            "import FreRustPanel from '@/components/ui/FreRustPanel.vue'")
-    exactly(app_vue, "const horizonWizard = ref(null)",
-            "const freRustWizard = ref(null)")
-    exactly(app_vue,
-            """function showHorizonWizard(instanceId) {
-    installationModal.value?.hide()
-    horizonWizard.value?.show(instanceId)
-}
-provide('showHorizonWizard', showHorizonWizard)""",
-            """function showFreRustWizard(profileId) {
+            "import IconEditorModal from '@/components/ui/instance_settings/icon-editor-modal/index.vue'",
+            "import FreRustPanel from '@/components/ui/FreRustPanel.vue'\n"
+            "import IconEditorModal from '@/components/ui/instance_settings/icon-editor-modal/index.vue'")
+    exactly(app_vue, "const creationIconEditorModal = ref(null)",
+            "const freRustWizard = ref(null)\nconst creationIconEditorModal = ref(null)")
+    exactly(app_vue, "const creationIconTarget = ref('creation-flow')",
+            """const creationIconTarget = ref('creation-flow')
+
+function showFreRustWizard(profileId) {
     installationModal.value?.hide()
     freRustWizard.value?.show(profileId)
 }
 provide('showFreRustWizard', showFreRustWizard)""")
-    # The new Create flow selects the built-in game, while existing Horizon
-    # cards still open their original wizard through showHorizonWizard.
-    exactly(app_vue, ':on-horizon="showHorizonWizard"',
-            ':on-horizon="showFreRustWizard"')
-    exactly(app_vue, '<HorizonRustPanel ref="horizonWizard" />',
-            '<FreRustPanel ref="freRustWizard" />')
+    exactly(app_vue, "import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'",
+            "import { computed, nextTick, onMounted, onUnmounted, provide, ref, watch } from 'vue'")
+    exactly(app_vue,
+            '<IconEditorModal\n\t\t\tref="creationIconEditorModal"',
+            '<FreRustPanel ref="freRustWizard" />\n\t\t<IconEditorModal\n\t\t\tref="creationIconEditorModal"')
 
-    # Keep the EXACT normal Java creation UI. Rust is a loader chip in the
-    # custom stage, not a parallel "New Rust profile" creation experience.
-    exactly(app_vue, 'type="instance"\n\t\t\t:on-horizon="showFreRustWizard"',
-            'type="instance"\n\t\t\t:available-loaders="[\'fabric\', \'neoforge\', \'forge\', \'quilt\', \'rust\']"\n\t\t\t:on-horizon="showFreRustWizard"')
+    # Create Rust the same way as Fabric/Forge: select the Rust loader chip.
+    exactly(app_vue,
+            'type="instance"',
+            'type="instance"\n\t\t\t:available-loaders="[\'fabric\', \'neoforge\', \'forge\', \'quilt\', \'rust\']"')
+
     exactly(app_vue, '@create="handleCreate"', '@create="handleFreRustOrJavaCreate"')
     exactly(app_vue,
             "provide('showFreRustWizard', showFreRustWizard)",
@@ -191,27 +189,14 @@ async function handleFreRustOrJavaCreate(config) {
     },
 \tuploadIcon: {""")
 
-    # The earlier separate entry in setup-type is superseded by the regular
-    # custom loader chips; existing Horizon management routes remain intact.
-    setup_stage = root / 'packages/ui/src/components/flows/creation-flow-modal/components/SetupTypeStage.vue'
-    exactly(setup_stage,
-            '''\t\t\t\t<BigOptionButton
-\t\t\t\t\tv-if="ctx.onHorizon"
-\t\t\t\t\t:icon="BoxesIcon"
-\t\t\t\t\t:title="formatMessage(messages.horizonTitle)"
-\t\t\t\t\t:description="formatMessage(messages.horizonDescription)"
-\t\t\t\t\t@click="ctx.onHorizon?.()"
-\t\t\t\t/>\n''',
-            '')
-
-
+    # Keep the standard setup-type UI; no separate Horizon shortcut.
     # The same Java instance card now opens a real full-width route rather
     # than a bespoke modal. No native Rust operation reaches Java's loader.
     routes = frontend / "src/routes.js"
     exactly(routes,
             "\t\t{\n\t\t\tpath: '/instance/:id',",
             """\t\t{
-            path: '/rust-instance/:kind(native|horizon)/:id',
+            path: '/rust-instance/:kind(native)/:id',
             name: 'RustInstance',
             component: () => import('@/pages/RustInstancePage.vue'),
         },
@@ -295,13 +280,11 @@ async function refreshRustNames() {
 const refreshRustLibrary = () => { void refreshRustNames() }
 onMounted(() => {
     window.addEventListener('fre-rust-library-refresh', refreshRustLibrary)
-    window.addEventListener('fre-horizon-library-refresh', refreshRustLibrary)
     void refreshRustNames()
 })
 onUnmounted(() => {
     rustRefreshGeneration++
     window.removeEventListener('fre-rust-library-refresh', refreshRustLibrary)
-    window.removeEventListener('fre-horizon-library-refresh', refreshRustLibrary)
 })
 const rustMatchesSearch = computed(() => {
     if (!rustProfileNames.value.length) return false
@@ -329,10 +312,6 @@ const visibleInstanceGroups = computed(() => {
 })""")
 
     index = frontend / "src/pages/Index.vue"
-    # Don't append separate Horizon/Rust sections or an empty "Rust library".
-    exactly(index,
-            "import HorizonLibrary from '@/components/ui/HorizonLibrary.vue'\n",
-            "")
     # Preserve the ORIGINAL Modrinth Home/Welcome behavior. The previous
     # patch removed WelcomeScreen for everyone, which changed the main menu.
     # Only supplement onboarding's Java-only flag when native Rust exists.
@@ -363,13 +342,11 @@ async function checkRustHome() {
 const onRustHomeRefresh = () => { void checkRustHome() }
 onMounted(() => {
     window.addEventListener('fre-rust-library-refresh', onRustHomeRefresh)
-    window.addEventListener('fre-horizon-library-refresh', onRustHomeRefresh)
     void checkRustHome()
 })
 onUnmounted(() => {
     rustHomeGeneration++
     window.removeEventListener('fre-rust-library-refresh', onRustHomeRefresh)
-    window.removeEventListener('fre-horizon-library-refresh', onRustHomeRefresh)
 })""")
     exactly(index,
             '\t<WelcomeScreen v-if="isReady && !hasCreatedInstance" />\n\t<div\n\t\tv-else-if="isReady"',
