@@ -332,10 +332,58 @@ const visibleInstanceGroups = computed(() => {
     exactly(index,
             "import HorizonLibrary from '@/components/ui/HorizonLibrary.vue'\n",
             "")
-    exactly(index, "import WelcomeScreen from '@/components/ui/WelcomeScreen.vue'\n", "")
+    # Preserve the ORIGINAL Modrinth Home/Welcome behavior. The previous
+    # patch removed WelcomeScreen for everyone, which changed the main menu.
+    # Only supplement onboarding's Java-only flag when native Rust exists.
+    exactly(index,
+            "import { computed, inject, ref } from 'vue'",
+            "import { computed, inject, onMounted, onUnmounted, ref } from 'vue'")
+    exactly(index,
+            "import { PlayIcon, PlusIcon } from '@modrinth/assets'",
+            "import { invoke } from '@tauri-apps/api/core'\nimport { PlayIcon, PlusIcon } from '@modrinth/assets'")
+    exactly(index,
+            "const showCreationModal = inject<() => void>('showCreationModal')",
+            """const showCreationModal = inject<() => void>('showCreationModal')
+const hasRustProfiles = ref(false)
+const rustHomeReady = ref(false)
+let rustHomeGeneration = 0
+async function checkRustHome() {
+    const request = ++rustHomeGeneration
+    let found = false
+    try {
+        const profiles = await invoke<{ id: string }[]>('plugin:fre-rust|rust_profiles')
+        found = profiles.length > 0
+    } catch { /* Keep the standard Java Home when native Rust is not available. */ }
+    if (!found) {
+        try {
+            const exe = await invoke<string | null>('plugin:fre-horizon|horizon_detect_launcher')
+            if (exe) {
+                const state = await invoke<{ instances: { id: string }[] }>(
+                    'plugin:fre-horizon|horizon_status', { exePath: exe },
+                )
+                found = state.instances.length > 0
+            }
+        } catch { /* A removed Horizon binary is not a reason to change Home. */ }
+    }
+    if (request === rustHomeGeneration) {
+        hasRustProfiles.value = found
+        rustHomeReady.value = true
+    }
+}
+const onRustHomeRefresh = () => { void checkRustHome() }
+onMounted(() => {
+    window.addEventListener('fre-rust-library-refresh', onRustHomeRefresh)
+    window.addEventListener('fre-horizon-library-refresh', onRustHomeRefresh)
+    void checkRustHome()
+})
+onUnmounted(() => {
+    rustHomeGeneration++
+    window.removeEventListener('fre-rust-library-refresh', onRustHomeRefresh)
+    window.removeEventListener('fre-horizon-library-refresh', onRustHomeRefresh)
+})""")
     exactly(index,
             '\t<WelcomeScreen v-if="isReady && !hasCreatedInstance" />\n\t<div\n\t\tv-else-if="isReady"',
-            '\t<div\n\t\tv-if="isReady"')
+            '\t<WelcomeScreen v-if="isReady && !hasCreatedInstance && rustHomeReady && !hasRustProfiles" />\n\t<div\n\t\tv-else-if="isReady && (hasCreatedInstance || hasRustProfiles)"')
     exactly(index,
             '\t\t<LibrarySection :instances="instances" />\n\t\t<HorizonLibrary />',
             '\t\t<LibrarySection :instances="instances" />')
