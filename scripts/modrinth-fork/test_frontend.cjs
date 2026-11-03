@@ -282,28 +282,6 @@ test('Native Rust manager folder shortcut targets the selected profile', async (
   assert.deepEqual(calls.at(-1), { command: 'plugin:fre-rust|rust_open_folder', args: { profileId: profile.id, folder: 'mods' } })
 })
 
-test('Existing Horizon Files are listed inside the app and Explorer remains optional', async () => {
-  const calls = []
-  const profile = { id: 'horizon', name: 'Old Rust game', version: null, selected: true }
-  const c = component('HorizonLibrary.vue', async (command, args) => {
-    calls.push({ command, args })
-    if (command.endsWith('|horizon_detect_launcher')) return 'C:\\Horizon\\horizon-launcher.exe'
-    if (command.endsWith('|horizon_status')) return { instances: [profile], installedVersions: ['nightly'], preparedVersions: ['nightly'], selectedVersion: 'nightly' }
-    if (command.endsWith('|horizon_list_files')) return [{ name: 'native-mod.bin', bytes: 1024, isDirectory: false }]
-    if (command.endsWith('|horizon_open_folder')) return undefined
-    throw new Error(command)
-  })
-  await c.state.refresh()
-  await c.state.openFiles(profile)
-  assert.deepEqual(calls.at(-1), {
-    command: 'plugin:fre-horizon|horizon_list_files',
-    args: { exePath: 'C:\\Horizon\\horizon-launcher.exe', name: profile.id, folder: 'mods' },
-  })
-  assert.equal(c.state.fileEntries.value[0].name, 'native-mod.bin')
-  await c.state.openExplorer()
-  assert.equal(calls.at(-1).command, 'plugin:fre-horizon|horizon_open_folder')
-})
-
 test('Native Rust Files stay inside selected profile in the launcher', async () => {
   const calls = []
   const profile = { id: '12345678', name: 'Rust', created: 1 }
@@ -319,91 +297,6 @@ test('Native Rust Files stay inside selected profile in the launcher', async () 
     args: { profileId: profile.id, folder: 'mods' },
   })
   assert.equal(c.state.fileEntries.value[0].name, 'mod.wasm')
-})
-
-test('Horizon forwards the optional Minecraft folder using the official prepare flag input', async () => {
-  const calls = []
-  const c = component('HorizonRustPanel.vue', async (command, args) => {
-    calls.push({ command, args }); return command.endsWith('|horizon_status') ? horizonStatus : 'prepared'
-  })
-  c.state.executable.value = 'C:\\Horizon\\horizon-launcher.exe'
-  c.state.minecraftPath.value = 'D:\\My Minecraft'
-  await c.state.manageHorizon('prepare')
-  assert.equal(calls[0].command, 'plugin:fre-horizon|horizon_prepare')
-  assert.equal(calls[0].args.minecraftPath, 'D:\\My Minecraft')
-  assert.equal(c.state.pending.value, null)
-})
-
-test('Horizon prevents duplicate launch requests and shows CLI failures', async () => {
-  const request = deferred()
-  let calls = 0
-  const c = component('HorizonRustPanel.vue', () => { calls++; return request.promise })
-  c.state.executable.value = 'C:\\Horizon\\horizon-launcher.exe'
-  c.state.launchName.value = 'Survival'
-  c.state.status.value = { ...horizonStatus, instances: [{ id: 'Survival', name: 'Survival', version: null }] }
-  const play = c.state.playInstance()
-  await c.state.playInstance()
-  assert.equal(calls, 1)
-  request.reject(new Error('Missing installed version'))
-  await play
-  assert.match(c.state.error.value, /Missing installed version/)
-  assert.equal(c.state.pending.value, null)
-})
-
-const horizonStatus = { instances: [{ id: 'horizon', name: 'Horizon', version: null, selected: true }],
-  installedVersions: ['nightly-test'], preparedVersions: ['nightly-test'], selectedVersion: 'nightly-test' }
-
-test('Horizon downloads its launcher once, listens before starting, and selects the real default instance', async () => {
-  const order = [], request = deferred()
-  let listener, unlistened = 0
-  const c = component('HorizonRustPanel.vue', (command) => {
-    order.push(command)
-    return command.endsWith('|horizon_install_launcher') ? request.promise : Promise.resolve(horizonStatus)
-  }, [], { listen: async (event, callback) => { order.push(event); listener = callback; return () => unlistened++ } })
-  const first = c.state.downloadLauncher()
-  await Promise.resolve()
-  await c.state.downloadLauncher()
-  assert.equal(order[0], 'fre-horizon-bootstrap-progress')
-  assert.equal(order.filter(x => x.endsWith('|horizon_install_launcher')).length, 1)
-  listener({ payload: 55 })
-  assert.equal(c.state.downloadProgress.value, 55)
-  request.resolve('C:\\managed\\horizon-launcher.exe')
-  await first
-  assert.equal(c.state.executable.value, 'C:\\managed\\horizon-launcher.exe')
-  assert.equal(c.state.launchName.value, 'horizon')
-  assert.equal(c.state.canPlay.value, true)
-  assert.equal(c.state.pending.value, null)
-  assert.equal(unlistened, 1)
-})
-
-test('Horizon never offers Play before the selected instance version is prepared', async () => {
-  const calls = []
-  const c = component('HorizonRustPanel.vue', async command => calls.push(command))
-  c.state.executable.value = 'C:\\managed\\horizon-launcher.exe'
-  c.state.status.value = { ...horizonStatus, preparedVersions: [] }
-  assert.equal(c.state.canPlay.value, false)
-  await c.state.playInstance()
-  assert.equal(calls.length, 0)
-  c.state.status.value = { ...horizonStatus, instances: [{ id: 'horizon', name: 'Horizon', version: 'older' }] }
-  assert.equal(c.state.activeVersion.value, 'older')
-  assert.equal(c.state.canPlay.value, false)
-})
-
-test('Horizon uses a selected pinned version for preparation and reports bootstrap errors without advancing', async () => {
-  const calls = []
-  const c = component('HorizonRustPanel.vue', async (command, args) => {
-    calls.push({ command, args })
-    if (command.endsWith('|horizon_install_launcher')) throw new Error('SHA-256 mismatch')
-    return command.endsWith('|horizon_status') ? horizonStatus : 'prepared'
-  })
-  await c.state.downloadLauncher()
-  assert.match(c.state.error.value, /SHA-256 mismatch/)
-  assert.equal(c.state.status.value, null)
-  assert.equal(c.state.executable.value, '')
-  c.state.executable.value = 'C:\\managed\\horizon-launcher.exe'
-  c.state.status.value = { ...horizonStatus, instances: [{ id: 'horizon', name: 'Horizon', version: 'older' }] }
-  await c.state.manageHorizon('prepare')
-  assert.equal(calls.find(x => x.command.endsWith('|horizon_prepare')).args.version, 'older')
 })
 
 test('Leaving an instance catalog resets context without stale breadcrumb handles', () => {
@@ -429,6 +322,17 @@ test('Leaving an instance catalog resets context without stale breadcrumb handle
   assert.equal(refreshed, 1)
 })
 
+
+test('FRE Rust generator does not install the Horizon launcher or its account UI', () => {
+  const generator = fs.readFileSync(path.join(__dirname, 'feature_fre_rust.py'), 'utf8')
+  const prepare = fs.readFileSync(path.join(__dirname, 'prepare.py'), 'utf8')
+  const backend = fs.readFileSync(path.join(__dirname, 'fre_rust_backend.rs'), 'utf8')
+  assert.doesNotMatch(prepare, /add_horizon_client\(root\)/)
+  assert.doesNotMatch(generator, /HorizonRustPanel|showHorizonWizard|"fre-horizon"/)
+  assert.doesNotMatch(backend, /horizon_install_launcher|horizon_detect_launcher|native_mods_for_profile/)
+  assert.match(generator, /plugin:fre-rust\|rust_create_profile/)
+  assert.match(generator, /available-loaders/)
+})
 
 test('Native Rust profiles use Java InstanceCardView and navigate to the real page', async () => {
   const profile = { id: '12345678', name: 'Survival Rust', created: 1 }
