@@ -16,7 +16,7 @@ def patch_cargo_lock(root):
     contents = lock.read_text(encoding='utf-8')
     for package, additions in {
         'theseus': ['md5'],
-        'theseus_gui': ['minisign-verify', 'sha1 0.10.6', 'zip 6.0.0'],
+        'theseus_gui': ['minisign-verify', 'reqwest', 'sha1 0.10.6', 'zip 6.0.0'],
     }.items():
         pattern = rf'(\[\[package\]\]\nname = "{package}"\n.*?dependencies = \[\n)(.*?)(\n\])'
         matches = list(re.finditer(pattern, contents, re.S))
