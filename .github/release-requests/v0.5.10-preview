@@ -1,9 +1,11 @@
-FRE LAUNCH unsigned Windows preview (not a signed updater) — 2026-11-03 Rust instance UI and profile management corrections.
-Acceptance and rationale:
-- Restore exact original Home/Welcome conditions for Java, but keep standard library accessible for Rust-only profiles.
-- Rust/Horizon profiles display through the real InstanceCardView (same as Fabric), route to full profile PageHeader/NavTabs/Files/Worlds/Logs and never enter Java profile backend.
-- Rust profile context menu is the actual shared ContextMenu; deletion uses the genuine ConfirmDeleteInstanceModal both on card and profile, and a backend-only validated rust_delete_profile command. Rust Rename uses rust_rename_profile, preserving worlds, rejecting symlinks/path traversal, and serializes against launch to prevent deleting a running world.
-- Single Play attempts already-prepared local Minecraft resources and native launch; no fake progress or claim of official Mojang downloads. Requires authenticated account and owned Java Edition assets. Offline local nickname is not ownership verification.
-- Test via pinned Vue/TypeScript and 28/28 frontend regressions, preflight GitHub Actions #41623905661 completed SUCCESS. This green result does not prove new Rust commands compile; this release attempt MUST test that and does not publish unreviewed artifacts.
-- Full Windows Tauri build, exact pinned MIT engine, Defender scans of all binaries, SHA-256 manifest and clean NSIS install-launch smoke MUST PASS before artifact upload. No signing key is available; do NOT publish a signed release or auto-update.
-- Keep old Java profiles, native saves, game resources, updater publicKey and stable v0.5.9 unchanged.
+FRE LAUNCH v0.5.10 unsigned Windows preview — final unified native Rust UI.
+2026-11-03 after Rust polish preflight #41638950710 SUCCESS (31/31 tests, Vue TypeScript, production Vite, verified source patches).
+Includes:
+- Rust native and legacy Horizon records in same Java-style quick instance switcher/sidebar.
+- Selection checkbox and shared Java selection state for native Rust cards, safe mixed Rust+Java bulk deletion with the native rust_delete_profile command, Java IDs never sent to native engine.
+- Standard Java-style tabbed Rust settings, Play, game files, delete confirmation, transitions and original onboarding checks.
+- Remove redundant standalone CurseForge link: normal Browse Content source selector stays.
+- No claim of downloading proprietary game assets. Current engine can import verified prepared resources from an authenticated owner's existing Minecraft installation; clean one-click Mojang game asset installation is not yet implemented.
+- Do not touch existing world files, Java profiles, updater public key or signed v0.5.9 stable release.
+Require actual Windows Tauri compilation, pinned MIT engine signature/license, SHA256 of all binaries, Defender scan, NSIS silent-install & launcher smoke before uploading artifact.
+No signing secret; preview is not an automatic updater release.
