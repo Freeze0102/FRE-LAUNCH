@@ -553,6 +553,7 @@ test('Content mod file import and removal use only the FRE-owned Rust profile', 
     open: async () => 'D:\\Mods\\test.hmod',
   })
   await c.mount()
+  await new Promise(resolve => setImmediate(resolve))
   assert.equal(c.state.installed.value.length, 0)
   await c.state.importFile()
   assert.equal(c.state.installed.value.length, 1)
