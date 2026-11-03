@@ -175,6 +175,9 @@ def verify(root):
     rust_panel=(root/"apps/app-frontend/src/components/ui/FreRustPanel.vue").read_text(encoding="utf-8")
     rust_library=(root/"apps/app-frontend/src/components/ui/FreRustLibrary.vue").read_text(encoding="utf-8")
     unified_rust=(root/"apps/app-frontend/src/components/ui/library/instance-group/RustInstanceGrid.vue").read_text(encoding="utf-8")
+    rust_detail=(root/"apps/app-frontend/src/pages/RustInstancePage.vue").read_text(encoding="utf-8")
+    rust_files=(root/"apps/app-frontend/src/components/ui/RustInstanceFiles.vue").read_text(encoding="utf-8")
+    rust_routes=(root/"apps/app-frontend/src/routes.js").read_text(encoding="utf-8")
     unified_group=(root/"apps/app-frontend/src/components/ui/library/instance-group/index.vue").read_text(encoding="utf-8")
     rust_stage=(root/"packages/ui/src/components/flows/creation-flow-modal/components/SetupTypeStage.vue").read_text(encoding="utf-8")
     rust_index=(root/"apps/app-frontend/src/pages/Index.vue").read_text(encoding="utf-8")
@@ -272,13 +275,29 @@ def verify(root):
     assert "rustLibraryGroupId(displayState.value.group)" in rust_library_shell
     assert "rustProfileNames" in rust_library_shell
     assert "fre-rust-library-refresh" in rust_library_shell
-    for marker in ('plugin:fre-rust|rust_profiles', 'plugin:fre-horizon|horizon_detect_launcher',
+    # Native Rust uses the EXACT same visual card and page-level building
+    # blocks as Java. No bespoke library card, modal or Java game dispatch.
+    for marker in ('<InstanceCardView', ':instance="viewInstance(card)"',
+                   'plugin:fre-rust|rust_profiles', 'plugin:fre-horizon|horizon_detect_launcher',
                    'plugin:fre-rust|rust_launch', 'plugin:fre-horizon|horizon_direct_play',
-                   'plugin:fre-rust|rust_list_files', 'plugin:fre-horizon|horizon_list_files',
-                   'plugin:fre-rust|rust_open_folder', 'plugin:fre-horizon|horizon_open_folder',
-                   'showFreRustWizard', 'showHorizonWizard', 'data-library-instance-card',
-                   'role="dialog"', 'Rust {{ card.version }}'):
-        assert marker in unified_rust, f"Rust library profile operation missing: {marker}"
+                   'data-library-instance-card', "'/rust-instance/'"):
+        assert marker in unified_rust, f"Shared Java card integration missing: {marker}"
+    assert '<Teleport' not in unified_rust and 'role="dialog"' not in unified_rust, (
+        "Rust profile must open a Java-like full page, not a self-built modal"
+    )
+    for marker in ('<PageHeader', '<PageHeaderActions', '<PageHeaderMetadata',
+                   '<NavTabs', '<RustInstanceFiles', 'useRootBreadcrumb',
+                   'plugin:fre-rust|rust_launch', 'plugin:fre-horizon|horizon_direct_play',
+                   'showFreRustWizard', 'showHorizonWizard'):
+        assert marker in rust_detail, f"Java-like Rust profile page incomplete: {marker}"
+    for marker in ('<FilePageLayout', 'provideFileManager',
+                   'plugin:fre-rust|rust_list_files', 'plugin:fre-rust|rust_open_folder',
+                   'plugin:fre-horizon|horizon_list_files', 'plugin:fre-horizon|horizon_open_folder',
+                   'isReadOnly: () => true'):
+        assert marker in rust_files, f"Rust shared file browser unavailable: {marker}"
+    assert "path: '/rust-instance/:kind(native|horizon)/:id'" in rust_routes
+    assert "component: () => import('@/pages/RustInstancePage.vue')" in rust_routes
+    assert "plugin:profile|launch" not in rust_detail and "plugin:profile|launch" not in unified_rust
     rust_custom_setup=(root/"packages/ui/src/components/flows/creation-flow-modal/components/CustomSetupStage.vue").read_text(encoding="utf-8")
     rust_context=(root/"packages/ui/src/components/flows/creation-flow-modal/creation-flow-context.ts").read_text(encoding="utf-8")
     for marker in ("selectedLoader.value === 'rust'", "value: '26.3'", "fre-rust.create.requirement"):
@@ -298,6 +317,9 @@ def verify(root):
         assert translation in app_uk and translation in app_en, (
             f"Rust instance UI not translated into both UA and EN: {translation}"
         )
+    for translation in ('fre-rust.page.unavailable', 'fre-rust.page.content-note',
+                        'fre-rust.page.no-logs', 'fre-rust.page.retry', 'fre-rust.files.read-only'):
+        assert translation in app_uk and translation in app_en
     assert '<WelcomeScreen v-if=' not in rust_index, "Rust-first users must see the library before creating a Java profile"
     assert 'plugin:fre-horizon|horizon_open_folder' in legacy_library
     assert 'v-if="profiles.length || executable || error"' in legacy_library, "Legacy Horizon component preserved for existing users"
