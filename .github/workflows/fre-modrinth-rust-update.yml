@@ -54,7 +54,7 @@ jobs:
             throw 'Publishing requires explicit FRE_LAUNCH_SECURITY_APPROVED=true after independent review'
           }
           gh release view "v$($channel.version)" --repo "$env:GITHUB_REPOSITORY" 2>$null
-          if ($LASTEXITCODE -eq 0) { throw 'Release tag already exists; existing signed releases are immutable' }
+          if ($LASTEXITCODE -eq 0 -and $env:WILL_PUBLISH -eq 'true') { throw 'Release tag already exists; existing signed releases are immutable' }
           if (!(Test-Path 'scripts/modrinth-fork/feature_fre_rust.py')) {
             throw 'This is not the new Vue/Rust source checkout.'
           }
@@ -188,7 +188,7 @@ jobs:
           retention-days: 7
 
       - name: Publish signed v0.5.10 to the installed launcher
-        if: (inputs.publish || github.event_name == 'push') && vars.FRE_LAUNCH_SECURITY_APPROVED == 'true'
+        if: github.event_name == 'workflow_dispatch' && inputs.publish == true && vars.FRE_LAUNCH_SECURITY_APPROVED == 'true'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
