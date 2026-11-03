@@ -433,26 +433,20 @@ useRootBreadcrumb({
         <p class="m-0 text-sm text-secondary">{{ t(m.contentNote) }}</p>
         <RustInstanceFiles
           :key="kind + id + ':mods'"
-          :kind="kind"
-          :profile-id="id"
-          :horizon-executable="''"
-          initial-folder="mods"
+            :profile-id="id"
+            initial-folder="mods"
         />
       </div>
       <RustInstanceFiles
         v-else-if="tab === 'files'"
         :key="kind + id + ':files'"
-        :kind="kind"
         :profile-id="id"
-        :horizon-executable="''"
         initial-folder="root"
       />
       <RustInstanceFiles
         v-else-if="tab === 'worlds'"
         :key="kind + id + ':worlds'"
-        :kind="kind"
         :profile-id="id"
-        :horizon-executable="''"
         initial-folder="saves"
       />
       <div v-else-if="tab === 'logs'" class="flex flex-col gap-4">
