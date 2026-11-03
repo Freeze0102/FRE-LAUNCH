@@ -78,16 +78,24 @@ fn allowed_hash(lock: &Value, name: &str, alternative: &str, hash: &str) -> bool
 
 async fn json(client: &Client, url: &str) -> Result<(Vec<u8>, Value), String> {
     trusted_mojang_url(url)?;
-    let response = client.get(url).send().await.map_err(|e| format!("Mojang download failed: {e}"))?
+    let mut response = client.get(url).send().await.map_err(|e| format!("Mojang download failed: {e}"))?
         .error_for_status().map_err(|e| format!("Mojang returned an HTTP error: {e}"))?;
     if response.content_length().is_some_and(|size| size > MAX_JSON as u64) {
         return Err("Mojang metadata exceeds the allowed size.".into());
     }
-    let bytes = response.bytes().await.map_err(|e| format!("Cannot read Mojang metadata: {e}"))?;
-    if bytes.len() > MAX_JSON { return Err("Mojang metadata is too large.".into()); }
+    // A missing/misleading HTTP Content-Length must never allow unlimited
+    // allocation before checking the real metadata size.
+    let mut bytes = Vec::<u8>::new();
+    while let Some(chunk) = response.chunk().await
+        .map_err(|e| format!("Cannot read Mojang metadata: {e}"))? {
+        if bytes.len().checked_add(chunk.len()).is_none_or(|size| size > MAX_JSON) {
+            return Err("Mojang metadata is too large.".into());
+        }
+        bytes.extend_from_slice(&chunk);
+    }
     let value: Value = serde_json::from_slice(&bytes)
         .map_err(|e| format!("Invalid Mojang version data: {e}"))?;
-    Ok((bytes.to_vec(), value))
+    Ok((bytes, value))
 }
 
 /// Download into FRE-owned cache only; never overwrite a user's existing
