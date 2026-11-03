@@ -62,7 +62,9 @@ function component(file, invoke, instances = [], options = {}) {
     vue: { ...vue, onMounted: f => mounted.push(f), onUnmounted: f => unmounted.push(f) },
   }
   const names = file === 'RustInstanceGrid.vue'
-    ? 'cards,nativeProfiles,runtime,horizonStatus,refresh,openCard,play,cardStyle,viewInstance,detailUrl,busy,selectCard,isSelected,activateCard'
+    ? 'cards,nativeProfiles,runtime,refresh,openCard,play,cardStyle,viewInstance,detailUrl,busy,selectCard,isSelected,activateCard'
+    : file === 'RustNativeMods.vue'
+    ? 'installed,busy,error,notice,load,importFile,removeMod,openFolder'
     : file === 'CurseForgeBrowser.vue'
     ? 'instanceId,searchText,apiKey,results,searched,loading,notice,error,installing,doSearch,install'
     : file === 'FreRustPanel.vue'
@@ -512,30 +514,52 @@ test('Native Rust uses native game launch, page-specific Files and settings, nev
   assert.match(files, /plugin:fre-rust\|rust_open_folder/)
 })
 
-test('Existing Horizon profile uses same Java card and native direct play', async () => {
-  const calls = [], navigated = []
-  const c = component('RustInstanceGrid.vue', async (command, args) => {
-    calls.push({ command, args })
+test('Old Horizon records never appear as FRE Rust profiles or invoke a foreign launcher', async () => {
+  const calls = []
+  const c = component('RustInstanceGrid.vue', async (command) => {
+    calls.push(command)
     if (command.endsWith('|rust_profiles')) return []
-    if (command.endsWith('|rust_runtime')) return { installed: true, prepared: false, version: '26.3', reason: 'Not prepared' }
-    if (command.endsWith('|horizon_detect_launcher')) return 'C:\\Horizon\\horizon.exe'
-    if (command.endsWith('|horizon_status')) return {
-      instances: [{ id: 'survival', name: 'Horizon survival', version: '26.3', selected: true }],
-      installedVersions: ['26.3'], preparedVersions: ['26.3'], selectedVersion: '26.3',
-    }
-    if (command.endsWith('|horizon_direct_play')) return 'started'
-    throw Error('Unexpected command ' + command)
+    if (command.endsWith('|rust_runtime')) return { installed: true, prepared: true, version: '26.3', reason: null }
+    throw Error('Foreign launcher command invoked: ' + command)
   }, [], {
-    props: { startIndex: 1, columnCount: 3, cardWidth: 140, cardHeight: 180, gap: 12, compact: false, search: '' },
-    push: async url => navigated.push(url),
+    props: { startIndex: 0, columnCount: 2, cardWidth: 140, cardHeight: 180, gap: 12, compact: false, search: '' },
   })
   await c.state.refresh()
-  assert.equal(c.state.cards.value[0].kind, 'horizon')
-  c.state.openCard(c.state.cards.value[0])
-  assert.deepEqual(navigated, ['/rust-instance/horizon/survival'])
-  await c.state.play(c.state.cards.value[0])
-  assert.ok(calls.some(x => x.command === 'plugin:fre-horizon|horizon_direct_play' &&
-    x.args.name === 'survival' && x.args.exePath === 'C:\\Horizon\\horizon.exe'))
+  assert.deepEqual(c.state.cards.value, [])
+  assert.ok(calls.every(call => call.startsWith('plugin:fre-rust|')))
+  const grid = fs.readFileSync(path.join(__dirname, 'RustInstanceGrid.vue'), 'utf8')
+  const page = fs.readFileSync(path.join(__dirname, 'RustInstancePage.vue'), 'utf8')
+  const files = fs.readFileSync(path.join(__dirname, 'RustInstanceFiles.vue'), 'utf8')
+  assert.doesNotMatch(grid + page + files, /plugin:fre-horizon\|/)
+})
+
+test('Content mod file import and removal use only the FRE-owned Rust profile', async () => {
+  const calls = []
+  let installed = []
+  const c = component('RustNativeMods.vue', async (command, args) => {
+    calls.push({ command, args })
+    if (command.endsWith('|rust_mods') && args.action === 'list') return JSON.stringify(installed)
+    if (command.endsWith('|rust_import_mod')) {
+      installed = [{ project: 'test.hmod', slug: 'test', title: 'test', number: 'local', file: 'test.hmod', source: 'FRE LAUNCH' }]
+      return 'Imported. Enable in-game.'
+    }
+    if (command.endsWith('|rust_mods') && args.action === 'remove') {
+      installed = []
+      return 'Removed'
+    }
+    throw Error('Unexpected call: ' + command)
+  }, [], {
+    props: { profileId: '123' },
+    open: async () => 'D:\\Mods\\test.hmod',
+  })
+  await c.mount()
+  assert.equal(c.state.installed.value.length, 0)
+  await c.state.importFile()
+  assert.equal(c.state.installed.value.length, 1)
+  assert.ok(calls.some(x => x.command === 'plugin:fre-rust|rust_import_mod'
+    && x.args.profileId === '123' && x.args.source === 'D:\\Mods\\test.hmod'))
+  await c.state.removeMod('test.hmod')
+  assert.equal(c.state.installed.value.length, 0)
 })
 
 test('Rust appears as native loader in the ordinary Create instance dialog', () => {
