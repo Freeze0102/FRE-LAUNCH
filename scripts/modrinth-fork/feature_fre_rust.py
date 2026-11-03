@@ -531,9 +531,10 @@ onUnmounted(() => {
         if preparer_checksum.lower() != str(info.get("prepare_exe_sha256", "")).lower():
             raise RuntimeError("Native Rust preparer SHA-256 mismatch: rebuild; do not bundle.")
         parity = runtime / "mods/horizon/src/test/java/dev/horizonlab/parity/VanillaHeightmapOracle.java"
-        exporter = runtime / "crates/horizon-prepare/src/exporters.rs"
-        if not parity.is_file() or not exporter.is_file():
-            raise RuntimeError("Bundled independent Rust preparer lacks exporter source.")
+        prepare_source = runtime / "crates/horizon-prepare"
+        source_files = list((prepare_source / "src").glob("*.rs"))
+        if not parity.is_file() or not (prepare_source / "Cargo.toml").is_file() or not (prepare_source / "build.rs").is_file() or len(source_files) < 10:
+            raise RuntimeError("Bundled Rust preparer lacks its complete MIT source and Java exporters.")
         if info.get("engine_license") != "MIT":
             raise RuntimeError("Native Rust game license metadata changed.")
         if not (runtime / "LICENSE.txt").read_text(encoding="utf-8").startswith("MIT License"):
@@ -551,7 +552,7 @@ onUnmounted(() => {
             resources[f"fre-rust-runtime/{file}"] = f"fre-rust/{file}"
         # These are original MIT exporter sources, not Mojang game files.
         resources["fre-rust-runtime/mods/horizon/src/test/java/dev/horizonlab/parity/"] = "fre-rust/mods/horizon/src/test/java/dev/horizonlab/parity/"
-        resources["fre-rust-runtime/crates/horizon-prepare/src/exporters.rs"] = "fre-rust/crates/horizon-prepare/src/exporters.rs"
+        resources["fre-rust-runtime/crates/horizon-prepare/"] = "fre-rust/crates/horizon-prepare/"
         # PUBLIC releases carry the MIT engine only. Mojang resources are
         # imported locally by the authenticated owner after installation.
         if (runtime / "resources/horizon-resources.json").is_file():
