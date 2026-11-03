@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { convertFileSrc, invoke } from '@tauri-apps/api/core'
 import {
-  BoxesIcon, ClockIcon, FolderOpenIcon, GlobeIcon, MoreVerticalIcon,
+  BoxesIcon, ChevronRightIcon, ClockIcon, FolderOpenIcon, GlobeIcon, MoreVerticalIcon,
   PlayIcon, SettingsIcon, TerminalSquareIcon, TrashIcon,
 } from '@modrinth/assets'
 import {
-  Avatar, Button, commonMessages, defineMessages, IconButton, NavTabs, NewModal,
+  Avatar, Button, commonMessages, defineMessages, IconButton, NavTabs, TabbedModal,
   PageHeader, PageHeaderActions, PageHeaderMetadata, PageHeaderMetadataItem, TagIcon,
   TeleportOverflowMenu, useVIntl, injectNotificationManager,
 } from '@modrinth/ui'
@@ -59,6 +59,12 @@ const m = defineMessages({
   chooseResources: { id: 'fre-rust.page.choose-resources', defaultMessage: 'Choose prepared resources folder' },
   resources: { id: 'fre-rust.page.resources', defaultMessage: 'Game resources' },
   preparing: { id: 'fre-rust.page.preparing', defaultMessage: 'Checking locally available resources…' },
+  generalTab: { id: 'fre-rust.page.tab.general', defaultMessage: 'General' },
+  installationTab: { id: 'fre-rust.page.tab.installation', defaultMessage: 'Installation' },
+  instanceSection: { id: 'fre-rust.page.section.instance', defaultMessage: 'Instance' },
+  gameSection: { id: 'fre-rust.page.section.game', defaultMessage: 'Game' },
+  deleteNotice: { id: 'fre-rust.page.delete-notice', defaultMessage: 'Permanently deletes this Rust instance and its worlds. Shared game resources are kept.' },
+  notDownloaded: { id: 'fre-rust.page.not-downloaded', defaultMessage: 'Official game assets cannot be created by an empty profile. Set up game files from your owned installation.' },
 })
 
 const kind = computed<'native' | 'horizon'>(() => route.params.kind === 'horizon' ? 'horizon' : 'native')
@@ -74,7 +80,7 @@ const renaming = ref(false)
 const deleting = ref(false)
 const editedName = ref('')
 const setupError = ref('')
-const settingsModal = ref<InstanceType<typeof NewModal>>()
+const settingsModal = ref<InstanceType<typeof TabbedModal>>()
 const deleteModal = ref<InstanceType<typeof ConfirmDeleteInstanceModal>>()
 const displayInstance = computed(() => profile.value ? ({
   id: kind.value + ':' + id.value,
@@ -93,11 +99,15 @@ const tab = computed(() => {
   return value === 'files' || value === 'worlds' || value === 'logs' ? value : 'content'
 })
 const tabs = computed(() => [
-  { label: t(m.content), href: basePath.value, icon: BoxesIcon },
-  { label: t(m.files), href: basePath.value + '?tab=files', icon: FolderOpenIcon },
-  { label: t(m.worlds), href: basePath.value + '?tab=worlds', icon: GlobeIcon },
-  { label: t(m.logs), href: basePath.value + '?tab=logs', icon: TerminalSquareIcon },
+  { label: t(m.content), href: 'content', icon: BoxesIcon },
+  { label: t(m.files), href: 'files', icon: FolderOpenIcon },
+  { label: t(m.worlds), href: 'worlds', icon: GlobeIcon },
+  { label: t(m.logs), href: 'logs', icon: TerminalSquareIcon },
 ])
+const settingsTabs = [
+  { name: m.generalTab, category: m.instanceSection, icon: SettingsIcon },
+  { name: m.installationTab, category: m.gameSection, icon: FolderOpenIcon },
+]
 
 const iconSrc = computed(() =>
   profile.value?.iconPath ? convertFileSrc(profile.value.iconPath) : undefined,
@@ -299,18 +309,51 @@ useRootBreadcrumb({
       :instances="[displayInstance]"
       @delete="deleteProfile"
     />
-    <NewModal ref="settingsModal" :header="t(m.settings)" max-width="600px">
-      <div class="flex flex-col gap-5">
-        <div v-if="kind === 'native'" class="flex flex-col gap-2">
-          <label class="text-sm font-semibold text-contrast" for="fre-rust-name">{{ t(m.rename) }}</label>
-          <div class="flex flex-wrap gap-2">
-            <input id="fre-rust-name" v-model="editedName" class="min-w-0 flex-1 rounded-xl border border-solid border-surface-4 bg-surface-3 px-4 py-3 text-contrast" maxlength="64" />
-            <Button :disabled="renaming || !editedName.trim() || editedName.trim() === profile.name" @click="renameProfile">{{ t(m.saveName) }}</Button>
+    <TabbedModal
+      ref="settingsModal"
+      :tabs="settingsTabs"
+      width="928px"
+      max-width="928px"
+    >
+      <template #title>
+        <span class="flex items-center gap-2 text-lg font-semibold text-primary">
+          <Avatar :src="iconSrc" size="24px" :tint-by="id" pad-transparent-corners />
+          {{ profile.name }}
+          <ChevronRightIcon />
+          <span class="font-extrabold text-contrast">{{ t(m.settings) }}</span>
+        </span>
+      </template>
+      <template #content="{ index }">
+        <div v-if="index === 0" class="flex flex-col gap-6">
+          <div v-if="kind === 'native'" class="flex flex-col gap-2">
+            <label class="text-lg font-semibold text-contrast" for="fre-rust-name">{{ t(m.rename) }}</label>
+            <div class="flex flex-wrap gap-2">
+              <input
+                id="fre-rust-name"
+                v-model="editedName"
+                class="min-w-0 flex-1 rounded-xl border border-solid border-surface-4 bg-surface-3 px-4 py-3 text-contrast"
+                maxlength="64"
+              />
+              <Button :disabled="renaming || !editedName.trim() || editedName.trim() === profile.name" @click="renameProfile">
+                {{ t(m.saveName) }}
+              </Button>
+            </div>
+          </div>
+          <div>
+            <h3 class="m-0 text-lg font-semibold text-contrast">{{ t(m.openFolder) }}</h3>
+            <Button type="outlined" class="mt-2" @click="openFolder()"><FolderOpenIcon />{{ t(m.openFolder) }}</Button>
+          </div>
+          <div v-if="kind === 'native'" class="flex flex-col items-start gap-2">
+            <h3 class="m-0 text-lg font-semibold text-contrast">{{ t(m.delete) }}</h3>
+            <Button type="colored" color="red" @click="deleteModal?.show()">
+              <TrashIcon />{{ t(m.delete) }}
+            </Button>
+            <p class="m-0 text-sm text-secondary">{{ t(m.deleteNotice) }}</p>
           </div>
         </div>
-        <div class="flex flex-col gap-2">
-          <h3 class="m-0 text-base font-semibold">{{ t(m.resources) }}</h3>
-          <p v-if="!profile.ready" class="m-0 text-sm text-secondary">{{ statusText }}</p>
+        <div v-else class="flex flex-col gap-4">
+          <h3 class="m-0 text-lg font-semibold text-contrast">{{ t(m.resources) }}</h3>
+          <p class="m-0 text-sm text-secondary">{{ profile.ready ? t(m.play) : statusText }}</p>
           <div class="flex flex-wrap gap-2">
             <Button v-if="kind === 'native' && !profile.ready" :disabled="preparing" @click="autoPrepare">
               {{ preparing ? t(m.installing) : t(m.install) }}
@@ -318,15 +361,13 @@ useRootBreadcrumb({
             <Button v-if="kind === 'native' && !profile.ready" type="outlined" :disabled="preparing" @click="chooseResources">
               {{ t(m.chooseResources) }}
             </Button>
-            <Button type="outlined" @click="openFolder()">{{ t(m.openFolder) }}</Button>
+            <Button type="outlined" @click="openFolder()"><FolderOpenIcon />{{ t(m.openFolder) }}</Button>
           </div>
+          <p v-if="!profile.ready" class="m-0 text-sm text-secondary">{{ t(m.notDownloaded) }}</p>
           <p v-if="setupError" role="alert" class="m-0 text-sm text-red-400">{{ setupError }}</p>
         </div>
-        <Button v-if="kind === 'native'" type="colored" color="red" class="self-start" @click="deleteModal?.show()">
-          <TrashIcon />{{ t(m.delete) }}
-        </Button>
-      </div>
-    </NewModal>
+      </template>
+    </TabbedModal>
     <div class="shrink-0 p-6 pr-2 pb-4">
       <PageHeader :title="profile.name">
         <template #leading>
@@ -385,14 +426,15 @@ useRootBreadcrumb({
     </div>
 
     <div class="shrink-0 px-6">
-      <NavTabs :links="tabs" />
+      <NavTabs :links="tabs" query="tab" />
       <p v-if="setupError" role="alert" class="mt-4 text-sm text-red-400">{{ setupError }}</p>
       <p v-if="!profile.ready" class="mt-4 rounded-xl border border-solid border-surface-4 bg-surface-2 p-4 text-sm text-secondary">
         {{ statusText }}
       </p>
     </div>
 
-    <div class="min-h-0 flex-1 overflow-y-auto p-6 pt-4">
+    <Transition name="fre-rust-tab" mode="out-in">
+    <div :key="tab" class="min-h-0 flex-1 overflow-y-auto p-6 pt-4">
       <div v-if="tab === 'content'" class="flex flex-col gap-3">
         <p class="m-0 text-sm text-secondary">{{ t(m.contentNote) }}</p>
         <RustInstanceFiles
@@ -427,6 +469,7 @@ useRootBreadcrumb({
         <p v-else class="py-12 text-center text-secondary">{{ t(m.noLogs) }}</p>
       </div>
     </div>
+    </Transition>
   </div>
   <div v-else-if="loading" class="p-6 text-secondary">{{ t(commonMessages.loadingLabel) }}</div>
   <div v-else class="flex flex-col items-start gap-4 p-6">
@@ -434,3 +477,25 @@ useRootBreadcrumb({
     <Button @click="router.push('/')">Home</Button>
   </div>
 </template>
+
+
+<style scoped>
+.fre-rust-tab-enter-active,
+.fre-rust-tab-leave-active {
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+.fre-rust-tab-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+.fre-rust-tab-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .fre-rust-tab-enter-active,
+  .fre-rust-tab-leave-active {
+    transition: none;
+  }
+}
+</style>
