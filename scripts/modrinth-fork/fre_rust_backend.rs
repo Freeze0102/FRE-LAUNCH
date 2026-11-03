@@ -59,6 +59,7 @@ pub fn init<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
             rust_delete_profile,
             rust_runtime,
             rust_import_resources,
+            rust_mods,
             rust_launch,
             rust_logs,
             rust_open_folder,
@@ -240,7 +241,7 @@ async fn rust_create_profile<R: tauri::Runtime>(
                 }
                 // A real independent game home, not a shortcut to a foreign
                 // launcher. Each instance has its own worlds and native mods.
-                for folder in ["saves", "mods", "resourcepacks", "shaderpacks", "screenshots", "logs"] {
+                for folder in ["saves", "horizon-mods", "resourcepacks", "shaderpacks", "screenshots", "logs"] {
                     if let Err(error) = fs::create_dir(dir.join(folder)) {
                         let _ = fs::remove_dir_all(&dir); // Freshly created, never user data.
                         return Err(format!("Could not initialize Rust game folders: {error}"));
@@ -514,16 +515,51 @@ async fn rust_import_resources<R: tauri::Runtime>(
     if credentials.is_offline_profile() || credentials.online_profile_fresh().await.is_none() {
         return Err("Minecraft Java Edition ownership could not be verified.".into());
     }
+    let destination = base(&app)?.join("prepared");
+    // Idempotent: prepared assets are shared by all FRE Rust instances. A
+    // second launch never downloads or overwrites previously installed files.
+    if destination.join("horizon-resources.json").is_file() {
+        return Ok("Already prepared; using your cached Minecraft 26.3 game files.".into());
+    }
+    if destination.exists() {
+        return Err("Incomplete local Rust resource cache exists. Back it up before repairing.".into());
+    }
     let selected = if source.trim().is_empty() {
-        find_legacy_resources()?
+        match find_legacy_resources() {
+            Ok(existing) => existing,
+            Err(_) => super::horizon::prepare_for_native_rust(app.clone()).await?,
+        }
     } else {
         PathBuf::from(source.trim())
     };
     if !selected.is_dir() { return Err("Minecraft resource folder not found.".into()); }
-    let destination = base(&app)?.join("prepared");
     let bytes = tokio::task::spawn_blocking(move || copy_prepared(&selected, &destination))
         .await.map_err(|e| e.to_string())??;
     Ok(format!("Imported {bytes} bytes of your Minecraft resources into FRE LAUNCH."))
+}
+
+/// Search the official Horizon registry and install only its native mods.
+/// The checked official helper uses the validated FRE profile as HORIZON_HOME.
+#[tauri::command]
+async fn rust_mods<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    profile_id: String,
+    action: String,
+    project: Option<String>,
+) -> Result<String, String> {
+    let dir = profile_dir(&base(&app)?, &profile_id)?;
+    read_profile(&dir, &profile_id).ok_or("Rust profile does not exist.")?;
+    let dir = dir.canonicalize().map_err(|e| e.to_string())?;
+    if !dir.join("profile.json").is_file() && !dir.join("profile.json.backup").is_file() {
+        return Err("The Rust profile metadata is missing.".into());
+    }
+    if action != "search" && action != "list" &&
+        RUNNING_PROFILES.lock().await.contains(&profile_id) {
+        return Err("Close this Rust game before changing its mods.".into());
+    }
+    super::horizon::native_mods_for_profile(
+        app, &dir, &action, project.as_deref().unwrap_or(""),
+    ).await
 }
 
 #[tauri::command]
@@ -648,7 +684,7 @@ fn safe_game_folder(dir: &Path, folder: &str) -> Result<PathBuf, String> {
         return Err("Unsupported Rust game folder.".into());
     }
     let base = dir.canonicalize().map_err(|e| e.to_string())?;
-    let target = if folder == "root" { base.clone() } else { base.join(folder) };
+    let target = if folder == "root" { base.clone() } else if folder == "mods" { base.join("horizon-mods") } else { base.join(folder) };
     let resolved = target.canonicalize().map_err(|e| e.to_string())?;
     if !resolved.starts_with(&base) || !resolved.is_dir() {
         return Err("Cannot open a folder outside the Rust game profile.".into());
@@ -743,7 +779,7 @@ mod tests {
     fn only_profile_game_folders_are_openable() {
         let root = std::env::temp_dir().join(format!("fre-rust-folders-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
-        std::fs::create_dir_all(root.join("mods")).unwrap();
+        std::fs::create_dir_all(root.join("horizon-mods")).unwrap();
         assert!(safe_game_folder(&root, "root").is_ok());
         assert!(safe_game_folder(&root, "mods").is_ok());
         assert!(safe_game_folder(&root, "..").is_err());
@@ -756,9 +792,9 @@ mod tests {
     fn lists_only_allowed_local_files_without_following_links() {
         let root = tempfile::tempdir().unwrap();
         let dir = root.path();
-        fs::create_dir_all(dir.join("mods")).unwrap();
-        fs::write(dir.join("mods").join("native-mod.bin"), b"test").unwrap();
-        fs::create_dir_all(dir.join("mods").join("subfolder")).unwrap();
+        fs::create_dir_all(dir.join("horizon-mods")).unwrap();
+        fs::write(dir.join("horizon-mods").join("native-mod.bin"), b"test").unwrap();
+        fs::create_dir_all(dir.join("horizon-mods").join("subfolder")).unwrap();
         let items = list_game_files(dir, "mods").unwrap();
         assert_eq!(items.len(), 2);
         assert_eq!(items[0].name, "subfolder");
