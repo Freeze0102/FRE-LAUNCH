@@ -52,10 +52,18 @@ if (!(Test-Path -LiteralPath (Join-Path $paritySource 'VanillaHeightmapOracle.ja
 }
 New-Item -ItemType Directory -Force -Path $parityDestination | Out-Null
 Copy-Item -Path (Join-Path $paritySource '*') -Destination $parityDestination -Recurse -Force
-$exporterCode = Join-Path $source 'crates\horizon-prepare\src\exporters.rs'
-$exporterDestination = Join-Path $runtime 'crates\horizon-prepare\src'
-New-Item -ItemType Directory -Force -Path $exporterDestination | Out-Null
-Copy-Item -LiteralPath $exporterCode -Destination (Join-Path $exporterDestination 'exporters.rs')
+# The preparer verifies the complete crate source digest, including its
+# Cargo.toml, build.rs and every src/*.rs. An isolated exporters.rs is not
+# sufficient; it can force a needless rebuild or break resource verification.
+$prepareSource = Join-Path $source 'crates\horizon-prepare'
+$prepareDestination = Join-Path $runtime 'crates\horizon-prepare'
+New-Item -ItemType Directory -Force -Path (Join-Path $prepareDestination 'src') | Out-Null
+foreach ($name in @('Cargo.toml', 'build.rs')) {
+    Copy-Item -LiteralPath (Join-Path $prepareSource $name) -Destination (Join-Path $prepareDestination $name)
+}
+Copy-Item -Path (Join-Path $prepareSource 'src\*.rs') -Destination (Join-Path $prepareDestination 'src') -Force
+$sourceCount = @(Get-ChildItem -LiteralPath (Join-Path $prepareDestination 'src') -File -Filter '*.rs').Count
+if ($sourceCount -lt 10) { throw "Native preparer source snapshot is incomplete: $sourceCount Rust files" }
 Copy-Item -LiteralPath (Join-Path $source 'LICENSE') -Destination (Join-Path $runtime 'LICENSE.txt')
 Copy-Item -LiteralPath (Join-Path $source 'research-lock.json') -Destination (Join-Path $runtime 'research-lock.json')
 $hash = (Get-FileHash -LiteralPath (Join-Path $runtime 'fre-rust-client.exe') -Algorithm SHA256).Hash.ToLowerInvariant()
