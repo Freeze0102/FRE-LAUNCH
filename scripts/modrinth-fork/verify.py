@@ -183,6 +183,9 @@ def verify(root):
     rust_app=(root/"apps/app-frontend/src/App.vue").read_text(encoding="utf-8")
     rust_permissions=json.loads((root/"apps/app/capabilities/plugins.json").read_text(encoding="utf-8"))
     assert "fre-rust:default" in rust_permissions["permissions"]
+    assert "const MAX_ICON_BYTES:" in rust_backend and "fn prepare_icon(" in rust_backend
+    assert "icon_path: Option<String>" in rust_backend and "icon_bytes: Option<Vec<u8>>" in rust_backend
+    assert 'profile.icon_path = ["icon.png", "icon.jpg", "icon.webp"]' in rust_backend
     assert "fre-horizon:default" in rust_permissions["permissions"], "Existing Horizon profiles must remain accessible"
     assert 'pub mod fre_rust;' in (root/"apps/app/src/api/mod.rs").read_text(encoding="utf-8")
     assert "pub mod horizon;" in (root/"apps/app/src/api/mod.rs").read_text(encoding="utf-8")
@@ -209,8 +212,10 @@ def verify(root):
         (rust_app, [
             "import FreRustPanel", "<FreRustPanel", "showFreRustWizard",
             "provide('showFreRustWizard', showFreRustWizard)",
+            "handleFreRustOrJavaCreate", "plugin:fre-rust|rust_create_profile",
+            ":available-loaders=", "'rust'", "@create=\"handleFreRustOrJavaCreate\"",
         ]),
-        (rust_stage, ["Minecraft (Rust)", "ctx.onHorizon?.()"]),
+        (rust_stage, ["Minecraft (Rust)"]),
         (rust_main, [".plugin(api::fre_rust::init())", ".plugin(api::horizon::init())"]),
         (rust_build, ['"fre-rust"', '"fre-horizon"', '"rust_create_profile"', '"rust_launch"',
             '"rust_open_folder"', '"rust_list_files"', '"horizon_open_folder"', '"horizon_list_files"']),
@@ -266,6 +271,13 @@ def verify(root):
                    'showFreRustWizard', 'showHorizonWizard', 'data-library-instance-card',
                    'role="dialog"', 'Rust {{ card.version }}'):
         assert marker in unified_rust, f"Rust library profile operation missing: {marker}"
+    rust_custom_setup=(root/"packages/ui/src/components/flows/creation-flow-modal/components/CustomSetupStage.vue").read_text(encoding="utf-8")
+    rust_context=(root/"packages/ui/src/components/flows/creation-flow-modal/creation-flow-context.ts").read_text(encoding="utf-8")
+    for marker in ("selectedLoader.value === 'rust'", "value: '26.3'", "fre-rust.create.requirement"):
+        assert marker in rust_custom_setup, f"Rust version chooser must use actual native game: {marker}"
+    assert "selectedLoader.value === 'rust'" in rust_context, "Native loader must hide Java loader-version selection"
+    assert "ctx.onHorizon?.()" not in rust_stage, "Native Rust should be selected as a loader in the normal Create screen"
+    assert "fre-rust.create.requirement" in app_uk and "fre-rust.create.requirement" in app_en
     assert '<HorizonLibrary' not in rust_index and '<FreRustLibrary' not in rust_index, (
         "Do not render separate Horizon or Rust libraries"
     )
