@@ -15,6 +15,7 @@ use tokio::io::AsyncWriteExt;
 
 const MAX_NAME: usize = 64;
 const MAX_METADATA: u64 = 8192;
+const MAX_ICON_BYTES: usize = 2 * 1024 * 1024;
 // Creation must be serialized: two simultaneous requests cannot create
 // duplicate visible profile names or compete for the same metadata.
 static PROFILE_CREATION: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
@@ -27,6 +28,8 @@ struct RustProfile {
     id: String,
     name: String,
     created: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    icon_path: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -108,8 +111,15 @@ fn read_profile(dir: &Path, id: &str) -> Option<RustProfile> {
     if metadata.metadata().ok()?.len() > MAX_METADATA {
         return None;
     }
-    let profile: RustProfile = serde_json::from_slice(&fs::read(metadata).ok()?).ok()?;
-    (profile.id == id && name_valid(&profile.name)).then_some(profile)
+    let mut profile: RustProfile = serde_json::from_slice(&fs::read(metadata).ok()?).ok()?;
+    if profile.id != id || !name_valid(&profile.name) { return None; }
+    // Never trust a path supplied through editable profile.json metadata.
+    // A profile icon may only be an actual ordinary file INSIDE this profile.
+    profile.icon_path = ["icon.png", "icon.jpg", "icon.webp"].iter()
+        .map(|name| dir.join(name))
+        .find(|file| file.symlink_metadata().is_ok_and(|m| m.file_type().is_file()))
+        .map(|file| file.to_string_lossy().into_owned());
+    Some(profile)
 }
 
 fn list(root: &Path) -> Result<Vec<RustProfile>, String> {
@@ -136,16 +146,51 @@ async fn rust_profiles<R: tauri::Runtime>(
     list(&base(&app)?)
 }
 
+// Only three inert raster formats are accepted. Never persist raw SVG, HTML
+// or an arbitrary selected file as executable content.
+fn valid_icon(bytes: &[u8]) -> Result<&'static str, String> {
+    if bytes.len() < 12 || bytes.len() > MAX_ICON_BYTES {
+        return Err("The profile icon must be a PNG, JPEG or WebP smaller than 2 MiB.".into());
+    }
+    if bytes.starts_with(b"\x89PNG\r\n\x1a\n") { return Ok("png"); }
+    if bytes.starts_with(&[0xff, 0xd8, 0xff]) { return Ok("jpg"); }
+    if bytes.starts_with(b"RIFF") && bytes.get(8..12) == Some(b"WEBP") {
+        return Ok("webp");
+    }
+    Err("Profile icon must use PNG, JPEG or WebP; SVG and other formats are not allowed.".into())
+}
+
+fn prepare_icon(icon_path: Option<&str>, icon_bytes: Option<Vec<u8>>)
+    -> Result<Option<(Vec<u8>, &'static str)>, String> {
+    let bytes = if let Some(bytes) = icon_bytes {
+        bytes
+    } else if let Some(path) = icon_path.filter(|path| !path.trim().is_empty()) {
+        let path = Path::new(path);
+        let metadata = fs::symlink_metadata(path).map_err(|e| format!("Cannot read profile icon: {e}"))?;
+        if !metadata.file_type().is_file() || metadata.len() > MAX_ICON_BYTES as u64 {
+            return Err("Profile icon is not a regular image file smaller than 2 MiB.".into());
+        }
+        fs::read(path).map_err(|e| format!("Cannot read profile icon: {e}"))?
+    } else {
+        return Ok(None);
+    };
+    let extension = valid_icon(&bytes)?;
+    Ok(Some((bytes, extension)))
+}
+
 #[tauri::command]
 async fn rust_create_profile<R: tauri::Runtime>(
     app: tauri::AppHandle<R>,
     name: String,
+    icon_path: Option<String>,
+    icon_bytes: Option<Vec<u8>>,
 ) -> Result<RustProfile, String> {
     let _guard = PROFILE_CREATION.lock().await;
     let name = name.trim().to_owned();
     if !name_valid(&name) {
         return Err("Name must contain 1–64 characters without control characters.".into());
     }
+    let icon = prepare_icon(icon_path.as_deref(), icon_bytes)?;
     let root = base(&app)?;
     if list(&root)?.iter().any(|p| p.name.eq_ignore_ascii_case(&name)) {
         return Err("A Rust profile with this name already exists.".into());
@@ -166,7 +211,16 @@ async fn rust_create_profile<R: tauri::Runtime>(
         let dir = profile_dir(&root, &id)?;
         match fs::create_dir(&dir) {
             Ok(()) => {
-                let profile = RustProfile { id, name, created };
+                let saved_icon = if let Some((bytes, extension)) = icon.as_ref() {
+                    let target = dir.join(format!("icon.{extension}"));
+                    if let Err(err) = fs::OpenOptions::new().write(true).create_new(true)
+                        .open(&target).and_then(|mut file| std::io::Write::write_all(&mut file, bytes)) {
+                        let _ = fs::remove_dir_all(&dir); // Only this fresh profile.
+                        return Err(format!("Could not save Rust profile icon: {err}"));
+                    }
+                    Some(target.to_string_lossy().into_owned())
+                } else { None };
+                let profile = RustProfile { id, name, created, icon_path: saved_icon };
                 let metadata = serde_json::to_vec_pretty(&profile).map_err(|e| e.to_string())?;
                 let path = dir.join("profile.json");
                 let written = fs::OpenOptions::new()
@@ -638,13 +692,21 @@ mod tests {
         let root = tempfile::tempdir().unwrap();
         let dir = profile_dir(root.path(), "123456789").unwrap();
         fs::create_dir_all(&dir).unwrap();
-        let expected = RustProfile { id: "123456789".into(), name: "Тест Rust".into(), created: 1234 };
+        let expected = RustProfile { id: "123456789".into(), name: "Тест Rust".into(), created: 1234, icon_path: None };
         fs::write(dir.join("profile.json"), serde_json::to_vec(&expected).unwrap()).unwrap();
         assert_eq!(read_profile(&dir, "123456789").unwrap().name, "Тест Rust");
         // A read profile must keep the original name and owner-supplied metadata.
         assert_eq!(read_profile(&dir, "123456789").unwrap().created, 1234);
         fs::write(dir.join("profile.json"), b"garbage").unwrap();
         assert!(read_profile(&dir, "123456789").is_none());
+    }
+    #[test]
+    fn rejects_unsafe_or_oversized_rust_icons() {
+        assert!(valid_icon(b"<svg onload=alert(1)>").is_err());
+        assert!(valid_icon(&vec![0; MAX_ICON_BYTES + 1]).is_err());
+        assert_eq!(valid_icon(b"\x89PNG\r\n\x1a\nDATA").unwrap(), "png");
+        assert_eq!(valid_icon(b"RIFFSIZEWEBP1234").unwrap(), "webp");
+        assert!(prepare_icon(None, None).unwrap().is_none());
     }
     #[test]
     fn refuses_modified_or_unknown_rust_executable() {
