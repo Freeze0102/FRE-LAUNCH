@@ -210,6 +210,41 @@ async function deleteFreRustQuick() {
             ':to="`/instance/${encodeURIComponent(instance.id)}`"',
             ':to="instance.freRustKind ? freRustDetailUrl(instance) : `/instance/${encodeURIComponent(instance.id)}`"')
 
+    # The right-hand onboarding checklist must count a native Rust profile as
+    # a real first instance, rather than asking to create a Java one again.
+    onboarding = frontend / "providers/onboarding-checklist.ts"
+    exactly(onboarding,
+            "import { createContext } from '@modrinth/ui'",
+            "import { invoke } from '@tauri-apps/api/core'\nimport { createContext } from '@modrinth/ui'")
+    exactly(onboarding,
+            "import { computed, type ComputedRef, ref } from 'vue'",
+            "import { computed, onMounted, onUnmounted, type ComputedRef, ref } from 'vue'")
+    exactly(onboarding,
+            "\tconst checklist = ref<OnboardingChecklist>()",
+            """\tconst checklist = ref<OnboardingChecklist>()
+    const hasNativeRustProfile = ref(false)
+    let rustCheckGeneration = 0
+    async function checkNativeRustProfiles() {
+        const request = ++rustCheckGeneration
+        let found = false
+        try {
+            const profiles = await invoke<{ id: string }[]>('plugin:fre-rust|rust_profiles')
+            found = profiles.length > 0
+        } catch { /* Optional Rust plugin must never break Java onboarding. */ }
+        if (request === rustCheckGeneration) hasNativeRustProfile.value = found
+    }
+    onMounted(() => {
+        window.addEventListener('fre-rust-library-refresh', checkNativeRustProfiles)
+        void checkNativeRustProfiles()
+    })
+    onUnmounted(() => {
+        rustCheckGeneration++
+        window.removeEventListener('fre-rust-library-refresh', checkNativeRustProfiles)
+    })""")
+    exactly(onboarding,
+            "hasCreatedInstance: computed(() => checklist.value?.has_created_instance ?? false),",
+            "hasCreatedInstance: computed(() => (checklist.value?.has_created_instance ?? false) || hasNativeRustProfile.value),")
+
     # The main library's native cards use the actual shared Java selection
     # state. The special ID namespace is crucial: Java bulk operations cannot
     # silently receive a native Rust profile ID.
