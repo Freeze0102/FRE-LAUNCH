@@ -261,9 +261,17 @@ def verify(root):
     # inside the ungrouped library, not in a second section below the list.
     for marker in ('<RustInstanceGrid', ':start-index="instanceGroup.instances.length"',
                    '@count-change="rustCardCount = $event"',
-                   'props.instanceGroup.instances.length + (isUngrouped.value ? rustCardCount.value : 0)',
-                   'class="relative" :style="{ height:', 'v-if="isUngrouped"'):
+                   'props.instanceGroup.instances.length + (isRustGridGroup.value ? rustCardCount.value : 0)',
+                   'class="relative" :style="{ height:', 'v-if="isRustGridGroup"'):
         assert marker in unified_group, f"Rust card grid is not integrated: {marker}"
+    rust_library_shell=(root/"apps/app-frontend/src/components/ui/library/index.vue").read_text(encoding="utf-8")
+    rust_grouping=(root/"apps/app-frontend/src/components/ui/library/rust-library-group.ts").read_text(encoding="utf-8")
+    for key in ("group:none", "None:None", "Loader:Rust", "Game version:26.3", "Instance type:Rust"):
+        assert key in rust_grouping, f"Rust profile missing from Java library grouping: {key}"
+    assert "rustLibraryGroupId(displayState.value.group)" in unified_group
+    assert "rustLibraryGroupId(displayState.value.group)" in rust_library_shell
+    assert "rustProfileNames" in rust_library_shell
+    assert "fre-rust-library-refresh" in rust_library_shell
     for marker in ('plugin:fre-rust|rust_profiles', 'plugin:fre-horizon|horizon_detect_launcher',
                    'plugin:fre-rust|rust_launch', 'plugin:fre-horizon|horizon_direct_play',
                    'plugin:fre-rust|rust_list_files', 'plugin:fre-horizon|horizon_list_files',
