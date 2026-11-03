@@ -206,13 +206,14 @@ async function play(card: Card) {
   try {
     if (card.kind === 'native') {
       if (!card.ready) {
-        // First attempt an owner-authorized import of already prepared local
-        // game data. Do not claim to have downloaded Mojang game assets.
+        // A first Play uses the existing cache or prepares verified game
+        // assets through Horizon and Mojang for a signed-in owner.
         try {
           await invoke<string>('plugin:fre-rust|rust_import_resources', { source: '' })
           await refresh()
-        } catch {
-          openCard(card) // Full profile contains the actual actionable error.
+        } catch (err) {
+          openCard(card)
+          handleError(err instanceof Error ? err : new Error(String(err)))
           return
         }
       }
