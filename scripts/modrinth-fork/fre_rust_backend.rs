@@ -154,7 +154,7 @@ fn valid_icon(bytes: &[u8]) -> Result<&'static str, String> {
     }
     if bytes.starts_with(b"\x89PNG\r\n\x1a\n") { return Ok("png"); }
     if bytes.starts_with(&[0xff, 0xd8, 0xff]) { return Ok("jpg"); }
-    if bytes.starts_with(b"RIFF") && bytes.get(8..12) == Some(b"WEBP") {
+    if bytes.starts_with(b"RIFF") && bytes.get(8..12).is_some_and(|tag| tag == &b"WEBP"[..]) {
         return Ok("webp");
     }
     Err("Profile icon must use PNG, JPEG or WebP; SVG and other formats are not allowed.".into())
