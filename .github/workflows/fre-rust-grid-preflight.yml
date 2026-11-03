@@ -1,4 +1,4 @@
-name: FRE LAUNCH final native Rust quick switcher and 30 patched-source tests
+name: FRE LAUNCH Rust complete native UI and onboarding 31 tests
 
 on:
   push:
