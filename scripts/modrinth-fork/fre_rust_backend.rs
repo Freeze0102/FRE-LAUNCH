@@ -384,9 +384,54 @@ fn verify_native_client(root: &Path) -> Result<(), String> {
     Ok(())
 }
 
+/// Quick integrity check for a completed Horizon preparation. A filename
+/// alone is not proof of a usable cache: partial copies and stale manifests
+/// must not make the library's Play button report Ready.
+fn resources_valid(root: &Path) -> bool {
+    use std::io::Read;
+    let manifest = root.join("horizon-resources.json");
+    let Ok(meta) = fs::symlink_metadata(&manifest) else { return false };
+    if !meta.file_type().is_file() || meta.len() == 0 || meta.len() > 2 * 1024 * 1024 {
+        return false;
+    }
+    let Ok(bytes) = fs::read(&manifest) else { return false };
+    let Ok(value) = serde_json::from_slice::<serde_json::Value>(&bytes) else { return false };
+    if value.get("minecraft").and_then(|v| v.as_str()) != Some("26.3")
+        || !value.get("schema").and_then(|v| v.as_i64()).is_some_and(|v| v > 0) {
+        return false;
+    }
+    // These hashes are recorded by Horizon's preparer and cover essential
+    // output. The official preparer verifies the rest at download/prep time.
+    for (field, relative) in [
+        ("facts_sha256", "facts.json"),
+        ("block_tags_sha256", "block-tags.json"),
+        ("collision_sha256", "cached-collision.nbt"),
+    ] {
+        let Some(expected) = value.get(field).and_then(|v| v.as_str()) else { return false };
+        if expected.len() != 64 || !expected.bytes().all(|b| b.is_ascii_hexdigit()) {
+            return false;
+        }
+        let path = root.join(relative);
+        let Ok(metadata) = fs::symlink_metadata(&path) else { return false };
+        if !metadata.file_type().is_file() { return false; }
+        let Ok(mut file) = fs::File::open(&path) else { return false };
+        let mut hasher = Sha256::new();
+        let mut buffer = [0u8; 65536];
+        loop {
+            let Ok(size) = file.read(&mut buffer) else { return false };
+            if size == 0 { break; }
+            hasher.update(&buffer[..size]);
+        }
+        if !format!("{:x}", hasher.finalize()).eq_ignore_ascii_case(expected) {
+            return false;
+        }
+    }
+    true
+}
+
 fn local_resources(data_root: &Path, bundle_root: &Path) -> PathBuf {
     let local = data_root.join("prepared");
-    if local.join("horizon-resources.json").is_file() {
+    if resources_valid(&local) {
         local
     } else {
         bundle_root.join("resources") // backwards-compatible personal installer
@@ -397,7 +442,7 @@ fn ready(root: &Path, data_root: &Path) -> RustRuntime {
     let (client, _) = runtime_files(root);
     let installed = client.is_file() && root.join("BUILD-INFO.json").is_file()
         && root.join("research-lock.json").is_file();
-    let prepared = local_resources(data_root, root).join("horizon-resources.json").is_file();
+    let prepared = resources_valid(&local_resources(data_root, root));
     let reason = if !installed {
         Some("The FRE LAUNCH Rust game was not included in this installer. Build and bundle the native client first.".into())
     } else if !prepared {
@@ -424,7 +469,7 @@ async fn rust_runtime<R: tauri::Runtime>(
 // The game engine is open source and bundled, but Mojang resources must
 // never be copied into a PUBLIC installer or downloaded from an unknown host.
 fn copy_prepared(source: &Path, target: &Path) -> Result<u64, String> {
-    if !source.join("horizon-resources.json").is_file() {
+    if !resources_valid(source) {
         return Err("Selected folder is not a prepared Minecraft Rust resource directory.".into());
     }
     if target.exists() {
@@ -469,7 +514,7 @@ fn copy_prepared(source: &Path, target: &Path) -> Result<u64, String> {
                 }
             }
         }
-        if !pending.join("horizon-resources.json").is_file() {
+        if !resources_valid(&pending) {
             return Err("Prepared resources manifest was not copied.".into());
         }
         fs::rename(&pending, target).map_err(|e| format!("Unable to finish resource import: {e}"))?;
@@ -495,7 +540,7 @@ fn find_legacy_resources() -> Result<PathBuf, String> {
         let Some(entry) = entries.next() else { break };
         let entry = entry.map_err(|e| e.to_string())?;
         let folder = entry.path().join(".local").join("horizon-client").join("26.3");
-        if folder.join("horizon-resources.json").is_file() { return Ok(folder); }
+        if resources_valid(&folder) { return Ok(folder); }
     }
     Err("No prepared Minecraft Rust resources were found. Select a folder with horizon-resources.json.".into())
 }
@@ -518,7 +563,7 @@ async fn rust_import_resources<R: tauri::Runtime>(
     let destination = base(&app)?.join("prepared");
     // Idempotent: prepared assets are shared by all FRE Rust instances. A
     // second launch never downloads or overwrites previously installed files.
-    if destination.join("horizon-resources.json").is_file() {
+    if resources_valid(&destination) {
         return Ok("Already prepared; using your cached Minecraft 26.3 game files.".into());
     }
     if destination.exists() {
