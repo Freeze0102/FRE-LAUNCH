@@ -39,17 +39,37 @@ New-Item -ItemType Directory -Path $runtime | Out-Null
 $engine = Join-Path $source 'target\release\horizon-client.exe'
 if (!(Test-Path $engine)) { throw 'Compiled Rust engine executable missing' }
 Copy-Item -LiteralPath $engine -Destination (Join-Path $runtime 'fre-rust-client.exe')
+# Include the MIT resource-preparation BINARY and original exporter sources.
+# Both operate inside FRE LAUNCH. No Horizon Launcher or Microsoft login
+# application is downloaded, started, or required by the native Rust client.
+$preparer = Join-Path $source 'target\release\horizon-prepare.exe'
+if (!(Test-Path -LiteralPath $preparer -PathType Leaf)) { throw 'Native Rust preparer missing from pinned source build' }
+Copy-Item -LiteralPath $preparer -Destination (Join-Path $runtime 'fre-rust-prepare.exe')
+$paritySource = Join-Path $source 'mods\horizon\src\test\java\dev\horizonlab\parity'
+$parityDestination = Join-Path $runtime 'mods\horizon\src\test\java\dev\horizonlab\parity'
+if (!(Test-Path -LiteralPath (Join-Path $paritySource 'VanillaHeightmapOracle.java'))) {
+    throw 'Native Rust exporter source missing from pinned checkout'
+}
+New-Item -ItemType Directory -Force -Path $parityDestination | Out-Null
+Copy-Item -Path (Join-Path $paritySource '*') -Destination $parityDestination -Recurse -Force
+$exporterCode = Join-Path $source 'crates\horizon-prepare\src\exporters.rs'
+$exporterDestination = Join-Path $runtime 'crates\horizon-prepare\src'
+New-Item -ItemType Directory -Force -Path $exporterDestination | Out-Null
+Copy-Item -LiteralPath $exporterCode -Destination (Join-Path $exporterDestination 'exporters.rs')
 Copy-Item -LiteralPath (Join-Path $source 'LICENSE') -Destination (Join-Path $runtime 'LICENSE.txt')
 Copy-Item -LiteralPath (Join-Path $source 'research-lock.json') -Destination (Join-Path $runtime 'research-lock.json')
 $hash = (Get-FileHash -LiteralPath (Join-Path $runtime 'fre-rust-client.exe') -Algorithm SHA256).Hash.ToLowerInvariant()
+$prepareHash = (Get-FileHash -LiteralPath (Join-Path $runtime 'fre-rust-prepare.exe') -Algorithm SHA256).Hash.ToLowerInvariant()
 $metadata = [ordered]@{
     engine_source = 'https://github.com/horizon-rust/horizon'
     source_commit = $Revision
     engine_license = 'MIT'
     game_exe_sha256 = $hash
+    prepare_exe_sha256 = $prepareHash
     proprietary_assets_origin = 'Not included in this public installer'
-    redistribution = 'Open-source MIT engine only; import owned Minecraft assets locally'
+    redistribution = 'Open-source MIT game + preparer; fetch owned Minecraft assets locally in FRE LAUNCH'
 }
 $metadata | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $runtime 'BUILD-INFO.json') -Encoding UTF8
 if (Test-Path -LiteralPath (Join-Path $runtime 'resources')) { throw 'Unexpected proprietary resource directory in CI output' }
 Write-Host "Built pinned MIT Rust client SHA-256: $hash"
+Write-Host "Bundled independent MIT resource preparer SHA-256: $prepareHash"
