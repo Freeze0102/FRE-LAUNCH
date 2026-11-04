@@ -377,8 +377,8 @@ onUnmounted(() => {
                             'Import your own Minecraft resources in Rust settings before playing.'),
         'game-required': ('Потрібні твої встановлені файли Minecraft.',
                           'Your own installed Minecraft resources are required.'),
-        'horizon-required': ('Спочатку підготуй версію Horizon у налаштуваннях.',
-                             'Prepare this Horizon version in settings before playing.'),
+        'horizon-required': ('Спочатку встанови ресурси Minecraft на Rust у FRE LAUNCH.',
+                             'Prepare the native Minecraft resources in FRE LAUNCH before playing.'),
         'mods-warning': ('Java JAR-моди не підтримуються нативним Rust-клієнтом. '
                          'Світи та файли кожної збірки зберігаються окремо.',
                          'Java JAR mods are not supported by the native Rust client. '
@@ -457,7 +457,7 @@ onUnmounted(() => {
                 'Import .hmod content files directly into this Rust instance. Enable them in the game Mods settings. Fabric/Forge JAR files are incompatible; .hnmod source mods need a separate build.',
             ),
             'fre-rust.mods.search': ('Пошук', 'Search'),
-            'fre-rust.mods.placeholder': ('Знайти мод для Horizon…', 'Find a Horizon mod…'),
+            'fre-rust.mods.placeholder': ('Пошук локальних Rust-модів…', 'Search local Rust mods…'),
             'fre-rust.mods.installed': ('Файли цієї збірки', 'Files in this instance'),
             'fre-rust.mods.empty': ('У цій збірці ще немає .hmod-файлів.', 'No .hmod content files yet.'),
             'fre-rust.mods.install': ('Встановити', 'Install'),
