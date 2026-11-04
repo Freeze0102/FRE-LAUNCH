@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { invoke } from '@tauri-apps/api/core'
-import { defineMessages, useVIntl } from '@modrinth/ui'
+import { convertFileSrc, invoke } from '@tauri-apps/api/core'
+import { listen } from '@tauri-apps/api/event'
+import { Avatar, defineMessages, useVIntl } from '@modrinth/ui'
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
 
-type Profile = { id: string; name: string; created: number }
+type Profile = { id: string; name: string; created: number; modified?: number; iconPath?: string | null }
 type Runtime = { installed: boolean; prepared: boolean; version: string; reason: string | null }
 type RustGameFile = { name: string; bytes: number; isDirectory: boolean }
 type FileCategory = 'root' | 'mods' | 'resourcepacks' | 'shaderpacks' | 'saves' | 'logs'
@@ -21,6 +22,7 @@ const m = defineMessages({
   ready: { id: 'fre-rust.library.ready', defaultMessage: 'Ready' },
   install: { id: 'fre-rust.library.install', defaultMessage: 'Game files required' },
   play: { id: 'fre-rust.library.play', defaultMessage: 'Play' },
+  stop: { id: 'fre-rust.library.stop', defaultMessage: 'Stop' },
   playing: { id: 'fre-rust.library.playing', defaultMessage: 'Starting...' },
   manage: { id: 'fre-rust.library.manage', defaultMessage: 'Manage' },
   files: { id: 'fre-rust.library.files', defaultMessage: 'Files' },
@@ -32,6 +34,14 @@ const openRustWizard = inject<(profileId?: string) => void>('showFreRustWizard',
 const profiles = ref<Profile[]>([])
 const runtime = ref<Runtime | null>(null)
 const loading = ref<string | null>(null)
+const runningIds = ref<string[]>([])
+const isRunning = (profile: Profile) => runningIds.value.includes(profile.id)
+let unlistenProcess: (() => void) | null = null
+let processListenerDisposed = false
+async function refreshRunning() {
+  try { runningIds.value = await invoke<string[]>('plugin:fre-rust|rust_running') }
+  catch { /* Keep regular profile and files views usable. */ }
+}
 const error = ref('')
 const fileProfile = ref<Profile | null>(null)
 const fileCategory = ref<FileCategory>('mods')
@@ -49,13 +59,15 @@ function reason(err: unknown) { return err instanceof Error ? err.message : Stri
 async function refresh() {
   const n = ++request
   try {
-    const [instances, info] = await Promise.all([
+    const [instances, info, running] = await Promise.all([
       invoke<Profile[]>('plugin:fre-rust|rust_profiles'),
       invoke<Runtime>('plugin:fre-rust|rust_runtime'),
+      invoke<string[]>('plugin:fre-rust|rust_running').catch(() => []),
     ])
     if (n !== request) return
     profiles.value = instances
     runtime.value = info
+    runningIds.value = running
     error.value = ''
   } catch (err) {
     if (n === request) error.value = t(m.error, { reason: reason(err) })
@@ -63,16 +75,29 @@ async function refresh() {
 }
 
 async function play(profile: Profile) {
-  if (loading.value || !playable.value) return
+  if (loading.value || !playable.value || isRunning(profile)) return
   loading.value = profile.id
   error.value = ''
   try {
     await invoke<string>('plugin:fre-rust|rust_launch', { profileId: profile.id })
+    await refreshRunning()
   } catch (err) {
     error.value = t(m.error, { reason: reason(err) })
   } finally {
     loading.value = null
   }
+} 
+
+async function stop(profile: Profile) {
+  if (loading.value || !isRunning(profile)) return
+  loading.value = profile.id
+  error.value = ''
+  try {
+    await invoke('plugin:fre-rust|rust_stop', { profileId: profile.id })
+    await refreshRunning()
+  } catch (err) {
+    error.value = t(m.error, { reason: reason(err) })
+  } finally { loading.value = null }
 }
 
 async function loadFiles(category: FileCategory = fileCategory.value) {
@@ -125,13 +150,24 @@ function fileSize(bytes: number): string {
 }
 const onRefresh = () => { void refresh() }
 onMounted(() => {
+  processListenerDisposed = false
   window.addEventListener('fre-rust-library-refresh', onRefresh)
+  window.addEventListener('focus', refreshRunning)
+  void listen('fre-rust-process-changed', () => { void refreshRunning() })
+    .then(unlisten => {
+      if (processListenerDisposed) unlisten()
+      else unlistenProcess = unlisten
+    }).catch(() => {})
   void refresh()
 })
 onUnmounted(() => {
   fileRequest++
   request++
   window.removeEventListener('fre-rust-library-refresh', onRefresh)
+  window.removeEventListener('focus', refreshRunning)
+  processListenerDisposed = true
+  unlistenProcess?.()
+  unlistenProcess = null
 })
 </script>
 
@@ -145,7 +181,7 @@ onUnmounted(() => {
     <div v-if="profiles.length" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       <article v-for="profile in profiles" :key="profile.id" class="flex min-h-44 flex-col justify-between gap-3 rounded-xl border border-solid border-surface-4 bg-bg-raised p-4 transition-colors hover:border-surface-5">
         <div class="flex items-center gap-3">
-          <div class="flex size-12 items-center justify-center rounded-lg bg-button-bg text-xl font-semibold text-brand">R</div>
+          <Avatar :src="profile.iconPath ? convertFileSrc(profile.iconPath) + '?v=' + (profile.modified ?? 0) : undefined" size="48px" :tint-by="profile.id" pad-transparent-corners />
           <div class="min-w-0">
             <h3 class="m-0 truncate text-base font-semibold text-contrast">{{ profile.name }}</h3>
             <p class="m-0 mt-1 text-xs text-secondary">Rust · {{ runtime?.version || 'Minecraft' }}</p>
@@ -153,8 +189,8 @@ onUnmounted(() => {
           </div>
         </div>
         <div class="flex gap-2">
-          <button type="button" class="flex-1 cursor-pointer rounded-lg border-0 bg-brand px-4 py-2 text-sm font-semibold text-white disabled:opacity-40" :disabled="!playable || !!loading" @click="play(profile)">
-            {{ loading === profile.id ? t(m.playing) : t(m.play) }}
+          <button type="button" class="flex-1 cursor-pointer rounded-lg border-0 bg-brand px-4 py-2 text-sm font-semibold text-white disabled:opacity-40" :disabled="!!loading || (!playable && !isRunning(profile))" @click="isRunning(profile) ? stop(profile) : play(profile)">
+            {{ loading === profile.id ? t(m.playing) : isRunning(profile) ? t(m.stop) : t(m.play) }}
           </button>
           <button type="button" class="cursor-pointer rounded-lg bg-button-bg px-3 py-2 text-sm text-contrast" @click="openFiles(profile)">{{ t(m.files) }}</button>
           <button type="button" class="cursor-pointer rounded-lg bg-button-bg px-3 py-2 text-sm text-contrast" @click="openRustWizard(profile.id)">{{ t(m.manage) }}</button>
