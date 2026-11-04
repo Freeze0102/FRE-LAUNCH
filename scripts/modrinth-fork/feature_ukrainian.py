@@ -341,6 +341,7 @@ NEW.update({
 "fre-rust.library.ready":("Готово", "Ready"),
 "fre-rust.library.install":("Потрібні файли гри", "Game files required"),
 "fre-rust.library.play":("Грати", "Play"),
+"fre-rust.library.stop":("Зупинити", "Stop"),
 "fre-rust.library.playing":("Запускаємо…", "Starting..."),
 "fre-rust.library.manage":("Налаштувати", "Manage"),
 "fre-rust.library.files":("Файли", "Files"),
