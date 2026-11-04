@@ -30,7 +30,7 @@ def apply(root: Path):
             'reqwest = { workspace = true, features = ["rustls-tls", "stream"] }\n'
             'sha1 = { workspace = true }\nsha2 = { workspace = true }\nzip = { workspace = true }')
     exactly(app / "Cargo.toml", 'tokio = { workspace = true, features = ["time"] }',
-            'tokio = { workspace = true, features = ["time", "fs", "io-util", "process", "rt"] }')
+            'tokio = { workspace = true, features = ["time", "fs", "io-util", "process", "rt", "sync"] }')
     shutil.copyfile(here / "FreRustPanel.vue", frontend / "src/components/ui/FreRustPanel.vue")
     shutil.copyfile(here / "FreRustLibrary.vue", frontend / "src/components/ui/FreRustLibrary.vue")
     shutil.copyfile(here / "RustInstanceGrid.vue", frontend / "src/components/ui/library/instance-group/RustInstanceGrid.vue")
