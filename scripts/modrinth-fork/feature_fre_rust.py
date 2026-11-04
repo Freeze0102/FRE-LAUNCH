@@ -23,11 +23,12 @@ def apply(root: Path):
 
     shutil.copyfile(here / "fre_rust_backend.rs", app / "src/api/fre_rust.rs")
     shutil.copyfile(here / "fre_rust_setup.rs", app / "src/api/fre_rust_setup.rs")
+    shutil.copyfile(here / "fre_rust_jdk.rs", app / "src/api/fre_rust_jdk.rs")
     # The independent first-run downloader uses Mojang HTTPS and pinned SHA-1,
     # not a second launcher, its CLI, or a separate Microsoft account.
     exactly(app / "Cargo.toml", "sha2 = { workspace = true }",
             'reqwest = { workspace = true, features = ["rustls-tls", "stream"] }\n'
-            'sha1 = { workspace = true }\nsha2 = { workspace = true }')
+            'sha1 = { workspace = true }\nsha2 = { workspace = true }\nzip = { workspace = true }')
     exactly(app / "Cargo.toml", 'tokio = { workspace = true, features = ["time"] }',
             'tokio = { workspace = true, features = ["time", "fs", "io-util", "process", "rt"] }')
     shutil.copyfile(here / "FreRustPanel.vue", frontend / "src/components/ui/FreRustPanel.vue")
@@ -429,6 +430,7 @@ onUnmounted(() => {
             'fre-rust.page.prep-local': ('Перевіряємо встановлені файли Minecraft…', 'Checking installed Minecraft files…'),
             'fre-rust.page.prep-download': ('Завантажуємо перевірені файли Minecraft із Mojang…', 'Downloading missing verified Minecraft files from Mojang…'),
             'fre-rust.page.prep-copy': ('Зберігаємо ресурси гри в кеш FRE LAUNCH…', 'Saving game resources in the FRE LAUNCH cache…'),
+            'fre-rust.page.prep-java': ('Перевіряємо Java 25 і, якщо потрібно, встановлюємо її у FRE LAUNCH…', 'Checking Java 25 and installing it privately in FRE LAUNCH if needed…'),
             'fre-rust.page.prep-prepare': ('Створюємо ресурси для нативної гри…', 'Preparing verified native Minecraft resources…'),
             'fre-rust.page.prep-ready': ('Ресурси Minecraft підготовлено.', 'Minecraft resources ready.'),
             'fre-rust.page.first-run-hint': (
