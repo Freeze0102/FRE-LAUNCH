@@ -178,6 +178,7 @@ def verify(root):
     rust_library=(root/"apps/app-frontend/src/components/ui/FreRustLibrary.vue").read_text(encoding="utf-8")
     unified_rust=(root/"apps/app-frontend/src/components/ui/library/instance-group/RustInstanceGrid.vue").read_text(encoding="utf-8")
     rust_detail=(root/"apps/app-frontend/src/pages/RustInstancePage.vue").read_text(encoding="utf-8")
+    managed_jdk=(root/"apps/app/src/api/fre_rust_jdk.rs").read_text(encoding="utf-8")
     rust_files=(root/"apps/app-frontend/src/components/ui/RustInstanceFiles.vue").read_text(encoding="utf-8")
     rust_routes=(root/"apps/app-frontend/src/routes.js").read_text(encoding="utf-8")
     unified_group=(root/"apps/app-frontend/src/components/ui/library/instance-group/index.vue").read_text(encoding="utf-8")
@@ -241,6 +242,13 @@ def verify(root):
     assert "use theseus::{State" not in rust_backend
     assert rust_backend.count("theseus::minecraft_auth::fre_rust_default_credentials()") == 2
     assert 'standalone_setup::prepare(' in rust_backend
+    assert 'mod managed_jdk;' in rust_backend
+    assert 'managed_jdk::ensure(data).await' in rust_setup
+    assert '--java-home' in rust_setup
+    assert 'api.adoptium.net' in managed_jdk and 'temurin25-binaries/releases/download/' in managed_jdk
+    for guard in ('valid_digest', 'sha2', 'MAX_ARCHIVE', 'MAX_EXPANDED',
+                  'enclosed_name()', 'valid_jdk', 'Refusing symbolic links'):
+        assert guard in managed_jdk, f"FRE Java provisioning safety check missing: {guard}"
     assert 'prepare_exe_sha256: String' in rust_backend
     assert 'preparer_hash.finalize()' in rust_backend
     assert 'root.join("fre-rust-prepare.exe").is_file()' in rust_backend
@@ -420,7 +428,7 @@ def verify(root):
     assert 'plugin:fre-horizon|' not in native_page, 'Native Rust page must not call Horizon Launcher'
     assert 'rust_import_mod' in (root / 'apps/app/build.rs').read_text(encoding="utf-8"), "Missing Tauri mod import permission"
     for key in ('fre-rust.mods.title', 'fre-rust.mods.import-file', 'fre-rust.mods.remove',
-                'fre-rust.page.first-run-hint', 'fre-rust.page.prep-prepare'):
+                'fre-rust.page.first-run-hint', 'fre-rust.page.prep-prepare', 'fre-rust.page.prep-java'):
         assert key in app_en and key in app_uk, f"Rust setup not translated: {key}"
     from feature_security_dependencies import workspace_overrides
     security = json.loads((Path(__file__).parent / 'security-dependencies.json').read_text(encoding="utf-8"))
