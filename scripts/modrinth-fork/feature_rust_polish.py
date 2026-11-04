@@ -17,7 +17,7 @@ def apply(root: Path) -> None:
     quick = frontend / "components/ui/QuickInstanceSwitcher.vue"
 
     exactly(quick, "import { useQuery } from '@tanstack/vue-query'",
-            "import { invoke } from '@tauri-apps/api/core'\nimport { useQuery } from '@tanstack/vue-query'")
+            "import { invoke } from '@tauri-apps/api/core'\nimport { listen } from '@tauri-apps/api/event'\nimport { useQuery } from '@tanstack/vue-query'")
     exactly(quick, "import NavButton from '@/components/ui/NavButton.vue'",
             "import NavButton from '@/components/ui/NavButton.vue'\n"
             "import ConfirmDeleteInstanceModal from '@/components/ui/modal/ConfirmDeleteInstanceModal.vue'")
@@ -28,6 +28,14 @@ function freInstanceIcon(instance) {
     return instance.freRustId && icon ? icon + '?v=' + (instance.modified ?? 0) : icon
 }
 const freRustInstances = ref([])
+const freRustRunningIds = ref([])
+let freRustProcessUnlisten = null
+let freRustListenerDisposed = false
+async function refreshFreRustRunning() {
+    try {
+        freRustRunningIds.value = await invoke('plugin:fre-rust|rust_running')
+    } catch { /* Do not interfere with the Java process manager. */ }
+}
 const freRustDeleteCandidate = ref(null)
 const freRustDeleteModal = ref(null)
 let freRustQueryId = 0
@@ -55,11 +63,13 @@ async function refreshFreRustInstances() {
         })
     } catch { /* Still show ordinary Java profiles without a Rust backend. */ }
     if (request === freRustQueryId) freRustInstances.value = native
+    void refreshFreRustRunning()
 }
 function freRustDetailUrl(instance) {
     return '/rust-instance/' + instance.freRustKind + '/' + encodeURIComponent(instance.freRustId)
 }
 async function playFreRustQuick(instance) {
+    if (freRustRunningIds.value.includes(instance.freRustId)) return
     try {
         if (instance.freRustKind === 'native') {
             let status = await invoke('plugin:fre-rust|rust_runtime')
@@ -74,7 +84,17 @@ async function playFreRustQuick(instance) {
                 return
             }
             await invoke('plugin:fre-rust|rust_launch', { profileId: instance.freRustId })
+            await refreshFreRustRunning()
         }
+    } catch (error) {
+        handleError(error instanceof Error ? error : new Error(String(error)))
+    }
+}
+async function stopFreRustQuick(instance) {
+    if (!freRustRunningIds.value.includes(instance.freRustId)) return
+    try {
+        await invoke('plugin:fre-rust|rust_stop', { profileId: instance.freRustId })
+        await refreshFreRustRunning()
     } catch (error) {
         handleError(error instanceof Error ? error : new Error(String(error)))
     }
@@ -105,14 +125,25 @@ async function deleteFreRustQuick() {
     exactly(quick,
             "onMounted(() => {\n\tresizeObserver = new ResizeObserver(updateMaxAuto)",
             """onMounted(() => {
+    freRustListenerDisposed = false
     window.addEventListener('fre-rust-library-refresh', refreshFreRustInstances)
+    window.addEventListener('focus', refreshFreRustRunning)
+    void listen('fre-rust-process-changed', () => { void refreshFreRustRunning() })
+        .then(unlisten => {
+            if (freRustListenerDisposed) unlisten()
+            else freRustProcessUnlisten = unlisten
+        }).catch(() => {})
     void refreshFreRustInstances()
 \tresizeObserver = new ResizeObserver(updateMaxAuto)""")
     exactly(quick,
             "onUnmounted(() => {\n\tresizeObserver?.disconnect()",
             """onUnmounted(() => {
     freRustQueryId++
+    freRustListenerDisposed = true
+    freRustProcessUnlisten?.()
+    freRustProcessUnlisten = null
     window.removeEventListener('fre-rust-library-refresh', refreshFreRustInstances)
+    window.removeEventListener('focus', refreshFreRustRunning)
 \tresizeObserver?.disconnect()""")
     exactly(quick,
             "async function playInstance(instance) {\n\tif (instance.quarantined",
@@ -122,14 +153,21 @@ async function deleteFreRustQuick() {
     exactly(quick,
             "async function stopInstance(instance) {\n\tawait kill(instance.id)",
             """async function stopInstance(instance) {
-    if (instance.freRustKind) return
+    if (instance.freRustKind) return stopFreRustQuick(instance)
 \tawait kill(instance.id)""")
     exactly(quick,
             "function openContextMenu(event, instance) {\n\tconst playing =",
             """function openContextMenu(event, instance) {
     if (instance.freRustKind) {
+        const playing = freRustRunningIds.value.includes(instance.freRustId)
         instanceOptions.value?.open(event, [
-            {
+            playing ? {
+                id: 'stop',
+                label: formatMessage(commonMessages.stopButton),
+                icon: StopCircleIcon,
+                tone: 'red',
+                action: () => void stopFreRustQuick(instance),
+            } : {
                 id: 'play',
                 label: formatMessage(commonMessages.playButton),
                 icon: PlayIcon,
@@ -178,6 +216,16 @@ async function deleteFreRustQuick() {
     exactly(quick,
             ':to="`/instance/${encodeURIComponent(instance.id)}`"',
             ':to="instance.freRustKind ? freRustDetailUrl(instance) : `/instance/${encodeURIComponent(instance.id)}`"')
+
+    exactly(quick,
+            'pad-transparent-corners\n\t\t\t\t\t/>',
+            '''pad-transparent-corners
+                    />
+                    <div
+                        v-if="instance.freRustKind && freRustRunningIds.includes(instance.freRustId)"
+                        class="absolute bottom-1 right-1 size-2.5 rounded-full border border-surface-1 bg-green"
+                        :aria-label="formatMessage(commonMessages.stopButton)"
+                    />''')
 
     # The right-hand onboarding checklist must count a native Rust profile as
     # a real first instance, rather than asking to create a Java one again.
