@@ -3,7 +3,7 @@ import { convertFileSrc, invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import {
   BoxesIcon, ChevronRightIcon, ClockIcon, FolderOpenIcon, GlobeIcon, MoreVerticalIcon,
-  PlayIcon, SettingsIcon, TerminalSquareIcon, TrashIcon,
+  PlayIcon, SettingsIcon, StopCircleIcon, TerminalSquareIcon, TrashIcon,
 } from '@modrinth/assets'
 import {
   Avatar, Button, commonMessages, defineMessages, IconButton, NavTabs, TabbedModal,
@@ -33,6 +33,8 @@ const m = defineMessages({
   worlds: { id: 'app.instance.tab.worlds', defaultMessage: 'Worlds' },
   logs: { id: 'app.instance.tab.logs', defaultMessage: 'Logs' },
   play: { id: 'fre-rust.grid.play', defaultMessage: 'Play' },
+  stop: { id: 'fre-rust.page.stop', defaultMessage: 'Stop' },
+  stopping: { id: 'fre-rust.page.stopping', defaultMessage: 'Stopping…' },
   setup: { id: 'fre-rust.grid.setup', defaultMessage: 'Set up game' },
   settings: { id: 'fre-rust.grid.settings', defaultMessage: 'Settings' },
   starting: { id: 'fre-rust.grid.starting', defaultMessage: 'Starting…' },
@@ -81,6 +83,8 @@ const runtime = ref<Runtime | null>(null)
 const error = ref('')
 const loading = ref(false)
 const launching = ref(false)
+const stopping = ref(false)
+const running = ref(false)
 const preparing = ref(false)
 const renaming = ref(false)
 const savingIcon = ref(false)
@@ -148,12 +152,14 @@ async function refresh() {
   error.value = ''
   try {
     if (kind.value !== 'native') throw new Error(t(m.unavailable))
-    const [profiles, status] = await Promise.all([
+    const [profiles, status, active] = await Promise.all([
       invoke<NativeProfile[]>('plugin:fre-rust|rust_profiles'),
       invoke<Runtime>('plugin:fre-rust|rust_runtime'),
+      invoke<string[]>('plugin:fre-rust|rust_running').catch(() => []),
     ])
     if (current !== generation) return
     runtime.value = status
+    running.value = active.includes(id.value)
     const found = profiles.find(item => item.id === id.value)
     if (!found) throw new Error(t(m.unavailable))
     profile.value = {
@@ -250,7 +256,7 @@ async function chooseResources() {
   } finally { preparing.value = false }
 }
 async function play() {
-  if (!profile.value || launching.value) return
+  if (!profile.value || launching.value || stopping.value || running.value) return
   // Play remains the only primary action, just like Fabric. If native
   // resources are missing, first attempt an authorized local preparation,
   // and report the REAL blocker if none is available.
@@ -263,10 +269,29 @@ async function play() {
   launching.value = true
   try {
     await invoke('plugin:fre-rust|rust_launch', { profileId: id.value })
+    await refreshRunning()
   } catch (err) {
     handleError(err instanceof Error ? err : new Error(String(err)))
   } finally {
     launching.value = false
+  }
+}
+async function refreshRunning() {
+  try {
+    const active = await invoke<string[]>('plugin:fre-rust|rust_running')
+    running.value = active.includes(id.value)
+  } catch { /* The profile's other tabs remain usable. */ }
+}
+async function stop() {
+  if (!running.value || stopping.value || launching.value) return
+  stopping.value = true
+  try {
+    await invoke('plugin:fre-rust|rust_stop', { profileId: id.value })
+    await refreshRunning()
+  } catch (err) {
+    handleError(err instanceof Error ? err : new Error(String(err)))
+  } finally {
+    stopping.value = false
   }
 }
 async function openFolder(folder = 'root') {
@@ -288,6 +313,7 @@ watch(() => [route.params.kind, route.params.id], () => { void refresh() }, { im
 watch(tab, next => { if (next === 'logs') void loadLogs() })
 const onRefresh = () => { void refresh() }
 let unlistenPrepareStage: (() => void) | null = null
+let unlistenProcess: (() => void) | null = null
 let stageListenerDisposed = false
 onMounted(() => {
   stageListenerDisposed = false
@@ -297,14 +323,23 @@ onMounted(() => {
     if (stageListenerDisposed) unlisten()
     else unlistenPrepareStage = unlisten
   }).catch(() => { /* Stage indicators are optional, not proof of success. */ })
+  void listen('fre-rust-process-changed', () => { void refreshRunning() })
+    .then(unlisten => {
+      if (stageListenerDisposed) unlisten()
+      else unlistenProcess = unlisten
+    }).catch(() => {})
   window.addEventListener('fre-rust-library-refresh', onRefresh)
+  window.addEventListener('focus', refreshRunning)
 })
 onUnmounted(() => {
   generation++
   stageListenerDisposed = true
   unlistenPrepareStage?.()
   unlistenPrepareStage = null
+  unlistenProcess?.()
+  unlistenProcess = null
   window.removeEventListener('fre-rust-library-refresh', onRefresh)
+  window.removeEventListener('focus', refreshRunning)
 })
 useRootBreadcrumb({
   slot: 'instance',
@@ -418,11 +453,12 @@ useRootBreadcrumb({
               color="brand"
               size="xl"
               native-type="button"
-              :disabled="launching || preparing"
-              @click="play"
+              :disabled="launching || stopping || preparing"
+              @click="running ? stop() : play()"
             >
-              <PlayIcon />
-              {{ preparing ? t(m.installing) : launching ? t(m.starting) : t(m.play) }}
+              <StopCircleIcon v-if="running" />
+              <PlayIcon v-else />
+              {{ preparing ? t(m.installing) : stopping ? t(m.stopping) : launching ? t(m.starting) : running ? t(m.stop) : t(m.play) }}
             </Button>
             <IconButton
               :label="t(m.settings)"
