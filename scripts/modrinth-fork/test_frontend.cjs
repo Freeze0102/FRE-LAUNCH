@@ -32,7 +32,7 @@ function component(file, invoke, instances = [], options = {}) {
     '@tauri-apps/plugin-opener': { openUrl: options.openUrl || (async () => {}) },
     '@tauri-apps/plugin-dialog': { open: options.open || (async () => null) },
     '@/helpers/instance': { list: async () => instances, add_project_from_path: options.addProjectFromPath || (async () => {}) },
-    '@modrinth/assets': { PlayIcon: {}, CheckIcon: {}, SettingsIcon: {}, TrashIcon: {}, FolderOpenIcon: {} },
+    '@modrinth/assets': { PlayIcon: {}, StopCircleIcon: {}, CheckIcon: {}, SettingsIcon: {}, TrashIcon: {}, FolderOpenIcon: {} },
     '@/components/ui/library/use-library': {
       getLibraryInstanceSelectionKey: ({ instanceId, groupId }) => JSON.stringify([groupId, instanceId]),
       useLibrary: () => {
@@ -62,7 +62,7 @@ function component(file, invoke, instances = [], options = {}) {
     vue: { ...vue, onMounted: f => mounted.push(f), onUnmounted: f => unmounted.push(f) },
   }
   const names = file === 'RustInstanceGrid.vue'
-    ? 'cards,nativeProfiles,runtime,refresh,openCard,play,cardStyle,viewInstance,detailUrl,busy,selectCard,isSelected,activateCard'
+    ? 'cards,nativeProfiles,runtime,refresh,refreshRunning,runningIds,isRunning,openCard,play,stop,cardStyle,viewInstance,detailUrl,busy,selectCard,isSelected,activateCard'
     : file === 'RustNativeMods.vue'
     ? 'installed,busy,error,notice,load,importFile,removeMod,openFolder'
     : file === 'CurseForgeBrowser.vue'
@@ -384,6 +384,51 @@ test('Native Rust profiles use Java InstanceCardView and navigate to the real pa
   assert.doesNotMatch(grid, /<Teleport|role="dialog"|<article/)
 })
 
+test('Running native Rust instance shows Stop, and rejects duplicate Play', async () => {
+  const calls = []
+  let running = false
+  const c = component('RustInstanceGrid.vue', async (command, args) => {
+    calls.push({ command, args })
+    if (command.endsWith('|rust_profiles')) return [{ id: '77', name: 'Native Rust', created: 1 }]
+    if (command.endsWith('|rust_runtime')) return { installed: true, prepared: true, version: '26.3', reason: null }
+    if (command.endsWith('|rust_running')) return running ? ['77'] : []
+    if (command.endsWith('|rust_launch')) {
+      if (running) throw Error('Backend must reject a duplicate launch')
+      running = true
+      return 'started'
+    }
+    if (command.endsWith('|rust_stop')) {
+      running = false
+      return 'stop requested'
+    }
+    throw Error('Unexpected command: ' + command)
+  }, [], {
+    props: { startIndex: 0, columnCount: 1, cardWidth: 140, cardHeight: 180, gap: 12, compact: false, search: '' },
+  })
+  await c.state.refresh()
+  const card = c.state.cards.value[0]
+  assert.equal(c.state.isRunning(card), false)
+  await c.state.play(card)
+  assert.equal(c.state.isRunning(card), true)
+  await c.state.play(card)
+  assert.equal(calls.filter(x => x.command.endsWith('|rust_launch')).length, 1)
+  await c.state.stop(card)
+  assert.equal(c.state.isRunning(card), false)
+  assert.equal(calls.filter(x => x.command.endsWith('|rust_stop')).length, 1)
+  const grid = fs.readFileSync(path.join(__dirname, 'RustInstanceGrid.vue'), 'utf8')
+  const page = fs.readFileSync(path.join(__dirname, 'RustInstancePage.vue'), 'utf8')
+  const backend = fs.readFileSync(path.join(__dirname, 'fre_rust_backend.rs'), 'utf8')
+  const polish = fs.readFileSync(path.join(__dirname, 'feature_rust_polish.py'), 'utf8')
+  assert.match(grid, /fre-rust-process-changed/)
+  assert.match(page, /fre-rust-process-changed/)
+  assert.match(polish, /fre-rust-process-changed/)
+  assert.match(polish, /plugin:fre-rust\|rust_stop/)
+  assert.match(backend, /async fn rust_running\(/)
+  assert.match(backend, /async fn rust_stop\(/)
+  assert.match(backend, /RUNNING_PROFILES\.lock\(\)\.await\.retain/)
+  assert.match(backend, /STOP_SIGNALS\.lock\(\)\.await\.remove/)
+})
+
 test('Missing Horizon executable never obscures native Rust or invents a second library', async () => {
   const navigated = []
   const c = component('RustInstanceGrid.vue', async command => {
@@ -425,7 +470,7 @@ test('Native Rust uses native game launch, page-specific Files and settings, nev
   assert.match(page, /plugin:fre-rust\|rust_rename_profile/)
   assert.match(page, /plugin:fre-rust\|rust_delete_profile/)
   assert.match(page, /plugin:fre-rust\|rust_import_resources/)
-  assert.match(page, /launching \? t\(m.starting\) : t\(m.play\)/)
+  assert.match(page, /running \? t\(m.stop\) : t\(m.play\)/)
   assert.match(page, /<NavTabs/)
   assert.match(page, /query="tab"/)
   assert.match(page, /<Transition name="fre-rust-tab"/)
