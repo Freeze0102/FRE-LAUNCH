@@ -4,7 +4,7 @@
 //! over HTTPS with a publisher-provided SHA-256 and extracted only under FRE's
 //! own application data. Neither Horizon Launcher nor a global Java install
 //! is required. No JVM bytes are redistributed with the FRE installer.
-use std::{fs, io::{Read, Write}, path::{Component, Path, PathBuf}, time::Duration};
+use std::{fs, io::Write, path::{Component, Path, PathBuf}, time::Duration};
 use sha2::{Digest, Sha256};
 use tokio::{io::AsyncWriteExt, process::Command};
 
@@ -48,11 +48,20 @@ async fn version(output: &Path, argument: &str) -> bool {
         String::from_utf8_lossy(&result.stdout),
         String::from_utf8_lossy(&result.stderr)
     );
-    if argument == "--version" {
-        text.lines().any(|line| line.trim_start().starts_with("javac 25"))
-    } else {
-        text.contains("version \"25.") || text.contains("version 25.")
-    }
+    reports_java_25(&text, argument == "--version")
+}
+
+fn reports_java_25(text: &str, compiler: bool) -> bool {
+    text.lines().any(|line| {
+        let line = line.trim();
+        let value = if compiler {
+            line.strip_prefix("javac ")
+        } else {
+            line.strip_prefix("openjdk version ").or_else(|| line.strip_prefix("java version "))
+        };
+        value.and_then(|value| value.trim_start_matches('"').split(['.', '-', '+', '"', ' ']).next())
+            .is_some_and(|major| major == "25")
+    })
 }
 
 async fn valid_jdk(home: &Path) -> bool {
@@ -193,7 +202,7 @@ async fn download_jdk(archive: &Path) -> Result<(), String> {
         .timeout(Duration::from_secs(20 * 60))
         .redirect(redirect)
         .build().map_err(|e| e.to_string())?;
-    let meta = reqwest::Client::builder()
+    let mut meta = reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::none())
         .timeout(Duration::from_secs(20))
         .build().map_err(|e| e.to_string())?
@@ -203,8 +212,13 @@ async fn download_jdk(archive: &Path) -> Result<(), String> {
     if meta.content_length().is_some_and(|len| len > 2 * 1024 * 1024) {
         return Err("Unexpected Adoptium metadata size.".into());
     }
-    let raw = meta.bytes().await.map_err(|e| e.to_string())?;
-    if raw.len() > 2 * 1024 * 1024 { return Err("Unexpected Adoptium metadata size.".into()); }
+    let mut raw = Vec::new();
+    while let Some(chunk) = meta.chunk().await.map_err(|e| e.to_string())? {
+        if raw.len() + chunk.len() > 2 * 1024 * 1024 {
+            return Err("Unexpected Adoptium metadata size.".into());
+        }
+        raw.extend_from_slice(&chunk);
+    }
     let releases: serde_json::Value = serde_json::from_slice(&raw)
         .map_err(|e| format!("Invalid Adoptium JDK metadata: {e}"))?;
     let binary = releases.as_array().and_then(|versions| versions.first())
@@ -297,5 +311,14 @@ mod tests {
         assert!(binary_download_url("http://github.com/adoptium/temurin25-binaries/releases/download/file.zip").is_err());
         assert!(binary_download_url("https://example.com/adoptium/fake.zip").is_err());
         assert!(!valid_digest("deadbeef"));
+    }
+    #[test]
+    fn accepts_exact_java_25_ga_and_patch_releases() {
+        assert!(reports_java_25("openjdk version \"25\" 2025-09-16", false));
+        assert!(reports_java_25("openjdk version \"25.0.1\" 2025-10-21", false));
+        assert!(reports_java_25("javac 25", true));
+        assert!(reports_java_25("javac 25.0.1", true));
+        assert!(!reports_java_25("javac 250", true));
+        assert!(!reports_java_25("openjdk version \"21.0.9\"", false));
     }
 }

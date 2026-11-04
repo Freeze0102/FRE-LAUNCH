@@ -5,6 +5,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+import tomllib
 import unittest
 from unittest.mock import patch
 
@@ -18,6 +19,11 @@ TEMP_ROOT.mkdir(exist_ok=True)
 
 
 class PatchTests(unittest.TestCase):
+    def test_vendored_engine_matches_the_complete_pinned_git_tree(self):
+        import native_source
+        meta = native_source.verify(REPOSITORY / 'vendor/fre-rust-source')
+        self.assertFalse(meta['proprietary_minecraft_assets_included'])
+
     def test_security_lock_drift_cannot_mutate_workspace(self):
         import feature_security_dependencies
         with tempfile.TemporaryDirectory(dir=TEMP_ROOT, prefix='test-security-drift-') as directory:
@@ -90,14 +96,23 @@ class PatchTests(unittest.TestCase):
             shutil.copytree(UPSTREAM, root, ignore=shutil.ignore_patterns('.git', 'target', 'node_modules'))
             prepare.customize(root, sha)
             verify.verify(root)
+            # Catch duplicate dependency keys before spending Windows build time.
+            for manifest in root.rglob('Cargo.toml'):
+                with self.subTest(manifest=str(manifest.relative_to(root))):
+                    tomllib.loads(manifest.read_text(encoding='utf-8'))
             main = root / 'apps/app/src/main.rs'
             before = main.read_bytes()
             with self.assertRaisesRegex(RuntimeError, 'already customized'):
                 prepare.customize(root, sha)
             self.assertEqual(main.read_bytes(), before)
             capability = json.loads((root / 'apps/app/capabilities/plugins.json').read_text())
-            self.assertTrue({'fre-curseforge:default', 'fre-horizon:default', 'fre-rust:default'} <= set(
+            self.assertTrue({'fre-curseforge:default', 'fre-rust:default'} <= set(
                 p for p in capability['permissions'] if isinstance(p, str)))
+            self.assertNotIn('fre-horizon:default', capability['permissions'])
+            app_config = json.loads((root / 'apps/app/tauri.conf.json').read_text())
+            icon_scope = app_config['app']['security']['assetProtocol']['scope']
+            for extension in ('png', 'jpg', 'webp'):
+                self.assertIn(f'$APPDATA/fre-rust-minecraft/profiles/*/icon.{extension}', icon_scope)
             # Optionally retain this exact verified result for local compilation.
             destination = os.environ.get('FRE_AUDIT_SOURCE')
             if destination:

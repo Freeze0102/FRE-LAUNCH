@@ -35,7 +35,7 @@ goto done
 :build
 echo.
 echo --- REAL MODRINTH SOURCE / WINDOWS INSTALLER ---
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0FRE-MODRINTH-LOCAL.ps1" -BuildWindows
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0BUILD-FRE-WINDOWS.ps1"
 if errorlevel 1 goto failure
 if exist "%~dp0FRE-Modrinth-Source\target\release\bundle\nsis" (
  explorer "%~dp0FRE-Modrinth-Source\target\release\bundle\nsis"

@@ -85,6 +85,8 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw 'Preflight Vite production frontend build failed' }
             node "$env:GITHUB_WORKSPACE/scripts/modrinth-fork/test_frontend.cjs" $preflight
             if ($LASTEXITCODE -ne 0) { throw 'Preflight content/profile regression tests failed' }
+            node "$env:GITHUB_WORKSPACE/scripts/modrinth-fork/test_build_scripts.cjs" $preflight
+            if ($LASTEXITCODE -ne 0) { throw 'Workflow / PowerShell syntax validation failed' }
           } finally { Pop-Location }
           # Verify the actual pinned Tauri 2.5 CLI options before costly Rust compilation.
           Push-Location $preflight
@@ -95,21 +97,21 @@ jobs:
               if (!$buildHelp.Contains($requiredFlag)) { throw "Unsupported Tauri option: $requiredFlag" }
             }
           } finally { Pop-Location }
-          Write-Host 'Full Vue typecheck, 18 regression tests and Tauri option preflight passed.'
+          Write-Host 'Full Vue typecheck, component regressions, build-script syntax and Tauri option preflight passed.'
 
       - name: Restore already-compiled Windows preview when sources are identical
         id: preview-cache
         uses: actions/cache/restore@v4
         with:
           path: preview-pending
-          key: frelaunch-0510-compiled-nsis-${{ hashFiles('scripts/modrinth-fork/*.py', 'scripts/modrinth-fork/*.rs', 'scripts/modrinth-fork/*.vue', 'scripts/modrinth-fork/*.ts', 'scripts/modrinth-fork/*.cjs', 'scripts/modrinth-fork/*.json', 'FRE-MODRINTH-LOCAL.ps1', 'update-channel.json') }}
+          key: frelaunch-0510-compiled-nsis-${{ hashFiles('scripts/modrinth-fork/*.ps1', 'vendor/fre-rust-source/FRE-VENDORED-SOURCE.json', 'scripts/modrinth-fork/*.py', 'scripts/modrinth-fork/*.rs', 'scripts/modrinth-fork/*.vue', 'scripts/modrinth-fork/*.ts', 'scripts/modrinth-fork/*.cjs', 'scripts/modrinth-fork/*.json', 'FRE-MODRINTH-LOCAL.ps1', 'update-channel.json') }}
 
       - name: Restore pinned native Rust engine if previously compiled
         id: rust-engine-cache
         uses: actions/cache/restore@v4
         with:
           path: scripts/modrinth-fork/fre-rust-runtime
-          key: frelaunch-windows-x64-rust-975c07d9151847e6af13afc4b5ab37b6bbe78ef5-v2
+          key: frelaunch-windows-x64-rust-975c07d9151847e6af13afc4b5ab37b6bbe78ef5-v3
 
       - name: Build MIT-only native game engine
         if: steps.preview-cache.outputs.cache-hit != 'true' && steps.rust-engine-cache.outputs.cache-hit != 'true'
@@ -127,7 +129,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: scripts/modrinth-fork/fre-rust-runtime
-          key: frelaunch-windows-x64-rust-975c07d9151847e6af13afc4b5ab37b6bbe78ef5-v2
+          key: frelaunch-windows-x64-rust-975c07d9151847e6af13afc4b5ab37b6bbe78ef5-v3
 
       - name: Verify fresh or cached native engine digest and license
         if: steps.preview-cache.outputs.cache-hit != 'true'
@@ -172,6 +174,10 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw 'Translation generation failed' }
             pnpm.cmd --filter '@modrinth/app-frontend' run tsc:check
             if ($LASTEXITCODE -ne 0) { throw 'Vue typecheck failed' }
+            pnpm.cmd --filter '@modrinth/app-frontend' exec vite build
+            if ($LASTEXITCODE -ne 0) { throw 'Frontend required by Rust test codegen failed' }
+            cargo test --locked -p theseus_gui
+            if ($LASTEXITCODE -ne 0) { throw 'FRE native backend unit tests failed' }
             node ../scripts/modrinth-fork/test_frontend.cjs .
             if ($LASTEXITCODE -ne 0) { throw 'Content and profile regression tests failed' }
           } finally { Pop-Location }
@@ -188,7 +194,7 @@ jobs:
             $env:TAURI_SIGNING_PRIVATE_KEY = $null
             $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = $null
             $configFile = 'apps/app/tauri.preview.conf.json'
-            Set-Content -LiteralPath $configFile -Value '{"bundle":{"createUpdaterArtifacts":false}}' -Encoding utf8
+            Set-Content -LiteralPath $configFile -Value '{"build":{"beforeBuildCommand":""},"bundle":{"createUpdaterArtifacts":false}}' -Encoding utf8
             if ((Get-Content -LiteralPath $configFile -Raw | ConvertFrom-Json).bundle.createUpdaterArtifacts -ne $false) {
               throw 'Preview config must disable signed updater artifacts'
             }
@@ -225,7 +231,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: preview-pending
-          key: frelaunch-0510-compiled-nsis-${{ hashFiles('scripts/modrinth-fork/*.py', 'scripts/modrinth-fork/*.rs', 'scripts/modrinth-fork/*.vue', 'scripts/modrinth-fork/*.ts', 'scripts/modrinth-fork/*.cjs', 'scripts/modrinth-fork/*.json', 'FRE-MODRINTH-LOCAL.ps1', 'update-channel.json') }}
+          key: frelaunch-0510-compiled-nsis-${{ hashFiles('scripts/modrinth-fork/*.ps1', 'vendor/fre-rust-source/FRE-VENDORED-SOURCE.json', 'scripts/modrinth-fork/*.py', 'scripts/modrinth-fork/*.rs', 'scripts/modrinth-fork/*.vue', 'scripts/modrinth-fork/*.ts', 'scripts/modrinth-fork/*.cjs', 'scripts/modrinth-fork/*.json', 'FRE-MODRINTH-LOCAL.ps1', 'update-channel.json') }}
 
       - name: Verify compiled preview cache and check file integrity
         shell: pwsh
@@ -263,7 +269,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $folder = Join-Path $env:RUNNER_TEMP 'FRELaunch0510Preview'
-          $installer = Start-Process -FilePath $env:PREVIEW_INSTALLER -ArgumentList @('/S',"/D=$folder") -Wait -PassThru
+          $installer = Start-Process -FilePath $env:PREVIEW_INSTALLER -ArgumentList @('/S',"/D=$folder") -WindowStyle Hidden -Wait -PassThru
           if ($installer.ExitCode -ne 0) { throw "Preview installer failed: $($installer.ExitCode)" }
           # The bundled native Rust game is also an EXE. Launch exactly FRE LAUNCH,
           # never the largest arbitrary bundled program.

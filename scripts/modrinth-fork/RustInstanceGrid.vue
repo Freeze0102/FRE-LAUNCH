@@ -12,7 +12,7 @@ import type { GameInstance } from '@/helpers/types'
 // Rust has its own real game engine. Only the VISUAL Java card is reused;
 // a Rust profile must never be passed to Java's installer, process manager,
 // bulk-delete routines or instance query APIs.
-type NativeProfile = { id: string; name: string; created: number; iconPath?: string | null }
+type NativeProfile = { id: string; name: string; created: number; modified?: number; iconPath?: string | null }
 type Runtime = { installed: boolean; prepared: boolean; version: string; reason: string | null }
 type Card = {
   key: string
@@ -23,6 +23,7 @@ type Card = {
   version: string
   ready: boolean
   created?: number
+  modified?: number
 }
 
 const props = defineProps<{
@@ -64,6 +65,7 @@ const cards = computed<Card[]>(() => {
     version: runtime.value?.version || '26.3',
     ready: runtime.value?.installed === true && runtime.value?.prepared === true,
     created: profile.created,
+    modified: profile.modified,
   }))
   const term = props.search.trim().toLocaleLowerCase()
   return native.filter(card =>
@@ -99,7 +101,7 @@ function viewInstance(card: Card): GameInstance {
     loader: 'Rust',
     game_version: card.version,
     icon_path: card.iconPath ?? null,
-    modified: card.created ?? 0,
+    modified: card.modified ?? card.created ?? 0,
   } as unknown as GameInstance
 }
 

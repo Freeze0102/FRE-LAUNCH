@@ -12,15 +12,11 @@ use tauri::Emitter;
 use tokio::{io::AsyncWriteExt, process::Command, task::JoinSet};
 
 const GAME_VERSION: &str = "26.3";
-const MANIFEST_URL: &str = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
 const MAX_JSON: usize = 12 * 1024 * 1024;
 const MAX_GAME_FILE: u64 = 200 * 1024 * 1024;
 const MAX_ASSET: u64 = 32 * 1024 * 1024;
 const MAX_SOURCE_FILES: usize = 512;
 
-fn sha1_hex(bytes: &[u8]) -> String {
-    format!("{:x}", Sha1::digest(bytes))
-}
 fn valid_sha1(hash: &str) -> bool {
     hash.len() == 40 && hash.bytes().all(|b| b.is_ascii_hexdigit())
 }
@@ -69,34 +65,15 @@ fn required_string<'a>(value: &'a Value, key: &str) -> Result<&'a str, String> {
     value.get(key).and_then(Value::as_str)
         .ok_or_else(|| format!("Mojang metadata is missing {key}."))
 }
-fn allowed_hash(lock: &Value, name: &str, alternative: &str, hash: &str) -> bool {
-    let game = &lock["minecraft"];
-    game[name].as_str() == Some(hash)
-        || game[alternative].as_array().is_some_and(|accepted|
-            accepted.iter().any(|v| v.as_str() == Some(hash)))
+fn pinned_version(lock: &Value) -> Result<(String, String), String> {
+    if lock["minecraft"]["version"] != GAME_VERSION {
+        return Err("Wrong Minecraft version in native source lock.".into());
+    }
+    let hash = required_string(&lock["minecraft"], "manifest_sha1")?;
+    if !valid_sha1(hash) { return Err("Invalid pinned Minecraft manifest hash.".into()); }
+    Ok((format!("https://piston-meta.mojang.com/v1/packages/{hash}/{GAME_VERSION}.json"), hash.to_owned()))
 }
 
-async fn json(client: &Client, url: &str) -> Result<(Vec<u8>, Value), String> {
-    trusted_mojang_url(url)?;
-    let mut response = client.get(url).send().await.map_err(|e| format!("Mojang download failed: {e}"))?
-        .error_for_status().map_err(|e| format!("Mojang returned an HTTP error: {e}"))?;
-    if response.content_length().is_some_and(|size| size > MAX_JSON as u64) {
-        return Err("Mojang metadata exceeds the allowed size.".into());
-    }
-    // A missing/misleading HTTP Content-Length must never allow unlimited
-    // allocation before checking the real metadata size.
-    let mut bytes = Vec::<u8>::new();
-    while let Some(chunk) = response.chunk().await
-        .map_err(|e| format!("Cannot read Mojang metadata: {e}"))? {
-        if bytes.len().checked_add(chunk.len()).is_none_or(|size| size > MAX_JSON) {
-            return Err("Mojang metadata is too large.".into());
-        }
-        bytes.extend_from_slice(&chunk);
-    }
-    let value: Value = serde_json::from_slice(&bytes)
-        .map_err(|e| format!("Invalid Mojang version data: {e}"))?;
-    Ok((bytes, value))
-}
 
 /// Download into FRE-owned cache only; never overwrite a user's existing
 /// Minecraft launcher, world, mod, account or configuration files.
@@ -262,24 +239,33 @@ fn verified_preparer(bundle: &Path) -> Result<PathBuf, String> {
     Ok(exe)
 }
 
+pub async fn check(bundle: &Path, resources: &Path) -> Result<(), String> {
+    let exe = verified_preparer(bundle)?;
+    let mut cmd = Command::new(exe);
+    cmd.arg("--check").arg("--root").arg(bundle).arg("--output").arg(resources).kill_on_drop(true);
+    #[cfg(windows)]
+    cmd.creation_flags(0x08000000);
+    let result = tokio::time::timeout(Duration::from_secs(60), cmd.output()).await
+        .map_err(|_| "Native resource verification timed out.")?
+        .map_err(|e| format!("Cannot verify native resources: {e}"))?;
+    if !result.status.success() {
+        return Err(format!("Minecraft resources need repair: {} {}",
+            String::from_utf8_lossy(&result.stdout).chars().take(1200).collect::<String>(),
+            String::from_utf8_lossy(&result.stderr).chars().take(600).collect::<String>()));
+    }
+    Ok(())
+}
+
 async fn acquire_game(client: &Client, data: &Path, lock: &Value) -> Result<PathBuf, String> {
     let minecraft = data.join("minecraft-26.3-cache");
     fs::create_dir_all(&minecraft).map_err(|e| e.to_string())?;
 
-    // The official version index only supplies an address and expected SHA-1.
-    // The pinned research lock independently restricts which game version
-    // manifest and Minecraft client/server binaries can be accepted.
-    let (_, version_index) = json(client, MANIFEST_URL).await?;
-    let versions = version_index["versions"].as_array().ok_or("Mojang versions index is missing.")?;
-    let version = versions.iter().find(|v| v["id"] == GAME_VERSION)
-        .ok_or("Minecraft 26.3 was not found in Mojang's version index.")?;
-    let version_url = required_string(version, "url")?;
-    let version_sha = required_string(version, "sha1")?;
-    if !allowed_hash(lock, "manifest_sha1", "accepted_manifest_sha1", version_sha) {
-        return Err("Mojang's Minecraft 26.3 version JSON is not pinned by this FRE Rust build.".into());
-    }
+    // Mojang republishes release metadata for new translations. Request the
+    // immutable content-addressed version pinned by THIS native engine, rather
+    // than failing every clean install when the latest version index changes.
+    let (version_url, version_sha) = pinned_version(lock)?;
     let version_path = minecraft.join("versions").join(GAME_VERSION).join("26.3.json");
-    download_to(client, version_url, &version_path, version_sha, MAX_JSON as u64).await?;
+    download_to(client, &version_url, &version_path, &version_sha, MAX_JSON as u64).await?;
     let raw = fs::read(&version_path).map_err(|e| e.to_string())?;
     let game: Value = serde_json::from_slice(&raw).map_err(|e| e.to_string())?;
     if game["id"] != GAME_VERSION { return Err("Wrong Minecraft version manifest.".into()); }
@@ -315,9 +301,10 @@ async fn acquire_game(client: &Client, data: &Path, lock: &Value) -> Result<Path
     let id = required_string(index, "id")?;
     if !safe_name(id) { return Err("Unsafe Mojang asset index name.".into()); }
     let index_hash = required_string(index, "sha1")?;
-    if !allowed_hash(lock, "asset_index_sha1", "accepted_asset_index_sha1", index_hash) {
-        return Err("Minecraft asset index does not match the verified 26.3 pins.".into());
-    }
+    // The descriptor (including this SHA-1) is authenticated by the pinned
+    // version JSON above. The lock's accepted_asset_index_sha1 lists OTHER
+    // republished indexes, and does not necessarily include this primary one.
+    if !valid_sha1(index_hash) { return Err("Invalid pinned Minecraft asset index hash.".into()); }
     let index_url = required_string(index, "url")?;
     let index_path = minecraft.join("assets/indexes").join(format!("{id}.json"));
     download_to(client, index_url, &index_path, index_hash, MAX_JSON as u64).await?;
@@ -419,5 +406,15 @@ mod tests {
         assert!(safe_relative("../world/saves").is_err());
         assert!(safe_relative("C:\\temp\\game.jar").is_err());
         assert!(!valid_sha1("not-a-hash"));
+    }
+    #[test]
+    fn uses_the_immutable_engine_manifest_when_mojang_republishes_the_release() {
+        let lock = serde_json::json!({"minecraft": {
+            "version": "26.3", "manifest_sha1": "11f1aefe473eefba0af62e3286c33b692807b2eb"
+        }});
+        let (url, hash) = pinned_version(&lock).unwrap();
+        assert_eq!(url, "https://piston-meta.mojang.com/v1/packages/11f1aefe473eefba0af62e3286c33b692807b2eb/26.3.json");
+        assert_eq!(hash, "11f1aefe473eefba0af62e3286c33b692807b2eb");
+        assert!(pinned_version(&serde_json::json!({"minecraft": {"version":"26.4"}})).is_err());
     }
 }

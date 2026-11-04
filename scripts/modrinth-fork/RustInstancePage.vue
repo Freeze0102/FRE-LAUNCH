@@ -19,9 +19,9 @@ import ConfirmDeleteInstanceModal from '@/components/ui/modal/ConfirmDeleteInsta
 import type { GameInstance } from '@/helpers/types'
 import { useRootBreadcrumb } from '@/shared/breadcrumbs'
 
-type NativeProfile = { id: string; name: string; created: number; iconPath?: string | null }
+type NativeProfile = { id: string; name: string; created: number; modified?: number; iconPath?: string | null }
 type Runtime = { installed: boolean; prepared: boolean; version: string; reason: string | null }
-type Profile = { id: string; name: string; iconPath?: string | null; version: string; ready: boolean }
+type Profile = { id: string; name: string; modified?: number; iconPath?: string | null; version: string; ready: boolean }
 
 const route = useRoute()
 const router = useRouter()
@@ -47,6 +47,9 @@ const m = defineMessages({
   retry: { id: 'fre-rust.page.retry', defaultMessage: 'Refresh' },
   rename: { id: 'fre-rust.page.rename', defaultMessage: 'Name' },
   saveName: { id: 'fre-rust.page.save-name', defaultMessage: 'Save name' },
+  changeIcon: { id: 'fre-rust.page.change-icon', defaultMessage: 'Choose icon' },
+  resetIcon: { id: 'fre-rust.page.reset-icon', defaultMessage: 'Restore default icon' },
+  repair: { id: 'fre-rust.page.repair', defaultMessage: 'Check and repair game resources' },
   delete: { id: 'fre-rust.page.delete', defaultMessage: 'Delete instance' },
   install: { id: 'fre-rust.page.install', defaultMessage: 'Install game resources' },
   installing: { id: 'fre-rust.page.installing', defaultMessage: 'Preparing Minecraft…' },
@@ -80,6 +83,7 @@ const loading = ref(false)
 const launching = ref(false)
 const preparing = ref(false)
 const renaming = ref(false)
+const savingIcon = ref(false)
 const deleting = ref(false)
 const editedName = ref('')
 const setupError = ref('')
@@ -92,7 +96,7 @@ const displayInstance = computed(() => profile.value ? ({
   icon_path: profile.value.iconPath ?? null,
   loader: 'rust',
   game_version: profile.value.version,
-  modified: 0,
+  modified: profile.value.modified ?? 0,
 }) as unknown as GameInstance : null)
 const logs = ref('')
 const basePath = computed(() =>
@@ -114,7 +118,7 @@ const settingsTabs = [
 ]
 
 const iconSrc = computed(() =>
-  profile.value?.iconPath ? convertFileSrc(profile.value.iconPath) : undefined,
+  profile.value?.iconPath ? convertFileSrc(profile.value.iconPath) + '?v=' + (profile.value.modified ?? 0) : undefined,
 )
 const prepareStageText = computed(() => {
   const labels: Record<string, keyof typeof m> = {
@@ -154,6 +158,7 @@ async function refresh() {
     if (!found) throw new Error(t(m.unavailable))
     profile.value = {
       id: found.id, name: found.name, iconPath: found.iconPath,
+      modified: found.modified,
       version: status.version || '26.3', ready: status.installed && status.prepared,
     }
     if (tab.value === 'logs') void loadLogs()
@@ -195,6 +200,24 @@ async function deleteProfile() {
   } catch (err) {
     handleError(err instanceof Error ? err : new Error(String(err)))
   } finally { deleting.value = false }
+}
+async function changeIcon(reset = false) {
+  if (savingIcon.value || !profile.value) return
+  let source: string | null = null
+  if (!reset) {
+    const { open } = await import('@tauri-apps/plugin-dialog')
+    const selected = await open({ multiple: false, filters: [{ name: 'PNG / JPEG / WebP', extensions: ['png', 'jpg', 'jpeg', 'webp'] }] })
+    if (typeof selected !== 'string') return
+    source = selected
+  }
+  savingIcon.value = true
+  try {
+    await invoke('plugin:fre-rust|rust_set_profile_icon', { profileId: id.value, source })
+    await refresh()
+    window.dispatchEvent(new Event('fre-rust-library-refresh'))
+  } catch (err) {
+    handleError(err instanceof Error ? err : new Error(String(err)))
+  } finally { savingIcon.value = false }
 }
 async function autoPrepare() {
   if (kind.value !== 'native' || preparing.value) return false
@@ -330,6 +353,11 @@ useRootBreadcrumb({
               </Button>
             </div>
           </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <Avatar :src="iconSrc" size="64px" :tint-by="id" pad-transparent-corners />
+            <Button :disabled="savingIcon" @click="changeIcon()">{{ t(m.changeIcon) }}</Button>
+            <Button type="outlined" :disabled="savingIcon" @click="changeIcon(true)">{{ t(m.resetIcon) }}</Button>
+          </div>
           <div>
             <h3 class="m-0 text-lg font-semibold text-contrast">{{ t(m.openFolder) }}</h3>
             <Button type="outlined" class="mt-2" @click="openFolder()"><FolderOpenIcon />{{ t(m.openFolder) }}</Button>
@@ -346,8 +374,8 @@ useRootBreadcrumb({
           <h3 class="m-0 text-lg font-semibold text-contrast">{{ t(m.resources) }}</h3>
           <p class="m-0 text-sm text-secondary">{{ profile.ready ? t(m.play) : statusText }}</p>
           <div class="flex flex-wrap gap-2">
-            <Button v-if="kind === 'native' && !profile.ready" :disabled="preparing" @click="autoPrepare">
-              {{ preparing ? t(m.installing) : t(m.install) }}
+            <Button v-if="kind === 'native'" :disabled="preparing" @click="autoPrepare">
+              {{ preparing ? t(m.installing) : profile.ready ? t(m.repair) : t(m.install) }}
             </Button>
 
             <Button v-if="kind === 'native' && !profile.ready" type="outlined" :disabled="preparing" @click="chooseResources">

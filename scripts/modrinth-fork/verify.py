@@ -280,9 +280,8 @@ def verify(root):
         assert (runtime_source/"crates/horizon-prepare/Cargo.toml").is_file()
         assert (runtime_source/"crates/horizon-prepare/build.rs").is_file()
         assert len(list((runtime_source/"crates/horizon-prepare/src").glob("*.rs"))) >= 10
-        assert rust_mapping.get("fre-rust-runtime/resources/") == (
-            "fre-rust/resources/" if (runtime_source/"resources/horizon-resources.json").is_file() else None
-        )
+        assert "fre-rust-runtime/resources/" not in rust_mapping
+        assert not (runtime_source/"resources").exists(), "Private Minecraft resources must not be bundled"
     else:
         assert "fre-rust-runtime/fre-rust-client.exe" not in rust_mapping
 

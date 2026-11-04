@@ -1,18 +1,16 @@
-# Build a PRIVATE FRE LAUNCH Windows installer with the native Rust game.
-# Runs on the owner's Windows PC using a locally owned Minecraft Java copy.
+# Build FRE LAUNCH with the MIT native game and bundled resource preparer.
+# Owned Minecraft assets are prepared privately after installation.
 # Never triggers GitHub Actions, uploads binaries, or touches Minecraft worlds.
 param(
-    [string]$MinecraftDir = "",
-    [string]$ServerJar = ""
+    [switch]$Preview,
+    [string]$PythonExe = $env:FRE_LAUNCH_PYTHON
 )
 $ErrorActionPreference = "Stop"
 $repo = Split-Path -Parent $MyInvocation.MyCommand.Path
 if (-not $env:OS -or $env:OS -ne "Windows_NT") {
     throw "This build needs Windows x64 with Rust MSVC and Visual Studio C++ Build Tools."
 }
-if (-not $MinecraftDir) {
-    $MinecraftDir = Join-Path $env:APPDATA ".minecraft"
-}
+if (!$PythonExe) { $PythonExe = 'python' }
 $rustScript = Join-Path $repo "BUILD-FRE-RUST.ps1"
 $launchScript = Join-Path $repo "FRE-MODRINTH-LOCAL.ps1"
 $runtime = Join-Path $repo "scripts\modrinth-fork\fre-rust-runtime"
@@ -33,20 +31,10 @@ if ($pnpmVersion -lt [version]"12.11.2") {
     throw "pnpm 12.11.2+ is needed; found $pnpmVersion."
 }
 $installedRuntime = Join-Path $runtime "fre-rust-client.exe"
-$hasRuntime = Test-Path -LiteralPath $runtime -PathType Container
-if (-not $hasRuntime) {
-    Write-Host "Preparing the Rust client and your private Minecraft resources..." -ForegroundColor Cyan
-    $rustArgs = @{ MinecraftDir = $MinecraftDir }
-    if ($ServerJar) { $rustArgs.ServerJar = $ServerJar }
-    & $rustScript @rustArgs
-    if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) {
-        throw "Rust game setup failed."
-    }
-} else {
-    Write-Host "Found an existing private Rust runtime; checking it, not overwriting it." -ForegroundColor Cyan
-}
+& $rustScript -PythonExe $PythonExe
+if ($LASTEXITCODE -ne 0) { throw 'Native engine build or integrity verification failed' }
 foreach ($file in @("fre-rust-client.exe", "BUILD-INFO.json", "research-lock.json",
-    "LICENSE.txt", "resources\horizon-resources.json")) {
+    "LICENSE.txt", "fre-rust-prepare.exe", "crates/horizon-prepare/src/lib.rs")) {
     if (!(Test-Path -LiteralPath (Join-Path $runtime $file) -PathType Leaf)) {
         throw "Incomplete native Rust runtime: $file. Back it up and rerun BUILD-FRE-RUST.ps1."
     }
@@ -58,7 +46,7 @@ if ($calculated -ne ([string]$buildInfo.game_exe_sha256).ToLowerInvariant()) {
 }
 $started = Get-Date
 Write-Host "Building and signing FRE LAUNCH Windows installer..." -ForegroundColor Cyan
-& $launchScript -BuildWindows
+& $launchScript -BuildWindows -Preview:$Preview -PythonExe $PythonExe
 if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) {
     throw "FRE LAUNCH compilation failed."
 }
@@ -74,14 +62,14 @@ if ($installers.Count -lt 1) {
 }
 $installer = $installers[0]
 $signature = "$($installer.FullName).sig"
-if (!(Test-Path -LiteralPath $signature -PathType Leaf)) {
+if (!$Preview -and !(Test-Path -LiteralPath $signature -PathType Leaf)) {
     throw "Missing signed updater artifact: $signature. Do not distribute this build."
 }
 $sha = (Get-FileHash -LiteralPath $installer.FullName -Algorithm SHA256).Hash
 Write-Host ""
-Write-Host "PRIVATE WINDOWS BUILD COMPLETED" -ForegroundColor Green
+Write-Host "WINDOWS BUILD COMPLETED (not published)" -ForegroundColor Green
 Write-Host "Installer: $($installer.FullName)"
-Write-Host "Signature: $signature"
+if (!$Preview) { Write-Host "Signature: $signature" }
 Write-Host "SHA-256: $sha"
 Write-Host "This script did NOT publish an update and did NOT trigger GitHub Actions."
-Write-Host "Do NOT publish a build containing private Minecraft game assets."
+Write-Host "Minecraft assets are not included; the owner prepares them privately inside FRE LAUNCH."

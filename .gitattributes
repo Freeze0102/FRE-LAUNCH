@@ -1,0 +1,2 @@
+# Preserve the pinned engine's exact Git blobs across Windows checkouts.
+vendor/fre-rust-source/** -text

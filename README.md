@@ -5,9 +5,9 @@
 Поточний лаунчер готується через `FRE-MODRINTH-LOCAL.ps1` із зафіксованого
 Modrinth. Нижче також залишилася документація старої окремої React-реалізації.
 Нова інтеграція **Minecraft на Rust прямо у FRE LAUNCH, без зовнішнього ігрового лаунчера**:
-**[FRE_RUST_NATIVE_UA.md](FRE_RUST_NATIVE_UA.md)**. Для власного локального білду Rust-гри використай `BUILD-FRE-RUST.ps1`. Нові зміни ще не зібрані й не перевірені в грі.
+**[FRE_RUST_NATIVE_UA.md](FRE_RUST_NATIVE_UA.md)**. Повне MIT-джерело рушія вже знаходиться в `vendor/fre-rust-source`; для Windows-збірки гри та лаунчера використай `BUILD-FRE-WINDOWS.ps1 -Preview`. Minecraft-ресурси завантажуються приватно після перевірки акаунта. Результати перевірок наведено в [звіті від 04.11.2026](VALIDATION_NATIVE_2026-11-04.md).
 
-Актуальний стан форка, CurseForge, Horizon і локальних перевірок:
+Історичний стан форка, CurseForge, Horizon і локальних перевірок:
 **[аудит від 01.11.2026](AUDIT_UA.md)**. Повний strict TypeScript gate тепер
 проходить без помилок; результат Windows-білду та межі перевірок наведено у звіті.
 
@@ -20,11 +20,11 @@ Modrinth. Нижче також залишилася документація с
 встановлення перевіреної збірки з updater. Нового інсталятора поки не опубліковано.
 
 Поточний Vue/Tauri-форк збирається локально командою
-`.\FRE-MODRINTH-LOCAL.ps1 -BuildWindows`; передумови та підписання описані у
-[UPDATES_UA.md](UPDATES_UA.md). Сценарій `FRE-LAUNCH-LOCAL.cmd` і
-[LOCAL_BUILD_UA.md](LOCAL_BUILD_UA.md) стосуються окремої старої React-реалізації.
+`.\BUILD-FRE-WINDOWS.ps1 -Preview`; передумови описані у
+[FRE_RUST_NATIVE_UA.md](FRE_RUST_NATIVE_UA.md), підписання — у [UPDATES_UA.md](UPDATES_UA.md).
+`FRE-LAUNCH-LOCAL.cmd` також відкриває поточний Vue/Tauri-форк.
 
-> **Vue/Tauri 0.5.8 — локальний SECURITY-REVIEW-ONLY білд; стара React-версія — Alpha 0.5.7.** FRE LAUNCH є незалежним неофіційним проєктом і не пов'язаний з Mojang, Microsoft, Modrinth або CurseForge.
+> **Vue/Tauri 0.5.10 — локальна тестова збірка; стара React-версія — Alpha 0.5.7.** FRE LAUNCH є незалежним неофіційним проєктом і не пов'язаний з Mojang, Microsoft, Modrinth або CurseForge. Реліз автоматично не публікується.
 
 > [!CAUTION]
 > **Зверни увагу на безпеку збірок.** Для інсталятора v0.5.5 раніше було повідомлено про спрацювання Microsoft Defender (`Trojan:Win32/Bearfoos.B!ml`). Причина **не встановлена**: це може бути помилкове спрацювання або загроза. **Не завантажуй, не запускай і не відновлюй v0.5.5 з карантину.** Нові CI-артефакти v0.5.7 позначені **SECURITY-REVIEW-ONLY**, а не «готовий перевірений реліз». Дивись [SECURITY_NOTICE.md](SECURITY_NOTICE.md).

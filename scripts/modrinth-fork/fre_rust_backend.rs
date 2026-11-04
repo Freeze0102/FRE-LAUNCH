@@ -57,6 +57,8 @@ struct RustProfile {
     id: String,
     name: String,
     created: u64,
+    #[serde(default)]
+    modified: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     icon_path: Option<String>,
 }
@@ -85,6 +87,7 @@ pub fn init<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
             rust_profiles,
             rust_create_profile,
             rust_rename_profile,
+            rust_set_profile_icon,
             rust_delete_profile,
             rust_runtime,
             rust_import_resources,
@@ -157,6 +160,11 @@ fn read_profile(dir: &Path, id: &str) -> Option<RustProfile> {
         .find(|file| file.symlink_metadata().is_ok_and(|m| m.file_type().is_file()))
         .map(|file| file.to_string_lossy().into_owned())
         .or_else(|| ensure_rust_icon(dir));
+    profile.modified = profile.icon_path.as_deref()
+        .and_then(|file| fs::metadata(file).ok())
+        .and_then(|meta| meta.modified().ok())
+        .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
+        .map(|duration| duration.as_micros() as u64).unwrap_or_default();
     Some(profile)
 }
 
@@ -181,7 +189,19 @@ fn list(root: &Path) -> Result<Vec<RustProfile>, String> {
 async fn rust_profiles<R: tauri::Runtime>(
     app: tauri::AppHandle<R>,
 ) -> Result<Vec<RustProfile>, String> {
-    list(&base(&app)?)
+    let profiles = list(&base(&app)?)?;
+    for profile in &profiles { allow_profile_icon(&app, profile)?; }
+    Ok(profiles)
+}
+
+fn allow_profile_icon<R: tauri::Runtime>(app: &tauri::AppHandle<R>, profile: &RustProfile) -> Result<(), String> {
+    if let Some(path) = &profile.icon_path {
+        // Register the validated existing file after creation. Static globs
+        // can resolve to the overridden Java settings dir in a portable run.
+        app.asset_protocol_scope().allow_file(path)
+            .map_err(|e| format!("Cannot expose this Rust profile icon: {e}"))?;
+    }
+    Ok(())
 }
 
 // Only three inert raster formats are accepted. Never persist raw SVG, HTML
@@ -258,7 +278,7 @@ async fn rust_create_profile<R: tauri::Runtime>(
                     }
                     Some(target.to_string_lossy().into_owned())
                 } else { None };
-                let profile = RustProfile { id, name, created, icon_path: saved_icon };
+                let profile = RustProfile { id, name, created, modified: 0, icon_path: saved_icon };
                 let metadata = serde_json::to_vec_pretty(&profile).map_err(|e| e.to_string())?;
                 let path = dir.join("profile.json");
                 let written = fs::OpenOptions::new()
@@ -278,6 +298,7 @@ async fn rust_create_profile<R: tauri::Runtime>(
                         return Err(format!("Could not initialize Rust game folders: {error}"));
                     }
                 }
+                allow_profile_icon(&app, &profile)?;
                 return Ok(profile);
             }
             Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
@@ -369,6 +390,41 @@ async fn rust_delete_profile<R: tauri::Runtime>(
     fs::remove_dir_all(&dir).map_err(|e| format!("Could not delete Rust profile: {e}"))
 }
 
+fn save_profile_icon(dir: &Path, bytes: &[u8], extension: &str) -> Result<(), String> {
+    let stage = dir.join("icon.upload-pending");
+    let mut file = fs::OpenOptions::new().write(true).create_new(true).open(&stage)
+        .map_err(|e| format!("Could not stage profile icon: {e}"))?;
+    use std::io::Write;
+    let result = file.write_all(bytes).and_then(|_| file.sync_all());
+    drop(file);
+    let result = result.and_then(|_| fs::rename(&stage, dir.join(format!("icon.{extension}"))));
+    if let Err(error) = result {
+        let _ = fs::remove_file(&stage);
+        return Err(format!("Could not save profile icon: {error}"));
+    }
+    for other in ["png", "jpg", "webp"].into_iter().filter(|ext| *ext != extension) {
+        let old = dir.join(format!("icon.{other}"));
+        if old.symlink_metadata().is_ok_and(|m| m.file_type().is_file()) {
+            fs::remove_file(old).map_err(|e| format!("Could not replace old profile icon: {e}"))?;
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
+async fn rust_set_profile_icon<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>, profile_id: String, source: Option<String>,
+) -> Result<RustProfile, String> {
+    let _guard = PROFILE_CREATION.lock().await;
+    let dir = profile_dir(&base(&app)?, &profile_id)?;
+    read_profile(&dir, &profile_id).ok_or("Rust profile no longer exists.")?;
+    let (bytes, extension) = prepare_icon(source.as_deref(), None)?.ok_or("Missing icon.")?;
+    save_profile_icon(&dir, &bytes, extension)?;
+    let profile = read_profile(&dir, &profile_id).ok_or("Could not reload Rust profile icon.")?;
+    allow_profile_icon(&app, &profile)?;
+    Ok(profile)
+}
+
 fn runtime_files(root: &Path) -> (PathBuf, PathBuf) {
     (root.join("fre-rust-client.exe"), root.join("resources"))
 }
@@ -446,8 +502,16 @@ fn resources_valid(root: &Path) -> bool {
     let Ok(bytes) = fs::read(&manifest) else { return false };
     let Ok(value) = serde_json::from_slice::<serde_json::Value>(&bytes) else { return false };
     if value.get("minecraft").and_then(|v| v.as_str()) != Some("26.3")
-        || !value.get("schema").and_then(|v| v.as_i64()).is_some_and(|v| v > 0) {
+        || value.get("schema").and_then(|v| v.as_i64()) != Some(7) {
         return false;
+    }
+    let stamp = fs::read(root.join("horizon-prepare.json")).ok()
+        .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok());
+    if stamp.as_ref().and_then(|stamp| stamp["output_version"].as_i64()) != Some(3) {
+        return false;
+    }
+    for file in ["items.json", "registries.json", "commands.json", "model-states.json", "assets/pack.mcmeta"] {
+        if !root.join(file).symlink_metadata().is_ok_and(|m| m.file_type().is_file()) { return false; }
     }
     // These hashes are recorded by Horizon's preparer and cover essential
     // output. The official preparer verifies the rest at download/prep time.
@@ -455,6 +519,7 @@ fn resources_valid(root: &Path) -> bool {
         ("facts_sha256", "facts.json"),
         ("block_tags_sha256", "block-tags.json"),
         ("collision_sha256", "cached-collision.nbt"),
+        ("model_states_sha256", "model-states.json"),
     ] {
         let Some(expected) = value.get(field).and_then(|v| v.as_str()) else { return false };
         if expected.len() != 64 || !expected.bytes().all(|b| b.is_ascii_hexdigit()) {
@@ -582,22 +647,6 @@ fn copy_prepared(source: &Path, target: &Path) -> Result<u64, String> {
     result
 }
 
-fn find_legacy_resources() -> Result<PathBuf, String> {
-    let home = std::env::var_os("APPDATA").map(PathBuf::from)
-        .ok_or("Windows application data folder unavailable.")?;
-    let versions = home.join("horizon-launcher").join("versions");
-    if !versions.is_dir() {
-        return Err("Choose the folder containing prepared Minecraft Rust resources.".into());
-    }
-    let mut entries = fs::read_dir(versions).map_err(|e| e.to_string())?;
-    for _ in 0..128 {
-        let Some(entry) = entries.next() else { break };
-        let entry = entry.map_err(|e| e.to_string())?;
-        let folder = entry.path().join(".local").join("horizon-client").join("26.3");
-        if resources_valid(&folder) { return Ok(folder); }
-    }
-    Err("No prepared Minecraft Rust resources were found. Select a folder with horizon-resources.json.".into())
-}
 
 /// Never destroy a damaged or interrupted resource cache: rename it
 /// atomically so setup can retry with a fresh directory. The backup remains
@@ -643,7 +692,7 @@ async fn rust_import_resources<R: tauri::Runtime>(
     let destination = base(&app)?.join("prepared");
     // Idempotent: prepared assets are shared by all FRE Rust instances. A
     // second launch never downloads or overwrites previously installed files.
-    if resources_valid(&destination) {
+    if resources_valid(&destination) && standalone_setup::check(&runtime, &destination).await.is_ok() {
         return Ok("Already prepared; using your cached Minecraft 26.3 game files.".into());
     }
     if RUNNING_PROFILES.lock().await.len() > 0 {
@@ -654,14 +703,12 @@ async fn rust_import_resources<R: tauri::Runtime>(
     preserve_incomplete(&destination)?;
     preserve_incomplete(&base(&app)?.join("prepared.pending"))?;
     let selected = if source.trim().is_empty() {
-        match find_legacy_resources() {
-            Ok(existing) => existing,
-            Err(_) => standalone_setup::prepare(app.clone(), &runtime, &base(&app)?).await?,
-        }
+        standalone_setup::prepare(app.clone(), &runtime, &base(&app)?).await?
     } else {
         PathBuf::from(source.trim())
     };
     if !selected.is_dir() { return Err("Minecraft resource folder not found.".into()); }
+    standalone_setup::check(&runtime, &selected).await?;
     let _ = app.emit("fre-rust-prepare-stage", "copy");
     let bytes = tokio::task::spawn_blocking(move || copy_prepared(&selected, &destination))
         .await.map_err(|e| e.to_string())??;
@@ -776,7 +823,7 @@ async fn rust_import_mod<R: tauri::Runtime>(
     }
     let staged = target.with_extension("hmod.pending");
     let result: Result<(), String> = (|| {
-        let mut input = fs::File::open(&source).map_err(|e| e.to_string())?;
+        let input = fs::File::open(&source).map_err(|e| e.to_string())?;
         let mut output = fs::OpenOptions::new().create_new(true).write(true)
             .open(&staged).map_err(|e| e.to_string())?;
         let count = std::io::copy(&mut input.take(32 * 1024 * 1024 + 1), &mut output)
@@ -815,6 +862,7 @@ async fn rust_launch<R: tauri::Runtime>(
     let resources = local_resources(&root, &runtime_dir);
     let client = client.canonicalize().map_err(|e| e.to_string())?;
     let resources = resources.canonicalize().map_err(|e| e.to_string())?;
+    standalone_setup::check(&runtime_dir, &resources).await?;
     // The native client's Launch API requires an authenticated Microsoft
     // owner session (docs/api/launch.md). Reuse the active FRE LAUNCH
     // Minecraft account, never launch an online-mode client using a fake
@@ -1056,7 +1104,7 @@ mod tests {
         let root = tempfile::tempdir().unwrap();
         let dir = profile_dir(root.path(), "123456789").unwrap();
         fs::create_dir_all(&dir).unwrap();
-        let expected = RustProfile { id: "123456789".into(), name: "Тест Rust".into(), created: 1234, icon_path: None };
+        let expected = RustProfile { id: "123456789".into(), name: "Тест Rust".into(), created: 1234, modified: 0, icon_path: None };
         fs::write(dir.join("profile.json"), serde_json::to_vec(&expected).unwrap()).unwrap();
         assert_eq!(read_profile(&dir, "123456789").unwrap().name, "Тест Rust");
         // A read profile must keep the original name and owner-supplied metadata.
@@ -1075,14 +1123,30 @@ mod tests {
         assert!(auto.0.starts_with(b"\x89PNG\r\n\x1a\n"));
     }
     #[test]
+    fn changing_icon_format_replaces_the_default_and_can_be_reset() {
+        let temp = tempfile::tempdir().unwrap();
+        fs::write(temp.path().join("icon.png"), default_rust_icon().unwrap()).unwrap();
+        save_profile_icon(temp.path(), b"RIFFSIZEWEBP1234", "webp").unwrap();
+        assert!(!temp.path().join("icon.png").exists());
+        assert_eq!(fs::read(temp.path().join("icon.webp")).unwrap(), b"RIFFSIZEWEBP1234");
+        save_profile_icon(temp.path(), &default_rust_icon().unwrap(), "png").unwrap();
+        assert!(!temp.path().join("icon.webp").exists());
+        assert!(temp.path().join("icon.png").is_file());
+    }
+    #[test]
     fn refuses_modified_or_unknown_rust_executable() {
         let directory = tempfile::tempdir().unwrap();
         fs::write(directory.path().join("fre-rust-client.exe"), b"MZ trusted build").unwrap();
         let digest = format!("{:x}", Sha256::digest(b"MZ trusted build"));
+        fs::write(directory.path().join("fre-rust-prepare.exe"), b"MZ trusted preparer").unwrap();
+        let prepare_digest = format!("{:x}", Sha256::digest(b"MZ trusted preparer"));
         fs::write(directory.path().join("BUILD-INFO.json"), format!(
-            "{{\"engine_license\":\"MIT\",\"source_commit\":\"975c07d9151847e6af13afc4b5ab37b6bbe78ef5\",\"game_exe_sha256\":\"{digest}\"}}"
+            "{{\"engine_license\":\"MIT\",\"source_commit\":\"975c07d9151847e6af13afc4b5ab37b6bbe78ef5\",\"game_exe_sha256\":\"{digest}\",\"prepare_exe_sha256\":\"{prepare_digest}\"}}"
         )).unwrap();
         assert!(verify_native_client(directory.path()).is_ok());
+        fs::write(directory.path().join("fre-rust-prepare.exe"), b"MZ tampered preparer").unwrap();
+        assert!(verify_native_client(directory.path()).is_err());
+        fs::write(directory.path().join("fre-rust-prepare.exe"), b"MZ trusted preparer").unwrap();
         fs::write(directory.path().join("fre-rust-client.exe"), b"MZ tampered").unwrap();
         assert!(verify_native_client(directory.path()).is_err());
     }
@@ -1093,7 +1157,13 @@ mod tests {
             ("facts_sha256", "facts.json", &b"facts"[..]),
             ("block_tags_sha256", "block-tags.json", &b"tags"[..]),
             ("collision_sha256", "cached-collision.nbt", &b"collision"[..]),
+            ("model_states_sha256", "model-states.json", &b"states"[..]),
         ];
+        fs::write(temp.path().join("horizon-prepare.json"), b"{\"output_version\":3}").unwrap();
+        fs::create_dir(temp.path().join("assets")).unwrap();
+        for name in ["items.json", "registries.json", "commands.json", "assets/pack.mcmeta"] {
+            fs::write(temp.path().join(name), b"{}").unwrap();
+        }
         let mut manifest = serde_json::json!({"schema": 7, "minecraft": "26.3"});
         for (key, name, bytes) in files {
             fs::write(temp.path().join(name), bytes).unwrap();
@@ -1108,6 +1178,9 @@ mod tests {
         assert!(!resources_valid(temp.path()), "a corrupt file cannot appear playable");
         fs::write(temp.path().join("facts.json"), b"facts").unwrap();
         assert!(resources_valid(temp.path()));
+        fs::remove_file(temp.path().join("commands.json")).unwrap();
+        assert!(!resources_valid(temp.path()), "missing game registries cannot appear playable");
+        fs::write(temp.path().join("commands.json"), b"{}").unwrap();
         manifest["minecraft"] = "26.4".into();
         fs::write(temp.path().join("horizon-resources.json"), serde_json::to_vec(&manifest).unwrap()).unwrap();
         assert!(!resources_valid(temp.path()), "a resource set for another game version is not valid");

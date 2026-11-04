@@ -20,6 +20,14 @@ def apply(root: Path):
     here = Path(__file__).resolve().parent
     app = root / "apps/app"
     frontend = root / "apps/app-frontend"
+    config_path = app / "tauri.conf.json"
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+    icon_scope = config["app"]["security"]["assetProtocol"]["scope"]
+    # Native icons live outside Theseus's Java profile/cache directories.
+    # Permit only the three validated raster filenames, never worlds or tokens.
+    for extension in ("png", "jpg", "webp"):
+        icon_scope.append(f"$APPDATA/fre-rust-minecraft/profiles/*/icon.{extension}")
+    config_path.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
     shutil.copyfile(here / "fre_rust_backend.rs", app / "src/api/fre_rust.rs")
     shutil.copyfile(here / "fre_rust_setup.rs", app / "src/api/fre_rust_setup.rs")
@@ -28,7 +36,7 @@ def apply(root: Path):
     # not a second launcher, its CLI, or a separate Microsoft account.
     exactly(app / "Cargo.toml", "sha2 = { workspace = true }",
             'reqwest = { workspace = true, features = ["rustls-tls", "stream"] }\n'
-            'sha1 = { workspace = true }\nsha2 = { workspace = true }\nzip = { workspace = true }')
+            'sha2 = { workspace = true }')
     exactly(app / "Cargo.toml", 'tokio = { workspace = true, features = ["time"] }',
             'tokio = { workspace = true, features = ["time", "fs", "io-util", "process", "rt", "sync"] }')
     shutil.copyfile(here / "FreRustPanel.vue", frontend / "src/components/ui/FreRustPanel.vue")
@@ -70,7 +78,7 @@ pub async fn get_default_user()""",
             '''            .plugin(
                 "fre-rust",
                 InlinedPlugin::new()
-                    .commands(&["rust_profiles", "rust_create_profile", "rust_rename_profile", "rust_delete_profile", "rust_runtime", "rust_import_resources", "rust_mods", "rust_import_mod", "rust_launch", "rust_logs", "rust_open_folder", "rust_list_files"])
+                    .commands(&["rust_profiles", "rust_create_profile", "rust_rename_profile", "rust_set_profile_icon", "rust_delete_profile", "rust_runtime", "rust_import_resources", "rust_mods", "rust_import_mod", "rust_launch", "rust_logs", "rust_open_folder", "rust_list_files"])
                     .default_permission(DefaultPermissionRule::AllowAllCommands),
             )
             .plugin(
@@ -123,7 +131,7 @@ async function handleFreRustOrJavaCreate(config) {
         if (!name) throw new Error('Enter a name for the Rust profile.')
         const icon = config.instanceIcon.value
         const iconBytes = icon ? Array.from(new Uint8Array(await icon.arrayBuffer())) : null
-        const profile = await invoke<{ id: string; name: string }>('plugin:fre-rust|rust_create_profile', {
+        const profile = await invoke('plugin:fre-rust|rust_create_profile', {
             name,
             iconPath: icon ? null : config.instanceIconPath.value,
             iconBytes,
@@ -133,7 +141,7 @@ async function handleFreRustOrJavaCreate(config) {
         // Open the normal Java-style instance details immediately, even when
         // its verified native assets still need installing.
         await router.push('/rust-instance/native/' + encodeURIComponent(profile.id))
-        const status = await invoke<{ installed: boolean; prepared: boolean; reason: string | null }>('plugin:fre-rust|rust_runtime')
+        const status = await invoke('plugin:fre-rust|rust_runtime')
         if (!status.installed) {
             handleError(new Error(status.reason || 'The native Rust game is not bundled with this FRE LAUNCH build.'))
             return
@@ -142,7 +150,7 @@ async function handleFreRustOrJavaCreate(config) {
             // First run downloads only the player's authorized Mojang files.
             // Surface real errors instead of silently leaving an empty profile.
             try {
-                await invoke<string>('plugin:fre-rust|rust_import_resources', { source: '' })
+                await invoke('plugin:fre-rust|rust_import_resources', { source: '' })
             } catch (error) {
                 handleError(error instanceof Error ? error : new Error(String(error)))
             }
@@ -438,6 +446,9 @@ onUnmounted(() => {
                 'First run: FRE LAUNCH reuses existing Minecraft 26.3 resources or downloads verified Mojang game files to its own cache after Minecraft account verification in FRE LAUNCH. No separate launcher is required.',
             ),
             'fre-rust.page.resources': ('Файли гри', 'Game resources'),
+            'fre-rust.page.change-icon': ('Обрати іконку', 'Choose icon'),
+            'fre-rust.page.reset-icon': ('Відновити стандартну іконку', 'Restore default icon'),
+            'fre-rust.page.repair': ('Перевірити й відновити файли гри', 'Check and repair game resources'),
             'fre-rust.page.preparing': ('Перевірка локальних ресурсів…', 'Checking locally available resources…'),
             'fre-rust.page.tab.general': ('Загальні', 'General'),
             'fre-rust.page.tab.installation': ('Встановлення', 'Installation'),
@@ -477,6 +488,8 @@ onUnmounted(() => {
     # artifacts. Missing assets are an explicit Runtime: Not installed state
     # in the UI, NEVER a fake Play button.
     runtime = here / "fre-rust-runtime"
+    if (runtime / "resources").exists():
+        raise RuntimeError("Minecraft resources must stay in the owner's private app cache, never in the installer.")
     binaries = ("fre-rust-client.exe", "fre-rust-prepare.exe", "research-lock.json", "LICENSE.txt")
     valid = all((runtime / f).is_file() for f in binaries) and (runtime / "BUILD-INFO.json").is_file()
     if valid:
@@ -524,10 +537,6 @@ onUnmounted(() => {
         resources["fre-rust-runtime/crates/horizon-prepare/"] = "fre-rust/crates/horizon-prepare/"
         # PUBLIC releases carry the MIT engine only. Mojang resources are
         # imported locally by the authenticated owner after installation.
-        if (runtime / "resources/horizon-resources.json").is_file():
-            resources["fre-rust-runtime/resources/"] = "fre-rust/resources/"
-        elif (runtime / "resources").exists():
-            raise RuntimeError("Incomplete private Minecraft resource set.")
         conf.write_text(json.dumps(settings, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         print("Bundled independent native FRE Rust engine + resource preparer; private Minecraft assets stay on the owner's PC.")
     else:

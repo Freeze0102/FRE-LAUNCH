@@ -1,4 +1,4 @@
-#Requires -Version 7.0
+#Requires -Version 5.1
 <#
   Scan Windows preview binaries with the actual Microsoft Defender engine.
   MpCmdRun is Microsoft's supported automation interface. Fail closed on
@@ -71,10 +71,18 @@ foreach ($path in $Paths) {
     if ($after -ne $before) {
         throw "Executable changed while being scanned: $file"
     }
-    # Catch prior or otherwise asynchronously reported detections too.
-    $detections = @(Get-MpThreatDetection -ErrorAction Stop | Where-Object { $null -ne $_ })
+    # Catch prior or asynchronous detections of THIS output too. Defender
+    # retains unrelated, remediated Downloads history indefinitely; those
+    # entries are not the result of this scan and must not make it lie about
+    # a newly compiled file. Never clear history or change Defender settings.
+    $detections = @(Get-MpThreatDetection -ErrorAction Stop | Where-Object {
+        $detection = $_
+        $null -ne $detection -and @($detection.Resources | Where-Object {
+            ([string]$_).IndexOf($file, [StringComparison]::OrdinalIgnoreCase) -ge 0
+        }).Count -gt 0
+    })
     if ($detections.Count -gt 0) {
-        throw "Defender reported $($detections.Count) malware detection(s). Preview distribution blocked."
+        throw "Defender reported $($detections.Count) detection(s) for this output. Preview distribution blocked."
     }
     Write-Host "Defender custom scan passed: $file (SHA-256: $after)"
 }

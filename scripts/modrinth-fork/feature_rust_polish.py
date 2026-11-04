@@ -23,6 +23,10 @@ def apply(root: Path) -> None:
             "import ConfirmDeleteInstanceModal from '@/components/ui/modal/ConfirmDeleteInstanceModal.vue'")
     exactly(quick, "const runningInstances = ref([])",
             """const runningInstances = ref([])
+function freInstanceIcon(instance) {
+    const icon = getInstanceIconUrl(instance.icon_path)
+    return instance.freRustId && icon ? icon + '?v=' + (instance.modified ?? 0) : icon
+}
 const freRustInstances = ref([])
 const freRustDeleteCandidate = ref(null)
 const freRustDeleteModal = ref(null)
@@ -43,6 +47,7 @@ async function refreshFreRustInstances() {
             loader: 'Rust',
             game_version: status.version || '26.3',
             icon_path: profile.iconPath ?? null,
+            modified: profile.modified ?? 0,
             created: new Date(profile.created * 1000).toISOString(),
             last_played: null,
             install_stage: 'installed',
@@ -91,6 +96,9 @@ async function deleteFreRustQuick() {
         handleError(error instanceof Error ? error : new Error(String(error)))
     }
 }""")
+    exactly(quick,
+            ':src="getInstanceIconUrl(instance.icon_path)"',
+            ':src="freInstanceIcon(instance)"')
     exactly(quick,
             "(instancesQuery.data.value ?? []).slice().sort((a, b) => {",
             "[...(instancesQuery.data.value ?? []), ...freRustInstances.value].sort((a, b) => {")

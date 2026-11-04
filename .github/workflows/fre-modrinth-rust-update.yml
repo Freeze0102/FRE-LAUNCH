@@ -1,12 +1,6 @@
 name: FRE LAUNCH Vue Rust Windows Update
 
 on:
-  # Explicit one-time release request from main; does not build on every push.
-  push:
-    branches:
-      - main
-    paths:
-      - '.github/release-requests/v0.5.10'
   workflow_dispatch:
     inputs:
       publish:

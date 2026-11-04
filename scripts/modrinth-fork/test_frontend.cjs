@@ -344,7 +344,7 @@ test('FRE LAUNCH prepares with a private verified JDK 25, not another launcher',
   assert.match(setup, /managed_jdk::ensure\(data\)\.await/)
   assert.match(setup, /"--java-home"/)
   assert.match(generator, /fre_rust_jdk\.rs/)
-  assert.match(generator, /zip = \{ workspace = true \}/)
+  assert.match(fs.readFileSync(path.join(source, 'apps/app/Cargo.toml'), 'utf8'), /zip = \{ workspace = true \}/)
   assert.match(jdk, /api\.adoptium\.net\/v3\/assets\/latest\/25\/hotspot/)
   assert.match(jdk, /valid_digest\(expected\)/)
   assert.match(jdk, /hasher\.finalize\(\)/)
@@ -355,7 +355,7 @@ test('FRE LAUNCH prepares with a private verified JDK 25, not another launcher',
 })
 
 test('Native Rust profiles use Java InstanceCardView and navigate to the real page', async () => {
-  const profile = { id: '12345678', name: 'Survival Rust', created: 1 }
+  const profile = { id: '12345678', name: 'Survival Rust', created: 1, modified: 98765 }
   const emitted = [], navigated = []
   const c = component('RustInstanceGrid.vue', async command => {
     if (command.endsWith('|rust_profiles')) return [profile]
@@ -371,6 +371,7 @@ test('Native Rust profiles use Java InstanceCardView and navigate to the real pa
   assert.equal(c.state.cards.value.length, 1)
   assert.deepEqual(c.state.cards.value.map(x => [x.kind, x.name, x.ready]), [['native', 'Survival Rust', true]])
   assert.equal(c.state.viewInstance(c.state.cards.value[0]).loader, 'Rust')
+  assert.equal(c.state.viewInstance(c.state.cards.value[0]).modified, 98765)
   assert.deepEqual(c.state.cardStyle(0), { position: 'absolute', width: '140px', left: '152px', top: '0px', height: '180px' })
   c.state.openCard(c.state.cards.value[0])
   assert.deepEqual(navigated, ['/rust-instance/native/12345678'])
@@ -637,7 +638,42 @@ test('Native Rust-only onboarding uses the original checklist but counts a Rust 
   assert.doesNotMatch(provider, /showChecklist: computed\(\(\) => false/)
 });
 
-test('Rust resource setup and native Horizon mod browser compile as Vue SFCs', () => {
+test('Rust profile icon settings save the selected image, support reset, and ignore cancellation', async () => {
+  const file = path.join(__dirname, 'RustInstancePage.vue')
+  const { descriptor } = compiler.parse(fs.readFileSync(file, 'utf8'))
+  const ast = ts.createSourceFile(file, descriptor.scriptSetup.content, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+  const fn = ast.statements.find(s => ts.isFunctionDeclaration(s) && s.name.text === 'changeIcon')
+  const code = ts.transpileModule(fn.getText(ast), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  }).outputText
+  let chosen = 'C:/Pictures/my-icon.webp'
+  const calls = [], events = [], errors = []
+  let refreshed = 0
+  const savingIcon = vue.ref(false)
+  const bindings = {
+    require: name => { assert.equal(name, '@tauri-apps/plugin-dialog'); return { open: async () => chosen } },
+    savingIcon, profile: vue.ref({ id: '123' }), id: vue.ref('123'),
+    invoke: async (command, args) => calls.push({ command, args }),
+    refresh: async () => { refreshed++ },
+    handleError: err => errors.push(err),
+    window: { dispatchEvent: e => events.push(e.type) }, Event,
+  }
+  const change = new Function(...Object.keys(bindings), code + '\nreturn changeIcon')(...Object.values(bindings))
+  await change()
+  await change(true)
+  chosen = null
+  await change()
+  assert.deepEqual(calls, [
+    { command: 'plugin:fre-rust|rust_set_profile_icon', args: { profileId: '123', source: 'C:/Pictures/my-icon.webp' } },
+    { command: 'plugin:fre-rust|rust_set_profile_icon', args: { profileId: '123', source: null } },
+  ])
+  assert.equal(refreshed, 2)
+  assert.deepEqual(events, ['fre-rust-library-refresh', 'fre-rust-library-refresh'])
+  assert.equal(savingIcon.value, false)
+  assert.deepEqual(errors, [])
+})
+
+test('Rust resource setup and native mod browser compile without an external launcher', () => {
   const compiler = rootRequire('@vue/compiler-sfc')
   for (const file of ['RustNativeMods.vue', 'RustInstancePage.vue', 'FreRustPanel.vue']) {
     const sourceText = fs.readFileSync(path.join(__dirname, file), 'utf8')
@@ -652,15 +688,16 @@ test('Rust resource setup and native Horizon mod browser compile as Vue SFCs', (
     assert.deepEqual(result.errors, [], file + ' template failed')
   }
   const api = fs.readFileSync(path.join(source, 'apps/app/src/api/fre_rust.rs'), 'utf8')
-  const horizon = fs.readFileSync(path.join(source, 'apps/app/src/api/horizon.rs'), 'utf8')
+  const setup = fs.readFileSync(path.join(source, 'apps/app/src/api/fre_rust_setup.rs'), 'utf8')
   const nativeMods = fs.readFileSync(path.join(source, 'apps/app-frontend/src/components/ui/RustNativeMods.vue'), 'utf8')
   const page = fs.readFileSync(path.join(source, 'apps/app-frontend/src/pages/RustInstancePage.vue'), 'utf8')
   assert.match(api, /fn resources_valid\(/)
   assert.match(api, /async fn rust_mods/)
   assert.match(api, /preserve_incomplete\(&destination\)/)
-  assert.match(api, /horizon::prepare_for_native_rust/)
-  assert.match(horizon, /"prepare", "--download", "--version"/)
-  assert.match(horizon, /native_mods_for_profile/)
+  assert.match(api, /standalone_setup::prepare/)
+  assert.match(setup, /verified_preparer\(bundle\)/)
+  assert.equal(fs.existsSync(path.join(source, 'apps/app/src/api/horizon.rs')), false)
+  assert.doesNotMatch(api + setup, /horizon::prepare_for_native_rust|horizon_install_launcher|native_mods_for_profile/)
   assert.match(nativeMods, /plugin:fre-rust\|rust_mods/)
   assert.match(page, /<RustNativeMods v-if="kind === 'native'"/)
 })

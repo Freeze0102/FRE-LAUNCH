@@ -3,6 +3,7 @@
 param(
     [switch]$BuildWindows,
     [switch]$RunDev,
+    [switch]$Preview,
     [string]$PythonExe = $env:FRE_LAUNCH_PYTHON
 )
 $ErrorActionPreference = 'Stop'
@@ -33,6 +34,7 @@ foreach ($candidate in $pythonCandidates) {
 }
 if (-not $pythonCommand) { throw 'Working Python 3 not found. Install Python 3 or pass -PythonExe PATH_TO_PYTHON.exe.' }
 if ($BuildWindows -and $RunDev) { throw 'Choose either -BuildWindows or -RunDev.' }
+if ($Preview -and !$BuildWindows) { throw '-Preview requires -BuildWindows.' }
 if ($BuildWindows -or $RunDev) {
     Get-Command node -ErrorAction Stop | Out-Null
     Get-Command pnpm.cmd -ErrorAction Stop | Out-Null
@@ -48,6 +50,7 @@ if ($BuildWindows -or $RunDev) {
 }
 $prepared = Join-Path $destination 'FRE_LAUNCH_FORK.md'
 $signaturePath = Join-Path $destination '.fre-launch-source-signature'
+$archivedSource = $null
 # Essential files must survive between runs. In particular, damaged pnpm
 # workspaces must never be treated as a usable prepared source tree.
 $requiredSourceFiles = @(
@@ -67,26 +70,26 @@ $requiredSourceFiles = @(
     'pnpm-workspace.yaml',
     'pnpm-lock.yaml'
 )
-$patchNames = @('prepare.py','feature_local_accounts.py','feature_ukrainian.py','feature_skin_notice.py','feature_offline_skins.py','feature_local_skin_preview.py','feature_ui_polish.py','feature_guest_launch.py','feature_java_nickname_lookup.py','feature_remove_modrinth_login.py','feature_brand_presence.py','feature_curseforge.py','curseforge_backend.rs','CurseForgeBrowser.vue','feature_horizon.py','horizon_backend.rs','HorizonRustPanel.vue','HorizonLibrary.vue','feature_fre_rust.py','fre_rust_backend.rs','FreRustPanel.vue','FreRustLibrary.vue','verify.py')
-$patchNames += @('feature_updates.py','fre-app-updater.ts','fre-update-ui.js','fre_update_policy.rs','fre_updater_impl.rs','fre-update-test.json')
-$patchNames += @('feature_frontend_types.py','frontend-type-fixes.json','fre-query-options.ts')
-$patchNames += @('fre-compat.d.ts')
-$patchNames += @('feature_security_dependencies.py','security-dependencies.json','security-pnpm-lock.yaml')
-$patchNames += @('horizon_bootstrap.rs','horizon-setup-messages.json')
+$patchNames = @(Get-ChildItem -LiteralPath (Join-Path $projectRoot 'scripts\modrinth-fork') -File |
+    Where-Object Extension -In @('.py', '.rs', '.vue', '.ts', '.js', '.cjs', '.json', '.yaml') |
+    Sort-Object Name | ForEach-Object Name)
 # The open-source Rust engine can be bundled without proprietary Minecraft
 # resources. Players import resources from a legitimately owned installation.
 # Local builds may additionally contain prepared resources; they must be complete.
 $rustRuntimeFolder = Join-Path $projectRoot 'scripts\modrinth-fork\fre-rust-runtime'
-$rustRuntimeInputs = @('fre-rust-client.exe', 'research-lock.json', 'LICENSE.txt', 'BUILD-INFO.json')
+$rustRuntimeInputs = @('fre-rust-client.exe', 'fre-rust-prepare.exe', 'research-lock.json', 'LICENSE.txt', 'BUILD-INFO.json')
 $rustRuntimeSignature = if (Test-Path -LiteralPath $rustRuntimeFolder -PathType Container) {
     $resourcesFolder = Join-Path $rustRuntimeFolder 'resources'
-    if ((Test-Path -LiteralPath $resourcesFolder) -and
-        -not (Test-Path -LiteralPath (Join-Path $resourcesFolder 'horizon-resources.json') -PathType Leaf)) {
-        throw 'Native Rust resource folder is incomplete. Import a complete owned copy or remove the incomplete staging folder.'
+    if (Test-Path -LiteralPath $resourcesFolder) { throw 'Private Minecraft resources cannot be packaged. Keep them in the installed app cache.' }
+    foreach ($relative in $rustRuntimeInputs) {
+        if (!(Test-Path -LiteralPath (Join-Path $rustRuntimeFolder $relative) -PathType Leaf)) {
+            throw "Native Rust runtime is incomplete: $relative"
+        }
     }
-    if (Test-Path -LiteralPath $resourcesFolder -PathType Container) {
-        $rustRuntimeInputs += 'resources\horizon-resources.json'
-    }
+    # Include the preparer/exporter sources too: changing any packaged input
+    # invalidates the generated tree, rather than silently reusing old files.
+    $rustRuntimeInputs = @(Get-ChildItem -LiteralPath $rustRuntimeFolder -Recurse -File |
+        Sort-Object FullName | ForEach-Object { $_.FullName.Substring($rustRuntimeFolder.Length + 1) })
     ($rustRuntimeInputs | ForEach-Object {
         $file = Join-Path $rustRuntimeFolder $_
         if (-not (Test-Path -LiteralPath $file -PathType Leaf)) {
@@ -123,6 +126,7 @@ if (Test-Path $destination) {
         }
         Write-Host 'Archiving existing generated source before regeneration:' $archive -ForegroundColor Yellow
         Move-Item -LiteralPath $destination -Destination $archive
+        $archivedSource = $archive
     } else {
         Write-Host 'Using existing generated Modrinth source. Verifying before launch...' -ForegroundColor Cyan
     }
@@ -132,8 +136,13 @@ Get-Command git -ErrorAction Stop | Out-Null
 Write-Host 'Fetching pinned original Modrinth source...' -ForegroundColor Cyan
 $gitDirectory = Join-Path $projectRoot '.git'
 if (Test-Path $gitDirectory) {
-    git -C "$projectRoot" submodule update --init --depth 1 vendor/modrinth
-    if ($LASTEXITCODE -ne 0) { throw 'Pinned Modrinth Git submodule fetch failed.' }
+    $currentUpstream = if (Test-Path -LiteralPath (Join-Path $upstream '.git')) {
+        (& git -C $upstream rev-parse HEAD).Trim()
+    } else { '' }
+    if ($currentUpstream -cne $revision) {
+        git -C "$projectRoot" submodule update --init --depth 1 vendor/modrinth
+        if ($LASTEXITCODE -ne 0) { throw 'Pinned Modrinth Git submodule fetch failed.' }
+    }
 } else {
     # GitHub's "Download ZIP" excludes submodules. Download the same verified
     # upstream revision directly in that case, with no new branch or Actions.
@@ -156,13 +165,27 @@ if (Test-Path $gitDirectory) {
 $actual = (git -C "$upstream" rev-parse HEAD).Trim()
 if ($actual -ne $revision) { throw "Refusing unverified Modrinth source: $actual" }
 Write-Host 'Copying upstream desktop source without modifying your old launcher...' -ForegroundColor Cyan
-Copy-Item -Path $upstream -Destination $destination -Recurse -Force
-$copiedGit = Join-Path $destination '.git'
-if (Test-Path $copiedGit) { Remove-Item $copiedGit -Force -Recurse }
-& $pythonCommand @pythonArguments -m pip install 'Pillow>=11,<13'
-if ($LASTEXITCODE -ne 0) { throw 'Pillow dependency installation failed.' }
+& $pythonCommand @pythonArguments -c 'import shutil,sys; shutil.copytree(sys.argv[1], sys.argv[2], ignore=shutil.ignore_patterns(".git", "node_modules", "target"))' $upstream $destination
+if ($LASTEXITCODE -ne 0) { throw 'Pinned source copy failed; the partial tree was preserved.' }
+& $pythonCommand @pythonArguments -c 'import PIL; assert 11 <= int(PIL.__version__.split(".")[0]) < 13' 2>$null
+if ($LASTEXITCODE -ne 0) {
+    & $pythonCommand @pythonArguments -m pip install 'Pillow>=11,<13'
+    if ($LASTEXITCODE -ne 0) { throw 'Pillow dependency installation failed.' }
+}
 & $pythonCommand @pythonArguments "$converter" "$destination" --upstream-sha $revision
 if ($LASTEXITCODE -ne 0) { throw 'Customization failed, source remains in FRE-Modrinth-Source for inspection.' }
+}
+if ($archivedSource) {
+    foreach ($cache in @('node_modules', 'target')) {
+        $from = [IO.Path]::GetFullPath((Join-Path $archivedSource $cache))
+        $to = [IO.Path]::GetFullPath((Join-Path $destination $cache))
+        if (!$from.StartsWith($projectRoot + [IO.Path]::DirectorySeparatorChar) -or
+            !$to.StartsWith($projectRoot + [IO.Path]::DirectorySeparatorChar)) { throw 'Build cache path escaped repository.' }
+        if ((Test-Path -LiteralPath $from -PathType Container) -and !(Test-Path -LiteralPath $to)) {
+            Move-Item -LiteralPath $from -Destination $to
+            Write-Host "Reused $cache build cache; the package managers will verify its inputs."
+        }
+    }
 }
 $missingPreparedFiles = @($requiredSourceFiles | Where-Object {
     -not (Test-Path -LiteralPath (Join-Path $destination $_) -PathType Leaf)
@@ -205,16 +228,29 @@ if ($BuildWindows -or $RunDev) {
             pnpm.cmd --filter '@modrinth/app' tauri dev
             if ($LASTEXITCODE -ne 0) { throw 'Tauri dev failed' }
         } else {
+            pnpm.cmd --filter '@modrinth/app-frontend' exec vite build
+            if ($LASTEXITCODE -ne 0) { throw 'Production frontend build failed' }
+            cargo test --locked -p theseus_gui
+            if ($LASTEXITCODE -ne 0) { throw 'Rust backend tests failed' }
             $previousSigningKey = $env:TAURI_SIGNING_PRIVATE_KEY
             $localSigningKey = Join-Path $projectRoot '.fre-update-keys\frelaunch.key'
             try {
                 if (-not $env:TAURI_SIGNING_PRIVATE_KEY -and (Test-Path -LiteralPath $localSigningKey)) {
                     $env:TAURI_SIGNING_PRIVATE_KEY = $localSigningKey
                 }
-                if (-not $env:TAURI_SIGNING_PRIVATE_KEY) {
+                if (-not $Preview -and -not $env:TAURI_SIGNING_PRIVATE_KEY) {
                     throw 'Signed releases require TAURI_SIGNING_PRIVATE_KEY. See UPDATES_UA.md. Never generate a replacement key for an existing channel.'
                 }
-                pnpm.cmd --filter '@modrinth/app' tauri build --ci --bundles nsis
+                # TypeScript, Vite and Rust tests just passed for this exact
+                # generated tree. Do not run the same frontend build a second
+                # time through Tauri's upstream Turborepo hook.
+                $buildConfig = @{ build = @{ beforeBuildCommand = '' } }
+                if ($Preview) {
+                    $env:TAURI_SIGNING_PRIVATE_KEY = $null
+                    $buildConfig.bundle = @{ createUpdaterArtifacts = $false }
+                }
+                $buildConfig | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath 'apps/app/tauri.fre-build.conf.json' -Encoding utf8
+                pnpm.cmd --filter '@modrinth/app' tauri build --ci --bundles nsis --config tauri.fre-build.conf.json
                 if ($LASTEXITCODE -ne 0) { throw 'Tauri build failed' }
             } finally { $env:TAURI_SIGNING_PRIVATE_KEY = $previousSigningKey }
             Write-Host 'Windows NSIS installer generated under FRE-Modrinth-Source/target/release/bundle/nsis' -ForegroundColor Green

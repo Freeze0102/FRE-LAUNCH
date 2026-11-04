@@ -1,11 +1,6 @@
-name: FRE LAUNCH Rust complete native UI and onboarding 31 tests
+name: FRE LAUNCH Rust UI and onboarding preflight
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - '.github/workflows/fre-rust-grid-preflight.yml'
   workflow_dispatch:
 
 permissions:

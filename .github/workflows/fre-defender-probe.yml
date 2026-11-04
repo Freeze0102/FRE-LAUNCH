@@ -1,12 +1,6 @@
 name: FRE LAUNCH Defender scanner probe (no compilation)
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - '.github/workflows/fre-defender-probe.yml'
-      - '.github/scripts/scan-preview-defender.ps1'
   workflow_dispatch:
 
 permissions:

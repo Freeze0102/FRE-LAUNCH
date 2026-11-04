@@ -1,5 +1,35 @@
 # FRE LAUNCH — Release QA checklist
 
+## Поточний Vue/Tauri + вбудований Minecraft на Rust
+
+Команди з кореня репозиторію:
+
+```powershell
+python scripts/modrinth-fork/native_source.py vendor/fre-rust-source
+python -m unittest discover -s scripts/modrinth-fork -p test_*.py -v
+.\FRE-MODRINTH-LOCAL.ps1
+node scripts/modrinth-fork/test_frontend.cjs FRE-Modrinth-Source
+node scripts/modrinth-fork/test_build_scripts.cjs FRE-Modrinth-Source
+node --test scripts/modrinth-fork/test_release.mjs scripts/modrinth-fork/test_content_security.cjs scripts/modrinth-fork/test_compat_frontend.cjs scripts/modrinth-fork/test_updater.cjs
+cargo test --locked --release --manifest-path vendor/fre-rust-source/Cargo.toml -p horizon-core -p horizon-prepare
+# Окремий мережевий тест справжнього JDK downloader: не змінює глобальну Java.
+cargo run --locked --manifest-path tests/native-jdk/Cargo.toml -- .audit/managed-jdk-check
+.\BUILD-FRE-WINDOWS.ps1 -Preview
+```
+
+Остання команда також виконує генерацію локалізацій, повну перевірку Vue TypeScript,
+production Vite build і `cargo test --locked -p theseus_gui` у згенерованому workspace,
+а потім створює NSIS. Без `-Preview` потрібен наявний приватний ключ updater-каналу.
+Ні ця команда, ні commit/push не запускають важкі Actions чи публікацію релізу.
+
+Перевірка реального завантаження ресурсів, Java 25, світу та гри потребує входу
+в Microsoft-акаунт власника Minecraft Java Edition. Для тесту використовуй новий
+профіль і тестові каталоги; не змінюй наявні світи. Видалення Rust-профілю після
+звичайного підтвердження видаляє і його світи; спільний кеш ресурсів зберігається.
+
+Нижче збережено історичний перелік QA старої React-версії. Її `src-tauri` і workflow
+`Windows Build` не замінюють поточні Vue/native-перевірки.
+
 Цей документ розділяє **автоматичні перевірки коду** й **ручне тестування Windows/Minecraft**. Жодна галочка CI не означає, що на іншому ПК усе гарантовано працюватиме.
 
 ## Автоматичні перевірки (GitHub Actions → Windows Build)
