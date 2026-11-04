@@ -57,6 +57,7 @@ const m = defineMessages({
   prepVersion: { id: 'fre-rust.page.prep-version', defaultMessage: 'Checking Rust game version…' },
   prepLocal: { id: 'fre-rust.page.prep-local', defaultMessage: 'Checking local Minecraft resources…' },
   prepDownload: { id: 'fre-rust.page.prep-download', defaultMessage: 'Downloading missing verified Minecraft files from Mojang…' },
+  prepJava: { id: 'fre-rust.page.prep-java', defaultMessage: 'Checking Java 25 and installing it privately in FRE LAUNCH if needed…' },
   prepPrepare: { id: 'fre-rust.page.prep-prepare', defaultMessage: 'Building verified native Minecraft resources…' },
   prepCopy: { id: 'fre-rust.page.prep-copy', defaultMessage: 'Saving game resources in the FRE LAUNCH cache…' },
   prepReady: { id: 'fre-rust.page.prep-ready', defaultMessage: 'Minecraft resources ready.' },
@@ -118,7 +119,7 @@ const iconSrc = computed(() =>
 const prepareStageText = computed(() => {
   const labels: Record<string, keyof typeof m> = {
     helper: 'prepHelper', version: 'prepVersion', local: 'prepLocal',
-    download: 'prepDownload', prepare: 'prepPrepare', copy: 'prepCopy', ready: 'prepReady',
+    download: 'prepDownload', java: 'prepJava', prepare: 'prepPrepare', copy: 'prepCopy', ready: 'prepReady',
   }
   return prepareStage.value && labels[prepareStage.value]
     ? t(m[labels[prepareStage.value]])
