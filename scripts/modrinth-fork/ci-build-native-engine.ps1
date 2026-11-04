@@ -21,76 +21,7 @@ if (Test-Path -LiteralPath $runtime) {
         $filename = Join-Path $runtime $item.name
         $expected = [string]$info.($item.checksum)
         if (!(Test-Path -LiteralPath $filename -PathType Leaf) -or
-            $expected -notmatch '^[A-Fa-f0-9]{64}
-# Reject a pinned engine checkout missing the verified gameplay branches.
-# This is not a substitute for runtime parity testing on Windows.
-$mechanics = @(
-    @('crates\horizon-client\src\game\beds.rs', 'destroy_straw_bed'),
-    @('crates\horizon-client\src\game\remote.rs', 'release_use_for_keybind_screen'),
-    @('crates\horizon-world\src\level\interact.rs', 'Class::Note'),
-    @('crates\horizon-world\src\level\redstone.rs', 'note_play'),
-    @('crates\horizon-world\src\level\redstone.rs', 'note_trigger_event'),
-    @('crates\horizon-world\src\level\redstone.rs', 'note_neighbor_changed')
-)
-foreach ($check in $mechanics) {
-    $file = Join-Path $source $check[0]
-    if (!(Test-Path -LiteralPath $file -PathType Leaf) -or
-        !(Select-String -LiteralPath $file -SimpleMatch -Quiet -Pattern $check[1])) {
-        throw "Pinned Rust gameplay contract changed: $($check[0]) missing $($check[1])."
-    }
-}
-Push-Location $source
-try {
-    cargo build --locked --release -p horizon-client -p horizon-prepare
-    if ($LASTEXITCODE -ne 0) { throw 'Rust engine failed to compile' }
-} finally { Pop-Location }
-New-Item -ItemType Directory -Path $runtime | Out-Null
-$engine = Join-Path $source 'target\release\horizon-client.exe'
-if (!(Test-Path $engine)) { throw 'Compiled Rust engine executable missing' }
-Copy-Item -LiteralPath $engine -Destination (Join-Path $runtime 'fre-rust-client.exe')
-# Include the MIT resource-preparation BINARY and original exporter sources.
-# Both operate inside FRE LAUNCH. No Horizon Launcher or Microsoft login
-# application is downloaded, started, or required by the native Rust client.
-$preparer = Join-Path $source 'target\release\horizon-prepare.exe'
-if (!(Test-Path -LiteralPath $preparer -PathType Leaf)) { throw 'Native Rust preparer missing from pinned source build' }
-Copy-Item -LiteralPath $preparer -Destination (Join-Path $runtime 'fre-rust-prepare.exe')
-$paritySource = Join-Path $source 'mods\horizon\src\test\java\dev\horizonlab\parity'
-$parityDestination = Join-Path $runtime 'mods\horizon\src\test\java\dev\horizonlab\parity'
-if (!(Test-Path -LiteralPath (Join-Path $paritySource 'VanillaHeightmapOracle.java'))) {
-    throw 'Native Rust exporter source missing from pinned checkout'
-}
-New-Item -ItemType Directory -Force -Path $parityDestination | Out-Null
-Copy-Item -Path (Join-Path $paritySource '*') -Destination $parityDestination -Recurse -Force
-# The preparer verifies the complete crate source digest, including its
-# Cargo.toml, build.rs and every src/*.rs. An isolated exporters.rs is not
-# sufficient; it can force a needless rebuild or break resource verification.
-$prepareSource = Join-Path $source 'crates\horizon-prepare'
-$prepareDestination = Join-Path $runtime 'crates\horizon-prepare'
-New-Item -ItemType Directory -Force -Path (Join-Path $prepareDestination 'src') | Out-Null
-foreach ($name in @('Cargo.toml', 'build.rs')) {
-    Copy-Item -LiteralPath (Join-Path $prepareSource $name) -Destination (Join-Path $prepareDestination $name)
-}
-Copy-Item -Path (Join-Path $prepareSource 'src\*.rs') -Destination (Join-Path $prepareDestination 'src') -Force
-$sourceCount = @(Get-ChildItem -LiteralPath (Join-Path $prepareDestination 'src') -File -Filter '*.rs').Count
-if ($sourceCount -lt 10) { throw "Native preparer source snapshot is incomplete: $sourceCount Rust files" }
-Copy-Item -LiteralPath (Join-Path $source 'LICENSE') -Destination (Join-Path $runtime 'LICENSE.txt')
-Copy-Item -LiteralPath (Join-Path $source 'research-lock.json') -Destination (Join-Path $runtime 'research-lock.json')
-$hash = (Get-FileHash -LiteralPath (Join-Path $runtime 'fre-rust-client.exe') -Algorithm SHA256).Hash.ToLowerInvariant()
-$prepareHash = (Get-FileHash -LiteralPath (Join-Path $runtime 'fre-rust-prepare.exe') -Algorithm SHA256).Hash.ToLowerInvariant()
-$metadata = [ordered]@{
-    engine_source = 'https://github.com/horizon-rust/horizon'
-    source_commit = $Revision
-    engine_license = 'MIT'
-    game_exe_sha256 = $hash
-    prepare_exe_sha256 = $prepareHash
-    proprietary_assets_origin = 'Not included in this public installer'
-    redistribution = 'Open-source MIT game + preparer; fetch owned Minecraft assets locally in FRE LAUNCH'
-}
-$metadata | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $runtime 'BUILD-INFO.json') -Encoding UTF8
-if (Test-Path -LiteralPath (Join-Path $runtime 'resources')) { throw 'Unexpected proprietary resource directory in CI output' }
-Write-Host "Built pinned MIT Rust client SHA-256: $hash"
-Write-Host "Bundled independent MIT resource preparer SHA-256: $prepareHash"
- -or
+            $expected -notmatch '^[A-Fa-f0-9]{64}$' -or
             (Get-FileHash -LiteralPath $filename -Algorithm SHA256).Hash -ine $expected) {
             throw "Existing Rust runtime contains an unverified binary: $($item.name)"
         }
