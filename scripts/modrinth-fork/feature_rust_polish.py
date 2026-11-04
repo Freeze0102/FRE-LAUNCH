@@ -267,8 +267,8 @@ async function deleteFreRustQuick() {
     # silently receive a native Rust profile ID.
     grid = frontend / "components/ui/library/instance-group/RustInstanceGrid.vue"
     exactly(grid,
-            "import { FolderOpenIcon, PlayIcon, SettingsIcon, TrashIcon } from '@modrinth/assets'",
-            "import { CheckIcon, FolderOpenIcon, PlayIcon, SettingsIcon, TrashIcon } from '@modrinth/assets'")
+            "import { FolderOpenIcon, PlayIcon, SettingsIcon, StopCircleIcon, TrashIcon } from '@modrinth/assets'",
+            "import { CheckIcon, FolderOpenIcon, PlayIcon, SettingsIcon, StopCircleIcon, TrashIcon } from '@modrinth/assets'")
     exactly(grid,
             "import InstanceCardView from '@/components/ui/library/instance-group/instance-card-view.vue'",
             "import InstanceCardView from '@/components/ui/library/instance-group/instance-card-view.vue'\n"
