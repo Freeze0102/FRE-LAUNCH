@@ -334,6 +334,26 @@ test('FRE Rust generator does not install the Horizon launcher or its account UI
   assert.match(generator, /available-loaders/)
 })
 
+test('FRE LAUNCH prepares with a private verified JDK 25, not another launcher', () => {
+  const backend = fs.readFileSync(path.join(__dirname, 'fre_rust_backend.rs'), 'utf8')
+  const setup = fs.readFileSync(path.join(__dirname, 'fre_rust_setup.rs'), 'utf8')
+  const jdk = fs.readFileSync(path.join(__dirname, 'fre_rust_jdk.rs'), 'utf8')
+  const generator = fs.readFileSync(path.join(__dirname, 'feature_fre_rust.py'), 'utf8')
+  const page = fs.readFileSync(path.join(__dirname, 'RustInstancePage.vue'), 'utf8')
+  assert.match(backend, /mod managed_jdk;/)
+  assert.match(setup, /managed_jdk::ensure\(data\)\.await/)
+  assert.match(setup, /"--java-home"/)
+  assert.match(generator, /fre_rust_jdk\.rs/)
+  assert.match(generator, /zip = \{ workspace = true \}/)
+  assert.match(jdk, /api\.adoptium\.net\/v3\/assets\/latest\/25\/hotspot/)
+  assert.match(jdk, /valid_digest\(expected\)/)
+  assert.match(jdk, /hasher\.finalize\(\)/)
+  assert.match(jdk, /item\.enclosed_name\(\)/)
+  assert.match(jdk, /Refusing symbolic links inside a downloaded JDK/)
+  assert.match(page, /java: 'prepJava'/)
+  assert.doesNotMatch(jdk, /horizon_install_launcher|horizon_detect_launcher/)
+})
+
 test('Native Rust profiles use Java InstanceCardView and navigate to the real page', async () => {
   const profile = { id: '12345678', name: 'Survival Rust', created: 1 }
   const emitted = [], navigated = []
