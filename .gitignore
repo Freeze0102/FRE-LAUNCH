@@ -9,6 +9,10 @@ FRE-Modrinth-Source-archive-*/
 .audit/
 .fre-update-keys/
 release-staging/
-vendor/fre-rust-source/
+# Pinned MIT Rust game source may be checked into this repository once imported.
+# Never commit compiler outputs, personal Minecraft files or an ephemeral checkout.
+vendor/fre-rust-source/target/
+vendor/fre-rust-source/.local/
+vendor/fre-rust-source/exporters/
 scripts/modrinth-fork/fre-rust-runtime/
 scripts/modrinth-fork/fre-rust-runtime.pending/
