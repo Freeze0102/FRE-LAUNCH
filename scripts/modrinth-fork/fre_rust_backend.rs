@@ -865,14 +865,14 @@ async fn rust_stop(profile_id: String) -> Result<String, String> {
         return Err("Invalid Rust profile identifier.".into());
     }
     let signal = STOP_SIGNALS.lock().await.remove(&profile_id);
-    match signal {
-        Some(signal) => {
-            signal.send(()).map_err(|_| "The game process has already exited.")?;
-            Ok("Stop requested for the selected Rust Minecraft game.".into())
-        }
-        None if RUNNING_PROFILES.lock().await.contains(&profile_id) =>
-            Err("Rust Minecraft is still starting; try Stop again shortly.".into()),
-        None => Err("This Rust Minecraft profile is not running.".into()),
+    if let Some(signal) = signal {
+        signal.send(()).map_err(|_| "The game process has already exited.")?;
+        return Ok("Stop requested for the selected Rust Minecraft game.".into());
+    }
+    if RUNNING_PROFILES.lock().await.contains(&profile_id) {
+        Err("Rust Minecraft is still starting; try Stop again shortly.".into())
+    } else {
+        Err("This Rust Minecraft profile is not running.".into())
     }
 }
 
