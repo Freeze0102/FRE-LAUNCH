@@ -371,6 +371,10 @@ pub async fn prepare<R: tauri::Runtime>(
         .build().map_err(|e| e.to_string())?;
     let _ = app.emit("fre-rust-prepare-stage", "download");
     let minecraft = acquire_game(&client, data, &lock).await?;
+    // Native exporters need javac 25, not merely a managed game JRE.
+    // FRE installs the verified open-source JDK privately when absent.
+    let _ = app.emit("fre-rust-prepare-stage", "java");
+    let java_home = super::managed_jdk::ensure(data).await?;
     let output = root.join(".local/horizon-client/26.3");
     let _ = app.emit("fre-rust-prepare-stage", "prepare");
     let mut command = Command::new(exe);
@@ -379,6 +383,7 @@ pub async fn prepare<R: tauri::Runtime>(
         .arg("--output").arg(&output)
         .arg("--minecraft-dir").arg(&minecraft)
         .arg("--server-jar").arg(minecraft.join("server-26.3.jar"))
+        .arg("--java-home").arg(&java_home)
         .arg("--prepare")
         .arg("--complete")
         .arg("--progress").arg("json")
