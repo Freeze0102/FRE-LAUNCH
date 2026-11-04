@@ -24,7 +24,7 @@ const m = defineMessages({
   playing: { id: 'fre-rust.library.playing', defaultMessage: 'Starting...' },
   manage: { id: 'fre-rust.library.manage', defaultMessage: 'Manage' },
   files: { id: 'fre-rust.library.files', defaultMessage: 'Files' },
-  modsInfo: { id: 'fre-rust.library.mods-info', defaultMessage: 'Horizon accepts native Rust mods, not CurseForge Java jars.' },
+  modsInfo: { id: 'fre-rust.library.mods-info', defaultMessage: 'Rust Minecraft uses .hmod native content mods. Java .jar files are incompatible.' },
   error: { id: 'fre-rust.library.error', defaultMessage: 'Rust game: {reason}' },
 })
 
