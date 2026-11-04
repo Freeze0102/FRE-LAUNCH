@@ -14,6 +14,8 @@ use tauri::{Emitter, Manager};
 use tokio::io::AsyncWriteExt;
 #[path = "fre_rust_setup.rs"]
 mod standalone_setup;
+#[path = "fre_rust_jdk.rs"]
+mod managed_jdk;
 
 const MAX_NAME: usize = 64;
 const MAX_METADATA: u64 = 8192;
