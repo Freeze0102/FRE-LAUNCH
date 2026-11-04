@@ -85,7 +85,15 @@ jobs:
           python -m pip install 'Pillow>=11,<13'
           if ($LASTEXITCODE -ne 0) { throw 'Could not install Python image dependency' }
 
-      - name: Compile real Rust Minecraft engine (MIT only)
+      - name: Restore verified native Rust game binaries from shared main-branch cache
+        id: rust-engine-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: scripts/modrinth-fork/fre-rust-runtime
+          key: frelaunch-windows-x64-rust-975c07d9151847e6af13afc4b5ab37b6bbe78ef5-v2
+
+      - name: Compile MIT native Rust game only on cache miss
+        if: steps.rust-engine-cache.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           ./scripts/modrinth-fork/ci-build-native-engine.ps1
@@ -93,6 +101,44 @@ jobs:
           if (Test-Path 'scripts/modrinth-fork/fre-rust-runtime/resources') {
             throw 'Proprietary Minecraft resources must never enter public GitHub update packages'
           }
+
+      - name: Cache native engine for later previews and signed builds
+        if: steps.rust-engine-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: scripts/modrinth-fork/fre-rust-runtime
+          key: frelaunch-windows-x64-rust-975c07d9151847e6af13afc4b5ab37b6bbe78ef5-v2
+
+      - name: Verify cached or newly compiled Rust game and preparer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = 'scripts/modrinth-fork/fre-rust-runtime'
+          $info = Get-Content -LiteralPath "$root/BUILD-INFO.json" -Raw | ConvertFrom-Json
+          if ($info.source_commit -ne '975c07d9151847e6af13afc4b5ab37b6bbe78ef5' -or $info.engine_license -ne 'MIT') {
+            throw 'Unapproved Rust engine source revision or license'
+          }
+          foreach ($item in @(
+            @{name='fre-rust-client.exe'; field='game_exe_sha256'},
+            @{name='fre-rust-prepare.exe'; field='prepare_exe_sha256'}
+          )) {
+            $file = Join-Path $root $item.name
+            if (!(Test-Path -LiteralPath $file -PathType Leaf)) { throw "Missing native game component: $($item.name)" }
+            $expected = [string]$info.($item.field)
+            if ($expected -notmatch '^[0-9a-fA-F]{64}$' -or (Get-FileHash $file -Algorithm SHA256).Hash -ine $expected) {
+              throw "Native game component checksum mismatch: $($item.name)"
+            }
+          }
+          foreach ($source in @(
+            'research-lock.json', 'LICENSE.txt', 'crates/horizon-prepare/Cargo.toml',
+            'crates/horizon-prepare/build.rs', 'crates/horizon-prepare/src/lib.rs',
+            'mods/horizon/src/test/java/dev/horizonlab/parity/VanillaHeightmapOracle.java'
+          )) {
+            if (!(Test-Path -LiteralPath (Join-Path $root $source) -PathType Leaf)) {
+              throw "Native resource preparer source snapshot incomplete: $source"
+            }
+          }
+          if (Test-Path "$root/resources") { throw 'Public packages cannot contain proprietary Minecraft assets' }
 
       - name: Compile full Vue/Tauri launcher with strict checks and existing update signature
         shell: pwsh
@@ -143,11 +189,11 @@ jobs:
           $folder = Join-Path $env:RUNNER_TEMP 'FRELaunchVueRustSmoke'
           $process = Start-Process -FilePath $env:FRE_REVIEW_INSTALLER -ArgumentList @('/S',"/D=$folder") -Wait -PassThru
           if ($process.ExitCode -ne 0) { throw "NSIS installation failed: $($process.ExitCode)" }
-          $executables = @(Get-ChildItem -LiteralPath $folder -Recurse -File -Filter '*.exe' |
-            Where-Object { $_.Name -notmatch 'unins|uninstall' })
-          if (!$executables.Count) { throw 'Installed FRE LAUNCH EXE not found' }
-          $binary = $executables | Sort-Object Length -Descending | Select-Object -First 1
-          $app = Start-Process -FilePath $binary.FullName -PassThru
+          # Installer also carries Rust game and preparer; never launch
+          # whichever bundled EXE happens to have the largest file size.
+          $executables = @(Get-ChildItem -LiteralPath $folder -Recurse -File -Filter 'FRE LAUNCH.exe')
+          if ($executables.Count -ne 1) { throw "Expected exactly one installed FRE LAUNCH.exe, found $($executables.Count)" }
+          $app = Start-Process -FilePath $executables[0].FullName -PassThru
           Start-Sleep -Seconds 12
           $app.Refresh()
           if ($app.HasExited) { throw "New Vue/Tauri launcher exited during startup: $($app.ExitCode)" }
@@ -159,7 +205,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $version = (Get-Content 'update-channel.json' -Raw | ConvertFrom-Json).version
-          $notes = "FRE LAUNCH $version — internal Modrinth search and installation for Java mods and modpacks; optional CurseForge Java mod search using an approved user API key, without opening external sites; local file browser for native Rust and Horizon profiles; detached Horizon client launch independent of CMD/PowerShell; Ukrainian localization and signed updater. CurseForge ZIP pack automatic installation is not supported. Source: $env:GITHUB_SHA. This release does not contain proprietary Minecraft assets."
+          $notes = "FRE LAUNCH $version — independent Minecraft 26.3 on Rust inside FRE LAUNCH, with its own instances, bundled MIT-native game and resource preparer, verified Mojang downloads and privately managed Java 25. No Horizon Launcher install, login or CLI is required. Local .hmod content mods and Java instance features are retained. Automatic .hnmod native-code builds remain unsupported. Source: $env:GITHUB_SHA. Proprietary Minecraft assets are never included; this requires separate signed release approval."
           Set-Content -LiteralPath 'release-notes-ci.md' -Value $notes -Encoding UTF8
           node scripts/modrinth-fork/package-update.mjs $env:FRE_REVIEW_INSTALLER release-notes-ci.md
           if ($LASTEXITCODE -ne 0) { throw 'Minisign updater verification failed: do not publish' }
