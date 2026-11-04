@@ -3,6 +3,8 @@
 //! client is bundled from openly licensed Rust sources at local build time.
 //! Private Minecraft game resources are supplied only from the owner's copy.
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::LazyLock;
 use sha2::{Digest, Sha256};
 use std::{
     fs,
@@ -49,6 +51,10 @@ fn ensure_rust_icon(dir: &Path) -> Option<String> {
 // duplicate visible profile names or compete for the same metadata.
 static PROFILE_CREATION: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 static RUNNING_PROFILES: tokio::sync::Mutex<Vec<String>> = tokio::sync::Mutex::const_new(Vec::new());
+// A stop request is delivered to the actual child process owned by this
+// application. Do not stop unrelated processes by name or PID.
+static STOP_SIGNALS: LazyLock<tokio::sync::Mutex<HashMap<String, tokio::sync::oneshot::Sender<()>>>> =
+    LazyLock::new(|| tokio::sync::Mutex::new(HashMap::new()));
 static RESOURCE_IMPORT: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -94,6 +100,8 @@ pub fn init<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
             rust_mods,
             rust_import_mod,
             rust_launch,
+            rust_running,
+            rust_stop,
             rust_logs,
             rust_open_folder,
             rust_list_files,
@@ -840,6 +848,34 @@ async fn rust_import_mod<R: tauri::Runtime>(
     Ok(format!("Imported {filename}. Turn it on in the game's Mods options to activate it."))
 }
 
+/// Source of truth for FRE LAUNCH UI (cards, side rail, instance page).
+/// This reports only children started by this launcher process; it never
+/// guesses based on executable names or stale persisted flags.
+#[tauri::command]
+async fn rust_running() -> Vec<String> {
+    RUNNING_PROFILES.lock().await.clone()
+}
+
+/// Request termination of the child owned by this profile. Worlds and game
+/// files are never removed. A stop is a forced termination, so in-game exit
+/// is preferable when a save is in progress.
+#[tauri::command]
+async fn rust_stop(profile_id: String) -> Result<String, String> {
+    if !profile_id_valid(&profile_id) {
+        return Err("Invalid Rust profile identifier.".into());
+    }
+    let signal = STOP_SIGNALS.lock().await.remove(&profile_id);
+    match signal {
+        Some(signal) => {
+            signal.send(()).map_err(|_| "The game process has already exited.")?;
+            Ok("Stop requested for the selected Rust Minecraft game.".into())
+        }
+        None if RUNNING_PROFILES.lock().await.contains(&profile_id) =>
+            Err("Rust Minecraft is still starting; try Stop again shortly.".into()),
+        None => Err("This Rust Minecraft profile is not running.".into()),
+    }
+}
+
 #[tauri::command]
 async fn rust_launch<R: tauri::Runtime>(
     app: tauri::AppHandle<R>, profile_id: String,
@@ -935,9 +971,31 @@ async fn rust_launch<R: tauri::Runtime>(
     drop(stdin);
     let pid = child.id().unwrap_or_default();
     let active_id = profile_id.clone();
+    let (stop_tx, stop_rx) = tokio::sync::oneshot::channel::<()>();
+    STOP_SIGNALS.lock().await.insert(profile_id.clone(), stop_tx);
+    let _ = app.emit("fre-rust-process-changed", serde_json::json!({
+        "profileId": profile_id, "running": true
+    }));
+    let app_for_exit = app.clone();
     let mut task = tokio::spawn(async move {
-        let result = child.wait().await;
+        // Child::wait is cancellation-safe. The stop request is delivered to
+        // this exact child, not to every executable with the same filename.
+        let waited = tokio::select! {
+            result = child.wait() => Some(result),
+            _ = stop_rx => None,
+        };
+        let result = match waited {
+            Some(result) => result,
+            None => {
+                let _ = child.start_kill();
+                child.wait().await
+            }
+        };
+        STOP_SIGNALS.lock().await.remove(&active_id);
         RUNNING_PROFILES.lock().await.retain(|id| id != &active_id);
+        let _ = app_for_exit.emit("fre-rust-process-changed", serde_json::json!({
+            "profileId": active_id, "running": false
+        }));
         result
     });
     match tokio::time::timeout(Duration::from_millis(1200), &mut task).await {
