@@ -1117,6 +1117,23 @@ async fn rust_logs<R: tauri::Runtime>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[tokio::test]
+    async fn stop_signals_only_the_chosen_native_profile() {
+        let active_id = "987654321123456789".to_owned();
+        let other_id = "123987654".to_owned();
+        let (sender, receiver) = tokio::sync::oneshot::channel();
+        RUNNING_PROFILES.lock().await.push(active_id.clone());
+        STOP_SIGNALS.lock().await.insert(active_id.clone(), sender);
+        let active = rust_running().await;
+        assert!(active.contains(&active_id));
+        assert!(rust_stop(other_id).await.is_err());
+        assert!(rust_stop(active_id.clone()).await.is_ok());
+        assert!(receiver.await.is_ok());
+        assert!(rust_stop(active_id.clone()).await.is_err());
+        RUNNING_PROFILES.lock().await.retain(|id| id != &active_id);
+        assert!(!rust_running().await.contains(&active_id));
+    }
+
     #[test]
     fn only_profile_game_folders_are_openable() {
         let root = std::env::temp_dir().join(format!("fre-rust-folders-{}", std::process::id()));
