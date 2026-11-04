@@ -78,7 +78,7 @@ pub async fn get_default_user()""",
             '''            .plugin(
                 "fre-rust",
                 InlinedPlugin::new()
-                    .commands(&["rust_profiles", "rust_create_profile", "rust_rename_profile", "rust_set_profile_icon", "rust_delete_profile", "rust_runtime", "rust_import_resources", "rust_mods", "rust_import_mod", "rust_launch", "rust_logs", "rust_open_folder", "rust_list_files"])
+                    .commands(&["rust_profiles", "rust_create_profile", "rust_rename_profile", "rust_set_profile_icon", "rust_delete_profile", "rust_runtime", "rust_import_resources", "rust_mods", "rust_import_mod", "rust_launch", "rust_running", "rust_stop", "rust_logs", "rust_open_folder", "rust_list_files"])
                     .default_permission(DefaultPermissionRule::AllowAllCommands),
             )
             .plugin(
@@ -369,6 +369,7 @@ onUnmounted(() => {
     grid_translations = {
         'open': ('Відкрити {name}', 'Open {name}'),
         'start': ('Запустити {name}', 'Play {name}'),
+        'stop': ('Зупинити {name}', 'Stop {name}'),
         'close': ('Закрити', 'Close'),
         'starting': ('Запуск…', 'Starting…'),
         'play': ('Грати', 'Play'),
@@ -412,6 +413,8 @@ onUnmounted(() => {
         messages['fre-rust.create.requirement'] = {'message': rust_requirement[position]}
         detail_messages = {
             'fre-rust.page.unavailable': ('Профіль Rust не знайдено.', 'Rust profile was not found.'),
+            'fre-rust.page.stop': ('Зупинити', 'Stop'),
+            'fre-rust.page.stopping': ('Зупинення…', 'Stopping…'),
             'fre-rust.page.content-note': (
                 'Нативні Rust-моди зберігаються у файлах гри. Java-моди Fabric/Forge несумісні.',
                 'Native Rust mods are managed in the game files. Java Fabric/Forge mods are not compatible.',
