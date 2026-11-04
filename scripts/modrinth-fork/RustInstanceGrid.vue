@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { invoke } from '@tauri-apps/api/core'
-import { FolderOpenIcon, PlayIcon, SettingsIcon, TrashIcon } from '@modrinth/assets'
+import { listen } from '@tauri-apps/api/event'
+import { FolderOpenIcon, PlayIcon, SettingsIcon, StopCircleIcon, TrashIcon } from '@modrinth/assets'
 import { ContextMenu, defineMessages, IconButton, injectNotificationManager, useVIntl } from '@modrinth/ui'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
@@ -42,6 +43,7 @@ const { formatMessage } = useVIntl()
 const messages = defineMessages({
   open: { id: 'fre-rust.grid.open', defaultMessage: 'Open {name}' },
   start: { id: 'fre-rust.grid.start', defaultMessage: 'Play {name}' },
+  stop: { id: 'fre-rust.grid.stop', defaultMessage: 'Stop {name}' },
   openFolder: { id: 'fre-rust.grid.open-folder', defaultMessage: 'Open folder' },
   settings: { id: 'fre-rust.grid.settings', defaultMessage: 'Settings' },
   delete: { id: 'fre-rust.page.delete', defaultMessage: 'Delete instance' },
@@ -49,6 +51,10 @@ const messages = defineMessages({
 const nativeProfiles = ref<NativeProfile[]>([])
 const runtime = ref<Runtime | null>(null)
 const busy = ref<string | null>(null)
+const runningIds = ref<string[]>([])
+const isRunning = (card: Card) => runningIds.value.includes(card.id)
+let unlistenProcess: (() => void) | null = null
+let processListenerDisposed = false
 const actionsMenu = ref<InstanceType<typeof ContextMenu>>()
 const deleteModal = ref<InstanceType<typeof ConfirmDeleteInstanceModal>>()
 const deleteTarget = ref<Card | null>(null)
@@ -79,17 +85,23 @@ watch(() => cards.value.length, length => emit('count-change', length), { immedi
 async function refresh() {
   const request = ++requestId
   try {
-    const [profiles, info] = await Promise.all([
+    const [profiles, info, running] = await Promise.all([
       invoke<NativeProfile[]>('plugin:fre-rust|rust_profiles'),
       invoke<Runtime>('plugin:fre-rust|rust_runtime'),
+      invoke<string[]>('plugin:fre-rust|rust_running').catch(() => []),
     ])
     if (request !== requestId) return
     nativeProfiles.value = profiles
     runtime.value = info
+    runningIds.value = running
   } catch (err) {
     if (request === requestId) handleError(err instanceof Error ? err : new Error(String(err)))
   }
-
+}
+async function refreshRunning() {
+  try {
+    runningIds.value = await invoke<string[]>('plugin:fre-rust|rust_running')
+  } catch { /* If the backend is unavailable, keep normal Java cards usable. */ }
 }
 
 // InstanceCardView is the SAME card renderer used by Fabric, Forge and
@@ -152,7 +164,9 @@ function openContext(event: MouseEvent, card: Card) {
   event.stopPropagation()
   actionsMenu.value?.open(event, [
     { id: 'open', label: formatMessage(messages.open, { name: card.name }), action: () => openCard(card) },
-    { id: 'play', label: formatMessage(messages.start, { name: card.name }), icon: PlayIcon, action: () => { void play(card) } },
+    isRunning(card)
+      ? { id: 'stop', label: formatMessage(messages.stop, { name: card.name }), icon: StopCircleIcon, action: () => { void stop(card) } }
+      : { id: 'play', label: formatMessage(messages.start, { name: card.name }), icon: PlayIcon, action: () => { void play(card) } },
     { id: 'settings', label: formatMessage(messages.settings), icon: SettingsIcon, action: () => openCard(card) },
     { id: 'files', label: formatMessage(messages.openFolder), icon: FolderOpenIcon, action: () => { void openFolder(card) } },
     ...(card.kind === 'native'
@@ -161,7 +175,7 @@ function openContext(event: MouseEvent, card: Card) {
   ])
 }
 async function play(card: Card) {
-  if (busy.value) return
+  if (busy.value || isRunning(card)) return
   busy.value = card.key
   try {
     if (!card.ready) {
@@ -180,6 +194,19 @@ async function play(card: Card) {
       return
     }
     await invoke<string>('plugin:fre-rust|rust_launch', { profileId: card.id })
+    await refreshRunning()
+  } catch (err) {
+    handleError(err instanceof Error ? err : new Error(String(err)))
+  } finally {
+    busy.value = null
+  }
+}
+async function stop(card: Card) {
+  if (busy.value || !isRunning(card)) return
+  busy.value = card.key
+  try {
+    await invoke('plugin:fre-rust|rust_stop', { profileId: card.id })
+    await refreshRunning()
   } catch (err) {
     handleError(err instanceof Error ? err : new Error(String(err)))
   } finally {
@@ -188,12 +215,23 @@ async function play(card: Card) {
 }
 const onRefresh = () => { void refresh() }
 onMounted(() => {
+  processListenerDisposed = false
   window.addEventListener('fre-rust-library-refresh', onRefresh)
+  window.addEventListener('focus', refreshRunning)
+  void listen('fre-rust-process-changed', () => { void refreshRunning() })
+    .then(unlisten => {
+      if (processListenerDisposed) unlisten()
+      else unlistenProcess = unlisten
+    }).catch(() => {})
   void refresh()
 })
 onUnmounted(() => {
   requestId++
   window.removeEventListener('fre-rust-library-refresh', onRefresh)
+  window.removeEventListener('focus', refreshRunning)
+  processListenerDisposed = true
+  unlistenProcess?.()
+  unlistenProcess = null
   emit('count-change', 0)
 })
 </script>
@@ -222,15 +260,16 @@ onUnmounted(() => {
         <div class="relative flex items-center justify-center" :class="compact ? 'size-10' : 'size-12'">
           <IconButton
             v-if="!busy"
-            v-tooltip="formatMessage(messages.start, { name: card.name })"
-            :label="formatMessage(messages.start, { name: card.name })"
+            v-tooltip="formatMessage(isRunning(card) ? messages.stop : messages.start, { name: card.name })"
+            :label="formatMessage(isRunning(card) ? messages.stop : messages.start, { name: card.name })"
             type="colored"
             color="brand"
             :size="compact ? 'md' : 'lg'"
             class="origin-bottom scale-75 opacity-0 transition-opacity group-hover/card:scale-100 group-hover/card:opacity-100"
-            @click.stop="play(card)"
+            @click.stop="isRunning(card) ? stop(card) : play(card)"
           >
-            <PlayIcon class="translate-x-px" />
+            <StopCircleIcon v-if="isRunning(card)" />
+            <PlayIcon v-else class="translate-x-px" />
           </IconButton>
         </div>
       </template>
