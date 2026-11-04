@@ -105,7 +105,25 @@ fn staging_path(root: &Path, name: &str) -> Result<PathBuf, String> {
     Ok(path)
 }
 
+const JDK_STAGING_MARKER: &[u8] = b"FRE-LAUNCH-MANAGED-JDK-25-STAGING-V1";
+fn clean_own_stage(root: &Path, stage: &Path) -> Result<(), String> {
+    if !stage.exists() { return Ok(()); }
+    let real_root = root.canonicalize().map_err(|e| e.to_string())?;
+    let real_stage = stage.canonicalize().map_err(|e| e.to_string())?;
+    if real_stage.parent() != Some(real_root.as_path())
+        || !stage.symlink_metadata().is_ok_and(|m| m.file_type().is_dir())
+        || fs::read(stage.join(".fre-jdk-staging")).ok().as_deref() != Some(JDK_STAGING_MARKER)
+    {
+        return Err("Refusing to erase an unrecognized or redirected Java staging folder.".into());
+    }
+    fs::remove_dir_all(stage).map_err(|e| format!("Cannot clean incomplete JDK installation: {e}"))
+}
 fn extract_archive(archive: &Path, destination: &Path) -> Result<(), String> {
+    fs::create_dir_all(destination).map_err(|e| e.to_string())?;
+    fs::OpenOptions::new().create_new(true).write(true)
+        .open(destination.join(".fre-jdk-staging"))
+        .and_then(|mut file| file.write_all(JDK_STAGING_MARKER))
+        .map_err(|e| format!("Cannot initialize FRE Java staging folder: {e}"))?;
     let file = fs::File::open(archive).map_err(|e| format!("Cannot open downloaded JDK: {e}"))?;
     let mut zip = zip::ZipArchive::new(file).map_err(|e| format!("Invalid JDK ZIP archive: {e}"))?;
     if zip.len() == 0 || zip.len() > 35000 {
@@ -236,16 +254,16 @@ pub async fn ensure(data: &Path) -> Result<PathBuf, String> {
     {
         let root = data.join("managed-java");
         fs::create_dir_all(&root).map_err(|e| format!("Cannot create FRE Java cache: {e}"))?;
+        if !root.symlink_metadata().is_ok_and(|m| m.file_type().is_dir()) {
+            return Err("Unsafe FRE Java cache root.".into());
+        }
         let target = staging_path(&root, "jdk-25")?;
         if valid_jdk(&target).await { return Ok(target); }
         if target.exists() {
             return Err("FRE's private JDK 25 cache is incomplete; back it up or rename it before retrying.".into());
         }
         let stage = staging_path(&root, "jdk-25.pending")?;
-        if stage.exists() {
-            if !stage.is_dir() { return Err("Unsafe pending FRE Java folder.".into()); }
-            fs::remove_dir_all(&stage).map_err(|e| e.to_string())?;
-        }
+        clean_own_stage(&root, &stage)?;
         let archive = staging_path(&root, "jdk-25.download")?;
         if archive.exists() {
             if !archive.is_file() { return Err("Unsafe incomplete JDK archive.".into()); }
@@ -264,9 +282,7 @@ pub async fn ensure(data: &Path) -> Result<PathBuf, String> {
             Ok(())
         }.await;
         let _ = fs::remove_file(&archive);
-        if result.is_err() {
-            if stage.is_dir() { let _ = fs::remove_dir_all(&stage); }
-        }
+        if result.is_err() { let _ = clean_own_stage(&root, &stage); }
         result?;
         Ok(target)
     }
