@@ -202,11 +202,11 @@ def verify(root):
     for source, markers in (
         (rust_backend, [
             'Builder::new("fre-rust")', "async fn rust_create_profile",
-            "async fn rust_import_resources", "async fn rust_launch", "async fn rust_rename_profile", "async fn rust_delete_profile", "async fn rust_profiles", "async fn rust_runtime",
+            "async fn rust_import_resources", "async fn rust_launch", "async fn rust_running", "async fn rust_stop", "async fn rust_rename_profile", "async fn rust_delete_profile", "async fn rust_profiles", "async fn rust_runtime",
             "async fn rust_logs", '"fre-rust-client.exe"', 'Command::new(client)',
             '"--resources"', '"--home"', '"--game-dir"', '"--session-stdin"',
             "theseus::minecraft_auth::fre_rust_default_credentials", "online_profile_fresh",
-            "verify_native_client", "Sha256::new", "RUNNING_PROFILES",
+            "verify_native_client", "Sha256::new", "RUNNING_PROFILES", "STOP_SIGNALS", "fre-rust-process-changed",
             "profile_id_valid", "read_profile", "safe_game_folder", "rust_open_folder", "rust_list_files", "list_game_files", "explorer.exe",
             "rust_import_mod", "owned_mods", "ensure_rust_icon", "default_rust_icon",
         ]),
@@ -228,7 +228,7 @@ def verify(root):
         ]),
         (rust_stage, ["customSetupTitle"]),
         (rust_main, [".plugin(api::fre_rust::init())"]),
-        (rust_build, ['"fre-rust"', '"rust_create_profile"', '"rust_rename_profile"', '"rust_delete_profile"', '"rust_import_mod"', '"rust_launch"',
+        (rust_build, ['"fre-rust"', '"rust_create_profile"', '"rust_rename_profile"', '"rust_delete_profile"', '"rust_import_mod"', '"rust_launch"', '"rust_running"', '"rust_stop"',
             '"rust_open_folder"', '"rust_list_files"']),
     ):
         for marker in markers:
@@ -306,6 +306,7 @@ def verify(root):
     # blocks as Java. No bespoke library card, modal or Java game dispatch.
     for marker in ('<InstanceCardView', ':instance="viewInstance(card)"',
                    'plugin:fre-rust|rust_profiles', 'plugin:fre-rust|rust_launch',
+                   'plugin:fre-rust|rust_running', 'plugin:fre-rust|rust_stop',
                    'data-library-instance-card', "'/rust-instance/'"):
         assert marker in unified_rust, f"Shared Java card integration missing: {marker}"
     assert '<Teleport' not in unified_rust and 'role="dialog"' not in unified_rust, (
@@ -315,7 +316,8 @@ def verify(root):
                    '<NavTabs', '<RustInstanceFiles', '<ConfirmDeleteInstanceModal',
                    '<TabbedModal', 'query="tab"', 'fre-rust-tab', 'rust_rename_profile', 'rust_delete_profile',
                    'useRootBreadcrumb',
-                   'plugin:fre-rust|rust_launch', 'plugin:fre-rust|rust_import_resources'):
+                   'plugin:fre-rust|rust_launch', 'plugin:fre-rust|rust_running',
+                   'plugin:fre-rust|rust_stop', 'plugin:fre-rust|rust_import_resources'):
         assert marker in rust_detail, f"Java-like Rust profile page incomplete: {marker}"
     for marker in ('<FilePageLayout', 'provideFileManager',
                    'plugin:fre-rust|rust_list_files', 'plugin:fre-rust|rust_open_folder',
@@ -404,6 +406,9 @@ def verify(root):
     assert 'MAX_UPDATE_BYTES' in updater
     assert (root / 'apps/app/src/api/fre_rust.rs').is_file()
     assert 'rust_launch' in (root / 'apps/app/build.rs').read_text(encoding="utf-8")
+    assert 'rust_running' in (root / 'apps/app/build.rs').read_text(encoding="utf-8")
+    assert 'rust_stop' in (root / 'apps/app/build.rs').read_text(encoding="utf-8")
+    assert "fre-rust-process-changed" in native_backend
     assert 'horizon_install_launcher' not in (root / 'apps/app/build.rs').read_text(encoding="utf-8")
     assert 'rust_open_folder' in (root / 'apps/app/src/api/fre_rust.rs').read_text(encoding="utf-8")
     assert 'rust_list_files' in (root / 'apps/app/src/api/fre_rust.rs').read_text(encoding="utf-8")
