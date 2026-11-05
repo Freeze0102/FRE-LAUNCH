@@ -1,6 +1,6 @@
 //! FRE LAUNCH's own Minecraft 26.3 asset preparation path.
 //! Reuses the MIT-licensed native preparer BUNDLED WITH FRE LAUNCH.
-//! No Horizon Launcher, Horizon account, external launcher CLI or
+//! No external launcher, external account, external launcher CLI or
 //! proprietary Minecraft data is bundled or downloaded from third parties.
 //! The caller must first verify ownership using FRE's Microsoft session.
 use std::{fs, io::Read, path::{Component, Path, PathBuf}, time::Duration};
@@ -164,10 +164,11 @@ fn prepare_root(bundle: &Path, data: &Path) -> Result<PathBuf, String> {
         return Err("Unsafe native resource preparer directory.".into());
     }
     fs::create_dir_all(&root).map_err(|e| e.to_string())?;
+    super::migration::cache(&root)?;
     for relative in [
         "research-lock.json",
-        "crates/horizon-prepare/Cargo.toml",
-        "crates/horizon-prepare/build.rs",
+        "crates/fre-prepare/Cargo.toml",
+        "crates/fre-prepare/build.rs",
     ] {
         let input = bundle.join(relative);
         let output = root.join(relative);
@@ -183,8 +184,8 @@ fn prepare_root(bundle: &Path, data: &Path) -> Result<PathBuf, String> {
     }
     // Match the pinned preparer's source checksum: Cargo.toml + build.rs
     // + all Rust src/*.rs, not merely the exporter implementation.
-    let crate_src = bundle.join("crates/horizon-prepare/src");
-    let target_src = root.join("crates/horizon-prepare/src");
+    let crate_src = bundle.join("crates/fre-prepare/src");
+    let target_src = root.join("crates/fre-prepare/src");
     let crate_meta = crate_src.symlink_metadata().map_err(|e| format!("Missing native source snapshot: {e}"))?;
     if !crate_meta.file_type().is_dir() {
         return Err("Native preparer source snapshot is not an ordinary directory.".into());
@@ -208,7 +209,7 @@ fn prepare_root(bundle: &Path, data: &Path) -> Result<PathBuf, String> {
         if rust_sources > 40 { return Err("Oversized native Rust source snapshot.".into()); }
     }
     if rust_sources < 10 { return Err("Native Rust source snapshot is incomplete.".into()); }
-    let parity = "mods/horizon/src/test/java/dev/horizonlab/parity";
+    let parity = "mods/fre/src/test/java/dev/frelaunch/parity";
     bounded_copy_tree(&bundle.join(parity), &root.join(parity))?;
     Ok(root)
 }
@@ -352,7 +353,7 @@ pub async fn prepare<R: tauri::Runtime>(
         .map_err(|e| e.to_string())?).map_err(|e| format!("Invalid Minecraft lock: {e}"))?;
     let _ = app.emit("fre-rust-prepare-stage", "local");
     let client = Client::builder()
-        .user_agent("FRE-LAUNCH/0.5.10 native-minecraft-setup")
+        .user_agent("FRE-LAUNCH/0.5.11 native-minecraft-setup")
         .timeout(Duration::from_secs(120))
         .redirect(reqwest::redirect::Policy::none())
         .build().map_err(|e| e.to_string())?;
@@ -362,7 +363,7 @@ pub async fn prepare<R: tauri::Runtime>(
     // FRE installs the verified open-source JDK privately when absent.
     let _ = app.emit("fre-rust-prepare-stage", "java");
     let java_home = super::managed_jdk::ensure(data).await?;
-    let output = root.join(".local/horizon-client/26.3");
+    let output = root.join(".local/fre-client/26.3");
     let _ = app.emit("fre-rust-prepare-stage", "prepare");
     let mut command = Command::new(exe);
     command
@@ -388,6 +389,14 @@ pub async fn prepare<R: tauri::Runtime>(
             .chars().rev().collect::<String>();
         return Err(format!("Native Minecraft preparation failed: {tail}"));
     }
+    // Distinguish this resource namespace from pre-rebranding caches. Java
+    // inputs and the JDK stay reusable; stale translated UI assets are rebuilt.
+    let stamp_path = output.join("fre-prepare.json");
+    let mut stamp: Value = serde_json::from_slice(&fs::read(&stamp_path).map_err(|e| e.to_string())?)
+        .map_err(|e| e.to_string())?;
+    stamp["product"] = Value::String("FRE LAUNCH".into());
+    fs::write(&stamp_path, serde_json::to_vec_pretty(&stamp).map_err(|e| e.to_string())?)
+        .map_err(|e| e.to_string())?;
     if !super::resources_valid(&output) {
         return Err("Bundled FRE Rust preparer did not produce a verified 26.3 resource cache.".into());
     }

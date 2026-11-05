@@ -2,7 +2,7 @@
 //! A JRE is not enough: the original MIT exporter Java sources require javac.
 //! Existing JDKs are reused. A missing JDK is fetched from Eclipse Adoptium
 //! over HTTPS with a publisher-provided SHA-256 and extracted only under FRE's
-//! own application data. Neither Horizon Launcher nor a global Java install
+//! own application data. Neither external launcher nor a global Java install
 //! is required. No JVM bytes are redistributed with the FRE installer.
 use std::{fs, io::Write, path::{Component, Path, PathBuf}, time::Duration};
 use sha2::{Digest, Sha256};
@@ -198,7 +198,7 @@ async fn download_jdk(archive: &Path) -> Result<(), String> {
         }
     });
     let client = reqwest::Client::builder()
-        .user_agent("FRE-LAUNCH/0.5.10 managed-JDK")
+        .user_agent("FRE-LAUNCH/0.5.11 managed-JDK")
         .timeout(Duration::from_secs(20 * 60))
         .redirect(redirect)
         .build().map_err(|e| e.to_string())?;

@@ -76,7 +76,7 @@ const m = defineMessages({
   notDownloaded: { id: 'fre-rust.page.not-downloaded', defaultMessage: 'If the resource cache is missing, FRE LAUNCH downloads verified Minecraft assets from Mojang after verifying account ownership.' },
 })
 
-const kind = computed<'native' | 'horizon'>(() => route.params.kind === 'horizon' ? 'horizon' : 'native')
+const kind = computed<'native' | 'legacy'>(() => route.params.kind === 'legacy' ? 'legacy' : 'native')
 const id = computed(() => String(route.params.id ?? ''))
 const profile = ref<Profile | null>(null)
 const runtime = ref<Runtime | null>(null)
@@ -155,7 +155,7 @@ async function refresh() {
     const [profiles, status, active] = await Promise.all([
       invoke<NativeProfile[]>('plugin:fre-rust|rust_profiles'),
       invoke<Runtime>('plugin:fre-rust|rust_runtime'),
-      invoke<string[]>('plugin:fre-rust|rust_running').catch(() => []),
+      invoke<string[]>('plugin:fre-rust|rust_running').catch((): string[] => []),
     ])
     if (current !== generation) return
     runtime.value = status

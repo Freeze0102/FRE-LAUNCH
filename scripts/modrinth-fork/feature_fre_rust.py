@@ -1,4 +1,4 @@
-"""Replace the old external Horizon Launcher integration with FRE LAUNCH's native Rust game.
+"""Replace the old external external launcher integration with FRE LAUNCH's native Rust game.
 
 The game executable is built locally and bundled as a Tauri resource. It is
 not downloaded, launched or updated through any foreign launcher executable.
@@ -6,8 +6,19 @@ Minecraft's private game assets come from the user's own installation.
 """
 import json
 import hashlib
+import re
 import shutil
 from pathlib import Path
+
+def verify_runtime_branding(runtime: Path):
+    for path in runtime.rglob("*"):
+        if path.is_symlink():
+            raise RuntimeError(f"Native Rust game runtime contains a link: {path}")
+        if re.search(r'horizon(?!tal)', path.relative_to(runtime).as_posix(), re.I):
+            raise RuntimeError(f"Old engine branding in packaged filename: {path.name}")
+        if path.is_file() and path.suffix in {'.rs', '.java', '.json', '.toml'}:
+            if re.search(r'horizon(?!tal)', path.read_text(encoding='utf-8-sig'), re.I):
+                raise RuntimeError(f"Old engine branding in bundled runtime text: {path.name}")
 
 def exactly(path: Path, before: str, after: str):
     source = path.read_text(encoding="utf-8")
@@ -32,6 +43,7 @@ def apply(root: Path):
     shutil.copyfile(here / "fre_rust_backend.rs", app / "src/api/fre_rust.rs")
     shutil.copyfile(here / "fre_rust_setup.rs", app / "src/api/fre_rust_setup.rs")
     shutil.copyfile(here / "fre_rust_jdk.rs", app / "src/api/fre_rust_jdk.rs")
+    shutil.copyfile(here / "fre_rust_migration.rs", app / "src/api/fre_rust_migration.rs")
     # The independent first-run downloader uses Mojang HTTPS and pinned SHA-1,
     # not a second launcher, its CLI, or a separate Microsoft account.
     exactly(app / "Cargo.toml", "sha2 = { workspace = true }",
@@ -65,7 +77,7 @@ pub async fn fre_rust_default_credentials() -> crate::Result<Option<Credentials>
 pub async fn get_default_user()""",
     )
 
-    # FRE Rust is registered directly in Tauri, with no Horizon Launcher
+    # FRE Rust is registered directly in Tauri, with no external launcher
     # plugin or foreign account workflow; old data folders remain untouched.
     exactly(app / "src/api/mod.rs",
             "pub mod files;\npub mod friends;",
@@ -199,7 +211,7 @@ async function handleFreRustOrJavaCreate(config) {
     },
 \tuploadIcon: {""")
 
-    # Keep the standard setup-type UI; no separate Horizon shortcut.
+    # Keep the standard setup-type UI; no separate external launcher shortcut.
     # The same Java instance card now opens a real full-width route rather
     # than a bespoke modal. No native Rust operation reaches Java's loader.
     routes = frontend / "src/routes.js"
@@ -361,7 +373,7 @@ onUnmounted(() => {
     exactly(index,
             '\t<WelcomeScreen v-if="isReady && !hasCreatedInstance" />\n\t<div\n\t\tv-else-if="isReady"',
             '\t<WelcomeScreen v-if="isReady && !hasCreatedInstance && rustHomeReady && !hasRustProfiles" />\n\t<div\n\t\tv-else-if="isReady && (hasCreatedInstance || hasRustProfiles)"')
-    # No second library section or Horizon setup option is ever inserted.
+    # No second library section or external launcher setup option is ever inserted.
     # The original Java Home and Create layouts remain unchanged.
 
     # The Rust instance details share the launcher's UA/EN locale system.
@@ -386,7 +398,7 @@ onUnmounted(() => {
                             'Import your own Minecraft resources in Rust settings before playing.'),
         'game-required': ('Потрібні твої встановлені файли Minecraft.',
                           'Your own installed Minecraft resources are required.'),
-        'horizon-required': ('Спочатку встанови ресурси Minecraft на Rust у FRE LAUNCH.',
+        'resources-required': ('Спочатку встанови ресурси Minecraft на Rust у FRE LAUNCH.',
                              'Prepare the native Minecraft resources in FRE LAUNCH before playing.'),
         'mods-warning': ('Java JAR-моди не підтримуються нативним Rust-клієнтом. '
                          'Світи та файли кожної збірки зберігаються окремо.',
@@ -435,7 +447,7 @@ onUnmounted(() => {
                 'Automatic preparation requires a Minecraft Java Edition account in FRE LAUNCH. The native resource preparer may require Java 25.',
             ),
             'fre-rust.page.choose-resources': ('Обрати папку ресурсів', 'Choose prepared resources folder'),
-            'fre-rust.page.sign-in-horizon': ('Вхід через FRE LAUNCH', 'Sign in with FRE LAUNCH'),
+            'fre-rust.page.sign-in-fre': ('Вхід через FRE LAUNCH', 'Sign in with FRE LAUNCH'),
             'fre-rust.page.prep-helper': ('Перевіряємо вбудований Rust-рушій…', 'Checking bundled Rust engine…'),
             'fre-rust.page.prep-version': ('Перевіряємо версію Rust-гри…', 'Checking Rust game version…'),
             'fre-rust.page.prep-local': ('Перевіряємо встановлені файли Minecraft…', 'Checking installed Minecraft files…'),
@@ -499,9 +511,7 @@ onUnmounted(() => {
         # These may be private Minecraft resources. Prevent symlink escapes
         # and detect incomplete, edited or mismatched native builds before
         # copying anything into the Tauri installer.
-        for path in runtime.rglob("*"):
-            if path.is_symlink():
-                raise RuntimeError(f"Native Rust game runtime contains a link: {path}")
+        verify_runtime_branding(runtime)
         info = json.loads((runtime / "BUILD-INFO.json").read_text(encoding="utf-8-sig"))
         if info.get("source_commit") != "975c07d9151847e6af13afc4b5ab37b6bbe78ef5":
             raise RuntimeError("Native Rust engine source revision is not approved.")
@@ -515,13 +525,16 @@ onUnmounted(() => {
         preparer_checksum = hashlib.sha256((runtime / "fre-rust-prepare.exe").read_bytes()).hexdigest()
         if preparer_checksum.lower() != str(info.get("prepare_exe_sha256", "")).lower():
             raise RuntimeError("Native Rust preparer SHA-256 mismatch: rebuild; do not bundle.")
-        parity = runtime / "mods/horizon/src/test/java/dev/horizonlab/parity/VanillaHeightmapOracle.java"
-        prepare_source = runtime / "crates/horizon-prepare"
+        parity = runtime / "mods/fre/src/test/java/dev/frelaunch/parity/VanillaHeightmapOracle.java"
+        prepare_source = runtime / "crates/fre-prepare"
         source_files = list((prepare_source / "src").glob("*.rs"))
         if not parity.is_file() or not (prepare_source / "Cargo.toml").is_file() or not (prepare_source / "build.rs").is_file() or len(source_files) < 10:
             raise RuntimeError("Bundled Rust preparer lacks its complete MIT source and Java exporters.")
         if info.get("engine_license") != "MIT":
             raise RuntimeError("Native Rust game license metadata changed.")
+        from native_branding import fingerprint
+        if info.get("branding_sha256") != fingerprint() or info.get("product_name") != "FRE LAUNCH":
+            raise RuntimeError("Native runtime has outdated branding. Run BUILD-FRE-RUST.ps1 before packaging.")
         if not (runtime / "LICENSE.txt").read_text(encoding="utf-8").startswith("MIT License"):
             raise RuntimeError("Native Rust game attribution is missing.")
         staged = app / "fre-rust-runtime"
@@ -536,8 +549,8 @@ onUnmounted(() => {
         for file in binaries + ("BUILD-INFO.json",):
             resources[f"fre-rust-runtime/{file}"] = f"fre-rust/{file}"
         # These are original MIT exporter sources, not Mojang game files.
-        resources["fre-rust-runtime/mods/horizon/src/test/java/dev/horizonlab/parity/"] = "fre-rust/mods/horizon/src/test/java/dev/horizonlab/parity/"
-        resources["fre-rust-runtime/crates/horizon-prepare/"] = "fre-rust/crates/horizon-prepare/"
+        resources["fre-rust-runtime/mods/fre/src/test/java/dev/frelaunch/parity/"] = "fre-rust/mods/fre/src/test/java/dev/frelaunch/parity/"
+        resources["fre-rust-runtime/crates/fre-prepare/"] = "fre-rust/crates/fre-prepare/"
         # PUBLIC releases carry the MIT engine only. Mojang resources are
         # imported locally by the authenticated owner after installation.
         conf.write_text(json.dumps(settings, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")

@@ -16,4 +16,5 @@ vendor/fre-rust-source/.local/
 vendor/fre-rust-source/exporters/
 scripts/modrinth-fork/fre-rust-runtime/
 scripts/modrinth-fork/fre-rust-runtime.pending/
+scripts/modrinth-fork/fre-rust-runtime-archive-*/
 tests/native-jdk/target/

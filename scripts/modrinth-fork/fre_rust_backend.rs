@@ -1,5 +1,5 @@
 //! FRE LAUNCH built-in Rust Minecraft profile manager.
-//! No Horizon Launcher process, filesystem dependency or API. The native
+//! No external launcher process, filesystem dependency or API. The native
 //! client is bundled from openly licensed Rust sources at local build time.
 //! Private Minecraft game resources are supplied only from the owner's copy.
 use serde::{Deserialize, Serialize};
@@ -18,6 +18,8 @@ use tokio::io::AsyncWriteExt;
 mod standalone_setup;
 #[path = "fre_rust_jdk.rs"]
 mod managed_jdk;
+#[path = "fre_rust_migration.rs"]
+mod migration;
 
 const MAX_NAME: usize = 64;
 const MAX_METADATA: u64 = 8192;
@@ -300,7 +302,7 @@ async fn rust_create_profile<R: tauri::Runtime>(
                 }
                 // A real independent game home, not a shortcut to a foreign
                 // launcher. Each instance has its own worlds and native mods.
-                for folder in ["saves", "horizon-mods", "resourcepacks", "shaderpacks", "screenshots", "logs"] {
+                for folder in ["saves", "fre-mods", "resourcepacks", "shaderpacks", "screenshots", "logs"] {
                     if let Err(error) = fs::create_dir(dir.join(folder)) {
                         let _ = fs::remove_dir_all(&dir); // Freshly created, never user data.
                         return Err(format!("Could not initialize Rust game folders: {error}"));
@@ -497,12 +499,12 @@ fn verify_native_client(root: &Path) -> Result<(), String> {
     Ok(())
 }
 
-/// Quick integrity check for a completed Horizon preparation. A filename
+/// Quick integrity check for a completed FRE preparation. A filename
 /// alone is not proof of a usable cache: partial copies and stale manifests
 /// must not make the library's Play button report Ready.
 fn resources_valid(root: &Path) -> bool {
     use std::io::Read;
-    let manifest = root.join("horizon-resources.json");
+    let manifest = root.join("fre-resources.json");
     let Ok(meta) = fs::symlink_metadata(&manifest) else { return false };
     if !meta.file_type().is_file() || meta.len() == 0 || meta.len() > 2 * 1024 * 1024 {
         return false;
@@ -513,15 +515,18 @@ fn resources_valid(root: &Path) -> bool {
         || value.get("schema").and_then(|v| v.as_i64()) != Some(7) {
         return false;
     }
-    let stamp = fs::read(root.join("horizon-prepare.json")).ok()
+    let stamp = fs::read(root.join("fre-prepare.json")).ok()
         .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok());
     if stamp.as_ref().and_then(|stamp| stamp["output_version"].as_i64()) != Some(3) {
+        return false;
+    }
+    if stamp.as_ref().and_then(|stamp| stamp["product"].as_str()) != Some("FRE LAUNCH") {
         return false;
     }
     for file in ["items.json", "registries.json", "commands.json", "model-states.json", "assets/pack.mcmeta"] {
         if !root.join(file).symlink_metadata().is_ok_and(|m| m.file_type().is_file()) { return false; }
     }
-    // These hashes are recorded by Horizon's preparer and cover essential
+    // These hashes are recorded by FRE's preparer and cover essential
     // output. The official preparer verifies the rest at download/prep time.
     for (field, relative) in [
         ("facts_sha256", "facts.json"),
@@ -565,10 +570,10 @@ fn ready(root: &Path, data_root: &Path) -> RustRuntime {
     let installed = client.is_file() && root.join("BUILD-INFO.json").is_file()
         && root.join("research-lock.json").is_file()
         && root.join("fre-rust-prepare.exe").is_file()
-        && root.join("crates/horizon-prepare/Cargo.toml").is_file()
-        && root.join("crates/horizon-prepare/build.rs").is_file()
-        && root.join("crates/horizon-prepare/src/lib.rs").is_file()
-        && root.join("mods/horizon/src/test/java/dev/horizonlab/parity/VanillaHeightmapOracle.java").is_file();
+        && root.join("crates/fre-prepare/Cargo.toml").is_file()
+        && root.join("crates/fre-prepare/build.rs").is_file()
+        && root.join("crates/fre-prepare/src/lib.rs").is_file()
+        && root.join("mods/fre/src/test/java/dev/frelaunch/parity/VanillaHeightmapOracle.java").is_file();
     let prepared = resources_valid(&local_resources(data_root, root));
     let reason = if !installed {
         Some("The FRE LAUNCH Rust game was not included in this installer. Build and bundle the native client first.".into())
@@ -708,6 +713,7 @@ async fn rust_import_resources<R: tauri::Runtime>(
     }
     // Preserve a damaged cache and stale interrupted copy, then safely retry.
     // Do not remove any of the user's original files or saved worlds.
+    migration::cache(&destination)?;
     preserve_incomplete(&destination)?;
     preserve_incomplete(&base(&app)?.join("prepared.pending"))?;
     let selected = if source.trim().is_empty() {
@@ -732,8 +738,9 @@ fn mod_filename_safe(name: &str) -> bool {
         && !name.starts_with('.')
 }
 fn owned_mods(dir: &Path) -> Result<PathBuf, String> {
+    migration::profile(dir)?;
     let root = dir.canonicalize().map_err(|e| e.to_string())?;
-    let folder = dir.join("horizon-mods");
+    let folder = dir.join("fre-mods");
     if !folder.exists() { fs::create_dir(&folder).map_err(|e| e.to_string())?; }
     let resolved = folder.canonicalize().map_err(|e| e.to_string())?;
     if resolved.parent() != Some(root.as_path()) {
@@ -798,7 +805,7 @@ async fn rust_mods<R: tauri::Runtime>(
         _ => Err("Use local .hmod import. Native .hnmod code requires a separate trusted native build.".into()),
     }
 }
-/// Local import only. Never uses the external Horizon Launcher or its account.
+/// Local import only. Never uses the external external launcher or its account.
 #[tauri::command]
 async fn rust_import_mod<R: tauri::Runtime>(
     app: tauri::AppHandle<R>, profile_id: String, source: String,
@@ -888,6 +895,10 @@ async fn rust_launch<R: tauri::Runtime>(
     let dir = profile_dir(&root, &profile_id)?;
     let profile = read_profile(&dir, &profile_id)
         .ok_or("Rust profile not found. Refresh the library.")?;
+    if RUNNING_PROFILES.lock().await.contains(&profile_id) {
+        return Err("This Rust Minecraft profile is already running.".into());
+    }
+    migration::profile(&dir)?;
     let runtime_dir = bundle(&app)?;
     let runtime = ready(&runtime_dir, &root);
     if let Some(message) = runtime.reason {
@@ -924,11 +935,13 @@ async fn rust_launch<R: tauri::Runtime>(
         .map_err(|_| "Could not prepare the Minecraft session.".to_owned())?;
 
     // The engine reads --home, --game-dir, --resources, and
-    // --session-stdin directly (Horizon native Launch API 0.1).
+    // --session-stdin directly (native Launch API 0.1).
     // Account tokens only travel through the child's private stdin pipe,
     // never in command-line arguments, logs or profile metadata.
     let mut cmd = tokio::process::Command::new(client);
     cmd.current_dir(&dir)
+        .env("FRE_NO_SELF_UPDATE", "1")
+        .env("FRE_TELEMETRY_URL", "off")
         .arg("--game-dir").arg(&dir)
         .arg("--home").arg(&dir)
         .arg("--resources").arg(resources)
@@ -1014,6 +1027,7 @@ async fn rust_launch<R: tauri::Runtime>(
 // Open a validated game subfolder, just like Java's Files button.
 // Never accept arbitrary paths or let a profile folder symlink escape the app.
 fn safe_game_folder(dir: &Path, folder: &str) -> Result<PathBuf, String> {
+    migration::profile(dir)?;
     const ALLOWED: &[&str] = &[
         "root", "saves", "mods", "resourcepacks", "shaderpacks", "screenshots", "logs"
     ];
@@ -1021,11 +1035,11 @@ fn safe_game_folder(dir: &Path, folder: &str) -> Result<PathBuf, String> {
         return Err("Unsupported Rust game folder.".into());
     }
     let base = dir.canonicalize().map_err(|e| e.to_string())?;
-    let target = if folder == "root" { base.clone() } else if folder == "mods" { base.join("horizon-mods") } else { base.join(folder) };
-    // Profiles created before Horizon mod support have only a legacy 'mods'
+    let target = if folder == "root" { base.clone() } else if folder == "mods" { base.join("fre-mods") } else { base.join(folder) };
+    // Profiles created before native mod support have only a legacy 'mods'
     // folder. Create the correct empty native folder without moving user data.
     if folder == "mods" && !target.exists() {
-        fs::create_dir(&target).map_err(|e| format!("Could not create Horizon mods folder: {e}"))?;
+        fs::create_dir(&target).map_err(|e| format!("Could not create FRE mods folder: {e}"))?;
     }
     let resolved = target.canonicalize().map_err(|e| e.to_string())?;
     if !resolved.starts_with(&base) || !resolved.is_dir() {
@@ -1138,7 +1152,7 @@ mod tests {
     fn only_profile_game_folders_are_openable() {
         let root = std::env::temp_dir().join(format!("fre-rust-folders-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
-        std::fs::create_dir_all(root.join("horizon-mods")).unwrap();
+        std::fs::create_dir_all(root.join("fre-mods")).unwrap();
         assert!(safe_game_folder(&root, "root").is_ok());
         assert!(safe_game_folder(&root, "mods").is_ok());
         assert!(safe_game_folder(&root, "..").is_err());
@@ -1148,12 +1162,22 @@ mod tests {
     }
 
     #[test]
+    fn file_browser_upgrades_legacy_mods_before_creating_the_new_folder() {
+        let temp = tempfile::tempdir().unwrap();
+        fs::create_dir(temp.path().join("horizon-mods")).unwrap();
+        fs::write(temp.path().join("horizon-mods/custom.hmod"), b"keep").unwrap();
+        let folder = safe_game_folder(temp.path(), "mods").unwrap();
+        assert_eq!(folder.file_name().unwrap(), "fre-mods");
+        assert_eq!(fs::read(folder.join("custom.hmod")).unwrap(), b"keep");
+        assert!(!temp.path().join("horizon-mods").exists());
+    }
+    #[test]
     fn lists_only_allowed_local_files_without_following_links() {
         let root = tempfile::tempdir().unwrap();
         let dir = root.path();
-        fs::create_dir_all(dir.join("horizon-mods")).unwrap();
-        fs::write(dir.join("horizon-mods").join("native-mod.bin"), b"test").unwrap();
-        fs::create_dir_all(dir.join("horizon-mods").join("subfolder")).unwrap();
+        fs::create_dir_all(dir.join("fre-mods")).unwrap();
+        fs::write(dir.join("fre-mods").join("native-mod.bin"), b"test").unwrap();
+        fs::create_dir_all(dir.join("fre-mods").join("subfolder")).unwrap();
         let items = list_game_files(dir, "mods").unwrap();
         assert_eq!(items.len(), 2);
         assert_eq!(items[0].name, "subfolder");
@@ -1234,7 +1258,7 @@ mod tests {
             ("collision_sha256", "cached-collision.nbt", &b"collision"[..]),
             ("model_states_sha256", "model-states.json", &b"states"[..]),
         ];
-        fs::write(temp.path().join("horizon-prepare.json"), b"{\"output_version\":3}").unwrap();
+        fs::write(temp.path().join("fre-prepare.json"), b"{\"output_version\":3,\"product\":\"FRE LAUNCH\"}").unwrap();
         fs::create_dir(temp.path().join("assets")).unwrap();
         for name in ["items.json", "registries.json", "commands.json", "assets/pack.mcmeta"] {
             fs::write(temp.path().join(name), b"{}").unwrap();
@@ -1245,10 +1269,13 @@ mod tests {
             manifest[key] = serde_json::Value::String(format!("{:x}", Sha256::digest(bytes)));
         }
         fs::write(
-            temp.path().join("horizon-resources.json"),
+            temp.path().join("fre-resources.json"),
             serde_json::to_vec(&manifest).unwrap(),
         ).unwrap();
         assert!(resources_valid(temp.path()), "a verified resource cache can be reused");
+        fs::write(temp.path().join("fre-prepare.json"), b"{\"output_version\":3}").unwrap();
+        assert!(!resources_valid(temp.path()), "a pre-branding cache must regenerate translated UI assets");
+        fs::write(temp.path().join("fre-prepare.json"), b"{\"output_version\":3,\"product\":\"FRE LAUNCH\"}").unwrap();
         fs::write(temp.path().join("facts.json"), b"corrupt").unwrap();
         assert!(!resources_valid(temp.path()), "a corrupt file cannot appear playable");
         fs::write(temp.path().join("facts.json"), b"facts").unwrap();
@@ -1257,7 +1284,7 @@ mod tests {
         assert!(!resources_valid(temp.path()), "missing game registries cannot appear playable");
         fs::write(temp.path().join("commands.json"), b"{}").unwrap();
         manifest["minecraft"] = "26.4".into();
-        fs::write(temp.path().join("horizon-resources.json"), serde_json::to_vec(&manifest).unwrap()).unwrap();
+        fs::write(temp.path().join("fre-resources.json"), serde_json::to_vec(&manifest).unwrap()).unwrap();
         assert!(!resources_valid(temp.path()), "a resource set for another game version is not valid");
     }
 

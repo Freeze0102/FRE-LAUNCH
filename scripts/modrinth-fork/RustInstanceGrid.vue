@@ -19,7 +19,7 @@ type Card = {
   key: string
   id: string
   name: string
-  kind: 'native' | 'horizon'
+  kind: 'native' | 'legacy'
   iconPath?: string | null
   version: string
   ready: boolean
@@ -88,7 +88,7 @@ async function refresh() {
     const [profiles, info, running] = await Promise.all([
       invoke<NativeProfile[]>('plugin:fre-rust|rust_profiles'),
       invoke<Runtime>('plugin:fre-rust|rust_runtime'),
-      invoke<string[]>('plugin:fre-rust|rust_running').catch(() => []),
+      invoke<string[]>('plugin:fre-rust|rust_running').catch((): string[] => []),
     ])
     if (request !== requestId) return
     nativeProfiles.value = profiles

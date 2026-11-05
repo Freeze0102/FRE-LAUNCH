@@ -276,10 +276,10 @@ def verify(root):
         assert rust_mapping["fre-rust-runtime/BUILD-INFO.json"] == "fre-rust/BUILD-INFO.json"
         assert rust_mapping["fre-rust-runtime/fre-rust-client.exe"] == "fre-rust/fre-rust-client.exe"
         assert rust_mapping["fre-rust-runtime/fre-rust-prepare.exe"] == "fre-rust/fre-rust-prepare.exe"
-        assert rust_mapping["fre-rust-runtime/crates/horizon-prepare/"] == "fre-rust/crates/horizon-prepare/"
-        assert (runtime_source/"crates/horizon-prepare/Cargo.toml").is_file()
-        assert (runtime_source/"crates/horizon-prepare/build.rs").is_file()
-        assert len(list((runtime_source/"crates/horizon-prepare/src").glob("*.rs"))) >= 10
+        assert rust_mapping["fre-rust-runtime/crates/fre-prepare/"] == "fre-rust/crates/fre-prepare/"
+        assert (runtime_source/"crates/fre-prepare/Cargo.toml").is_file()
+        assert (runtime_source/"crates/fre-prepare/build.rs").is_file()
+        assert len(list((runtime_source/"crates/fre-prepare/src").glob("*.rs"))) >= 10
         assert "fre-rust-runtime/resources/" not in rust_mapping
         assert not (runtime_source/"resources").exists(), "Private Minecraft resources must not be bundled"
     else:
@@ -341,7 +341,7 @@ def verify(root):
     for key in ('open', 'start', 'close', 'play', 'setup', 'settings',
                 'open-folder', 'files', 'search-files', 'refresh',
                 'reading', 'no-files', 'folder', 'native-required',
-                'game-required', 'horizon-required', 'mods-warning',
+                'game-required', 'resources-required', 'mods-warning',
                 'mods', 'resourcepacks', 'shaderpacks', 'saves', 'logs', 'root'):
         translation = 'fre-rust.grid.' + key
         assert translation in app_uk and translation in app_en, (
@@ -408,7 +408,7 @@ def verify(root):
     assert 'rust_launch' in (root / 'apps/app/build.rs').read_text(encoding="utf-8")
     assert 'rust_running' in (root / 'apps/app/build.rs').read_text(encoding="utf-8")
     assert 'rust_stop' in (root / 'apps/app/build.rs').read_text(encoding="utf-8")
-    assert "fre-rust-process-changed" in native_backend
+    assert "fre-rust-process-changed" in rust_backend
     assert 'horizon_install_launcher' not in (root / 'apps/app/build.rs').read_text(encoding="utf-8")
     assert 'rust_open_folder' in (root / 'apps/app/src/api/fre_rust.rs').read_text(encoding="utf-8")
     assert 'rust_list_files' in (root / 'apps/app/src/api/fre_rust.rs').read_text(encoding="utf-8")
@@ -418,7 +418,7 @@ def verify(root):
     standalone_setup = (root / 'apps/app/src/api/fre_rust_setup.rs').read_text(encoding="utf-8")
     for marker in ('standalone_setup::prepare(app.clone()', 'join("prepared")',
                    'if resources_valid(&destination)', 'fn resources_valid(root: &Path)',
-                   'online_profile_fresh().await', 'rust_import_mod', 'join("horizon-mods")'):
+                   'online_profile_fresh().await', 'rust_import_mod', 'join("fre-mods")'):
         assert marker in native_backend, f"Independent Rust first-run incomplete: {marker}"
     for marker in ('fre-rust-prepare.exe', 'piston-meta.mojang.com', 'resources.download.minecraft.net',
                    'research-lock.json', '--minecraft-dir', '--complete', 'verified_preparer'):

@@ -326,7 +326,7 @@ NEW.update({
 "fre-rust.setup.import":("Підготувати або завантажити Minecraft", "Prepare or download Minecraft"),
 "fre-rust.setup.importing":("Підготовка Minecraft…", "Preparing Minecraft…"),
 "fre-rust.setup.import-help":("Використай свій Microsoft-акаунт із Minecraft Java Edition у FRE LAUNCH. Якщо є підготовлені ресурси, їх також можна імпортувати.", "Use your Minecraft Java Edition Microsoft account in FRE LAUNCH. You can also import previously prepared resources."),
-"fre-rust.setup.sign-in-horizon":("Увійти через FRE LAUNCH", "Sign in with FRE LAUNCH"),
+"fre-rust.setup.sign-in-fre":("Увійти через FRE LAUNCH", "Sign in with FRE LAUNCH"),
 "fre-rust.setup.none":("Rust-збірок ще немає.", "No Rust profiles yet."),
 "fre-rust.setup.logs":("Показати лог гри", "Show game log"),
 "fre-rust.setup.files":("Файли", "Files"),

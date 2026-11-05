@@ -34,7 +34,7 @@ $installedRuntime = Join-Path $runtime "fre-rust-client.exe"
 & $rustScript -PythonExe $PythonExe
 if ($LASTEXITCODE -ne 0) { throw 'Native engine build or integrity verification failed' }
 foreach ($file in @("fre-rust-client.exe", "BUILD-INFO.json", "research-lock.json",
-    "LICENSE.txt", "fre-rust-prepare.exe", "crates/horizon-prepare/src/lib.rs")) {
+    "LICENSE.txt", "fre-rust-prepare.exe", "crates/fre-prepare/src/lib.rs")) {
     if (!(Test-Path -LiteralPath (Join-Path $runtime $file) -PathType Leaf)) {
         throw "Incomplete native Rust runtime: $file. Back it up and rerun BUILD-FRE-RUST.ps1."
     }
