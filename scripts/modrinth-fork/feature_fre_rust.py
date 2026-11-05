@@ -162,7 +162,7 @@ pub async fn get_default_user()""",
             '''            .plugin(
                 "fre-rust",
                 InlinedPlugin::new()
-                    .commands(&["rust_profiles", "rust_create_profile", "rust_rename_profile", "rust_set_profile_icon", "rust_delete_profile", "rust_runtime", "rust_import_resources", "rust_mods", "rust_import_mod", "rust_launch", "rust_running", "rust_stop", "rust_logs", "rust_open_folder", "rust_list_files"])
+                    .commands(&["rust_profiles", "rust_create_profile", "rust_rename_profile", "rust_set_profile_icon", "rust_delete_profile", "rust_runtime", "rust_import_resources", "rust_mods", "rust_client_mods", "rust_import_mod", "rust_launch", "rust_running", "rust_stop", "rust_logs", "rust_open_folder", "rust_list_files"])
                     .default_permission(DefaultPermissionRule::AllowAllCommands),
             )
             .plugin(
@@ -549,11 +549,26 @@ onUnmounted(() => {
                 'FRE LAUNCH завантажує перевірені ресурси Minecraft з Mojang для власника Java Edition без іншого лаунчера.',
                 'FRE LAUNCH downloads verified Minecraft resources from Mojang for a Java Edition owner, without another launcher.',
             ),
-            'fre-rust.mods.title': ('Моди Rust', 'Rust content mods'),
+            'fre-rust.mods.title': ('Моди Rust', 'Rust mods'),
             'fre-rust.mods.explanation': (
-                'Імпортуй .hmod-файли безпосередньо в цю Rust-збірку. Увімкни їх у налаштуваннях «Моди» самої гри. Java JAR-моди не підтримуються; .hnmod потребують окремого компілювання.',
-                'Import .hmod content files directly into this Rust instance. Enable them in the game Mods settings. Fabric/Forge JAR files are incompatible; .hnmod source mods need a separate build.',
+                'Увімкни готові клієнтські моди нижче або імпортуй власні .hmod-файли. Java JAR-моди не підтримуються.',
+                'Enable the included client mods below or import your own .hmod content files. Java JAR mods are not compatible.',
             ),
+            'fre-rust.mods.builtin-title': ('Готові до гри', 'Ready to play'),
+            'fre-rust.mods.builtin-hint': ('Ці моди вже входять до FRE LAUNCH. Закрий гру перед зміною: налаштування цієї збірки діятимуть під час наступного запуску.', 'These mods are included in FRE LAUNCH. Close the game before changing them; settings apply to this instance on its next launch.'),
+            'fre-rust.mods.zoom': ('Зум', 'Zoom'),
+            'fre-rust.mods.zoom-info': ('Утримуй вибрану клавішу, щоб наблизити далекі об’єкти. Відпусти — звичайний огляд повернеться.', 'Hold the zoom key to see distant objects. Release it to return to your normal view.'),
+            'fre-rust.mods.fps': ('Лічильник FPS', 'FPS counter'),
+            'fre-rust.mods.fps-info': ('Показує кількість кадрів за секунду на невеликій панелі під час гри.', 'Shows frames per second in a small panel while playing.'),
+            'fre-rust.mods.coords': ('Координати', 'Coordinates'),
+            'fre-rust.mods.coords-info': ('Показує твої X, Y та Z без відкриття екрана налагодження.', 'Keeps your X, Y and Z coordinates visible without opening the debug screen.'),
+            'fre-rust.mods.enable': ('Увімкнути', 'Enable'),
+            'fre-rust.mods.disable': ('Вимкнути', 'Disable'),
+            'fre-rust.mods.enabled': ('Увімкнено', 'Enabled'),
+            'fre-rust.mods.disabled': ('Вимкнено', 'Disabled'),
+            'fre-rust.mods.zoom-factor': ('Наближення', 'Magnification'),
+            'fre-rust.mods.zoom-key': ('Утримуй клавішу', 'Hold key'),
+            'fre-rust.mods.saved': ('Налаштування модів збережено для цієї збірки.', 'Mod settings saved for this instance.'),
             'fre-rust.mods.search': ('Пошук', 'Search'),
             'fre-rust.mods.placeholder': ('Пошук локальних Rust-модів…', 'Search local Rust mods…'),
             'fre-rust.mods.installed': ('Файли цієї збірки', 'Files in this instance'),
@@ -574,6 +589,7 @@ onUnmounted(() => {
     # Bundle the native game only when the local build has prepared real
     # artifacts. Missing assets are an explicit Runtime: Not installed state
     # in the UI, NEVER a fake Play button.
+    (app / "src/api/fre_client_mods.rs").write_bytes((here / "fre_client_mods.rs").read_bytes())
     bundle_native_runtime(root)
 
     from feature_rust_polish import apply as apply_rust_polish

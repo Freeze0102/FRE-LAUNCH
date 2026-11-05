@@ -64,7 +64,7 @@ function component(file, invoke, instances = [], options = {}) {
   const names = file === 'RustInstanceGrid.vue'
     ? 'cards,nativeProfiles,runtime,refresh,refreshRunning,runningIds,isRunning,openCard,play,stop,cardStyle,viewInstance,detailUrl,busy,selectCard,isSelected,activateCard'
     : file === 'RustNativeMods.vue'
-    ? 'installed,busy,error,notice,load,importFile,removeMod,openFolder'
+    ? 'installed,busy,error,notice,load,importFile,removeMod,openFolder,settings,saving,setMod,setZoomFactor,setZoomKey,saveSettings'
     : file === 'CurseForgeBrowser.vue'
     ? 'instanceId,searchText,apiKey,results,searched,loading,notice,error,installing,doSearch,install'
     : file === 'FreRustPanel.vue'
@@ -509,6 +509,7 @@ test('Content mod file import and removal use only the FRE-owned Rust profile', 
   const c = component('RustNativeMods.vue', async (command, args) => {
     calls.push({ command, args })
     if (command.endsWith('|rust_mods') && args.action === 'list') return JSON.stringify(installed)
+    if (command.endsWith('|rust_client_mods')) return { zoom: true, zoomFactor: 4, zoomKey: 'c', fpsCounter: false, coordinates: false }
     if (command.endsWith('|rust_import_mod')) {
       installed = [{ project: 'test.hmod', slug: 'test', title: 'test', number: 'local', file: 'test.hmod', source: 'FRE LAUNCH' }]
       return 'Imported. Enable in-game.'
@@ -745,4 +746,67 @@ test('Rust resource setup and native mod browser compile without an external lau
   assert.doesNotMatch(api + setup, /horizon::prepare_for_native_rust|horizon_install_launcher|native_mods_for_profile/)
   assert.match(nativeMods, /plugin:fre-rust\|rust_mods/)
   assert.match(page, /<RustNativeMods v-if="kind === 'native'"/)
+})
+
+
+test('Rust client mods save toggles, zoom strength and key for the selected profile', async () => {
+  const defaults = () => ({ zoom: true, zoomFactor: 4, zoomKey: 'c', fpsCounter: false, coordinates: false })
+  const saved = new Map()
+  const calls = []
+  const invoke = async (command, args) => {
+    calls.push({ command, args })
+    if (command.endsWith('|rust_mods')) return '[]'
+    assert.equal(command, 'plugin:fre-rust|rust_client_mods')
+    if (args.settings) saved.set(args.profileId, { ...args.settings })
+    return { ...(saved.get(args.profileId) || defaults()) }
+  }
+  const c = component('RustNativeMods.vue', invoke, [], { props: { profileId: '123' } })
+  await c.state.load()
+  assert.equal(c.state.settings.value.zoom, true)
+  await c.state.setMod('fpsCounter')
+  await c.state.setMod('coordinates')
+  await c.state.setZoomFactor({ target: { value: '8' } })
+  await c.state.setZoomKey({ target: { value: 'v' } })
+  await c.state.setMod('zoom')
+  assert.deepEqual(saved.get('123'), { zoom: false, zoomFactor: 8, zoomKey: 'v', fpsCounter: true, coordinates: true })
+  const count = calls.length
+  await c.state.setZoomFactor({ target: { value: '99' } })
+  await c.state.setZoomKey({ target: { value: 'invalid' } })
+  assert.equal(calls.length, count)
+  const second = component('RustNativeMods.vue', invoke, [], { props: { profileId: '456' } })
+  await second.state.load()
+  assert.equal(second.state.settings.value.fpsCounter, false)
+  await c.state.load()
+  assert.equal(c.state.settings.value.zoomFactor, 8)
+})
+
+test('A rejected native mod change retains the saved state and clears the busy indicator', async () => {
+  const c = component('RustNativeMods.vue', async (command, args) => {
+    if (command.endsWith('|rust_mods')) return '[]'
+    if (args.settings) throw Error('Close the Rust game before changing client mods.')
+    return { zoom: true, zoomFactor: 4, zoomKey: 'c', fpsCounter: false, coordinates: false }
+  }, [], { props: { profileId: '123' } })
+  await c.state.load()
+  await c.state.setMod('zoom')
+  assert.equal(c.state.settings.value.zoom, true)
+  assert.equal(c.state.saving.value, false)
+  assert.match(c.state.error.value, /Close the Rust game/)
+})
+
+test('A late Rust mod response cannot replace the newly selected profile settings', async () => {
+  const old = deferred()
+  const props = { profileId: '123' }
+  const c = component('RustNativeMods.vue', async (command, args) => {
+    if (command.endsWith('|rust_mods')) return '[]'
+    if (args.profileId === '123') return old.promise
+    return { zoom: false, zoomFactor: 8, zoomKey: 'z', fpsCounter: true, coordinates: true }
+  }, [], { props })
+  const first = c.state.load()
+  props.profileId = '456'
+  await c.state.load()
+  old.resolve({ zoom: true, zoomFactor: 2, zoomKey: 'c', fpsCounter: false, coordinates: false })
+  await first
+  assert.equal(c.state.settings.value.zoomFactor, 8)
+  assert.equal(c.state.settings.value.zoom, false)
+  assert.equal(c.state.busy.value, false)
 })

@@ -58,7 +58,7 @@ def fingerprint():
     from prepare import ico, png
     script = Path(__file__).read_bytes().replace(b"\r\n", b"\n")
     formats = Path(__file__).with_name("native_formats.py").read_bytes().replace(b"\r\n", b"\n")
-    return hashlib.sha256(script + formats + native_source.SOURCE_TREE.encode() + png(64) + ico(png(256))).hexdigest()
+    return hashlib.sha256(script + formats + b"".join(Path(__file__).with_name(name).read_bytes().replace(b"\r\n", b"\n") for name in ("native_client_features.py", "native_client_mods.rs", "fre_client_mods.rs")) + native_source.SOURCE_TREE.encode() + png(64) + ico(png(256))).hexdigest()
 
 
 def patch(text, before, after):
@@ -114,6 +114,8 @@ def build_tree(destination):
                     text = patch(text, "static MOD_API_LEVEL: [u8; 27]", "static MOD_API_LEVEL: [u8; fre_mods::api_level::MARK.len()]")
                 from native_formats import apply as apply_formats
                 text = apply_formats(name, text, patch)
+                from native_client_features import apply as apply_client_features
+                text = apply_client_features(name, text, patch)
                 data = text.encode("utf-8")
         # Replace upstream window/taskbar art with FRE's existing original icon.
         if name == "crates/horizon-theme/icons/horizon-64.png":
@@ -131,6 +133,14 @@ def build_tree(destination):
         if info["mode"] == "100755" and os.name != "nt":
             out.chmod(0o755)
         files[renamed] = hashlib.sha256(data).hexdigest()
+    from native_client_features import SOURCES
+    for relative, filename in SOURCES.items():
+        name = "crates/fre-client/src/" + relative
+        data = Path(__file__).with_name(filename).read_bytes().replace(b"\r\n", b"\n")
+        output = destination / name
+        if not output.exists() or output.read_bytes() != data:
+            output.write_bytes(data)
+        files[name] = hashlib.sha256(data).hexdigest()
     marker.write_text(json.dumps({"source_commit": native_source.REVISION,
         "source_tree": native_source.SOURCE_TREE, "branding_sha256": fingerprint(),
         "files": files}, indent=2) + "\n", encoding="utf-8", newline="\n")

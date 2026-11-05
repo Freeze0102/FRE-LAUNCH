@@ -20,6 +20,9 @@ mod standalone_setup;
 mod managed_jdk;
 #[path = "fre_rust_migration.rs"]
 mod migration;
+#[path = "fre_client_mods.rs"]
+mod client_mods;
+static CLIENT_MOD_SETTINGS: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 const MAX_NAME: usize = 64;
 const MAX_METADATA: u64 = 8192;
@@ -100,6 +103,7 @@ pub fn init<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
             rust_runtime,
             rust_import_resources,
             rust_mods,
+            rust_client_mods,
             rust_import_mod,
             rust_launch,
             rust_running,
@@ -728,6 +732,25 @@ async fn rust_import_resources<R: tauri::Runtime>(
         .await.map_err(|e| e.to_string())??;
     let _ = app.emit("fre-rust-prepare-stage", "ready");
     Ok(format!("Imported {bytes} bytes of your Minecraft resources into FRE LAUNCH."))
+}
+
+#[tauri::command]
+async fn rust_client_mods<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>, profile_id: String,
+    settings: Option<client_mods::ClientMods>,
+) -> Result<client_mods::ClientMods, String> {
+    let _settings_guard = CLIENT_MOD_SETTINGS.lock().await;
+    let dir = profile_dir(&base(&app)?, &profile_id)?;
+    read_profile(&dir, &profile_id).ok_or("Rust profile does not exist.")?;
+    if let Some(settings) = settings {
+        let running = RUNNING_PROFILES.lock().await;
+        if running.contains(&profile_id) {
+            return Err("Close the Rust game before changing client mods.".into());
+        }
+        client_mods::write(&dir, &settings)?;
+        return Ok(settings);
+    }
+    client_mods::read(&dir)
 }
 
 /// FRE-owned mods: .hmod are data-only, whereas native .hnmod source
