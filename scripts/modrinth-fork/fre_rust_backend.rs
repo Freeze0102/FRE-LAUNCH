@@ -788,7 +788,7 @@ async fn rust_catalog_install<R: tauri::Runtime>(app: tauri::AppHandle<R>, profi
 /// FRE-owned mods: .hmod are data-only, whereas native .hnmod source
 /// mixins require a separate trusted native rebuild and are not installed here.
 fn mod_filename_safe(name: &str) -> bool {
-    name.len() > 5 && name.len() <= 105 && name.to_ascii_lowercase().ends_with(".hmod")
+    name.len() > 5 && name.len() <= 128 && name.to_ascii_lowercase().ends_with(".hmod")
         && name.bytes().all(|c| c.is_ascii_alphanumeric() || matches!(c, b'.' | b'-' | b'_'))
         && !name.starts_with('.')
 }
@@ -811,18 +811,26 @@ struct LocalRustMod {
     number: String,
     file: String,
     source: &'static str,
+    enabled: bool,
+    authors: Vec<String>,
 }
 fn list_local_mods(dir: &Path) -> Result<Vec<LocalRustMod>, String> {
     let mut files = Vec::new();
+    let enabled=catalog::enabled_content(dir)?;
     for entry in fs::read_dir(owned_mods(dir)?).map_err(|e| e.to_string())? {
         let entry = entry.map_err(|e| e.to_string())?;
         if !entry.file_type().map_err(|e| e.to_string())?.is_file() { continue; }
         let file = entry.file_name().to_string_lossy().into_owned();
         if !mod_filename_safe(&file) { continue; }
-        let slug = file[..file.len()-5].to_owned();
+        let facts=catalog::local_facts(&entry.path()).ok();
+        let slug=facts.as_ref().map(|facts|facts.id.clone()).unwrap_or_else(||file[..file.len()-5].to_owned());
+        let on=enabled.contains(&slug);
         files.push(LocalRustMod {
-            project: file.clone(), slug: slug.clone(), title: slug,
-            number: "local".into(), file, source: "FRE LAUNCH",
+            project:file.clone(), slug:slug.clone(),
+            title:facts.as_ref().map(|facts|facts.name.clone()).unwrap_or(slug),
+            number:facts.as_ref().map(|facts|facts.version.clone()).unwrap_or_else(||"local".into()),
+            authors:facts.map(|facts|facts.authors).unwrap_or_default(),
+            file, source:"FRE LAUNCH", enabled:on,
         });
         if files.len() > 500 { return Err("Too many mods; use Files to manage the profile.".into()); }
     }
@@ -842,6 +850,14 @@ async fn rust_mods<R: tauri::Runtime>(
     read_profile(&dir, &profile_id).ok_or("Rust profile does not exist.")?;
     match action.as_str() {
         "list" => serde_json::to_string(&list_local_mods(&dir)?).map_err(|e| e.to_string()),
+        "enable" | "disable" => {
+            if RUNNING_PROFILES.lock().await.contains(&profile_id) { return Err("Close the Rust game before changing mods.".into()); }
+            let filename=project.as_deref().ok_or("Choose a Rust content mod.")?;
+            if !mod_filename_safe(filename) { return Err("Choose a .hmod content file.".into()); }
+            migration::profile(&dir)?;
+            let facts=catalog::set_installed_enabled(&base(&app)?,&dir,filename,action=="enable").await?;
+            Ok(format!("{} {}",facts.name,if action=="enable" {"enabled"} else {"disabled"}))
+        }
         "remove" => {
             if RUNNING_PROFILES.lock().await.contains(&profile_id) {
                 return Err("Close the Rust game before removing a mod.".into());
@@ -912,12 +928,13 @@ async fn rust_import_mod<R: tauri::Runtime>(
     })();
     if result.is_err() && staged_owned { let _ = fs::remove_file(&staged); }
     result?;
-    if let Err(error) = catalog::inspect_local(&base(&app)?,&staged).await {
-        let _ = fs::remove_file(&staged);
-        return Err(error);
-    }
+    let facts=match catalog::inspect_local(&base(&app)?,&staged).await {
+        Ok(facts)=>facts,
+        Err(error)=>{ let _=fs::remove_file(&staged); return Err(error); },
+    };
     fs::rename(&staged,&target).map_err(|e|e.to_string())?;
-    Ok(format!("Imported {filename}. Turn it on in the game's Mods options to activate it."))
+    catalog::set_content_enabled(&dir,&facts.id,true)?;
+    Ok(format!("Imported and enabled {filename} for the next launch."))
 }
 
 /// Source of truth for FRE LAUNCH UI (cards, side rail, instance page).
@@ -1297,6 +1314,26 @@ mod tests {
         save_profile_icon(temp.path(), &default_rust_icon().unwrap(), "png").unwrap();
         assert!(!temp.path().join("icon.webp").exists());
         assert!(temp.path().join("icon.png").is_file());
+    }
+    #[test]
+    fn local_mod_rows_use_package_metadata_and_the_games_enabled_state() {
+        use std::io::{Cursor,Write};
+        let profile=tempfile::tempdir().unwrap();
+        let mods=owned_mods(profile.path()).unwrap();
+        let mut archive=zip::ZipWriter::new(Cursor::new(Vec::new()));
+        archive.start_file("fre-mod.toml",zip::write::SimpleFileOptions::default()).unwrap();
+        archive.write_all(b"id='demo'\nname='Friendly mod'\nversion='2.1'\napi='0.2'\nauthors=['Builder']\ncapabilities=['registries']\n").unwrap();
+        fs::write(mods.join("download.hmod"),archive.finish().unwrap().into_inner()).unwrap();
+        catalog::set_content_enabled(profile.path(),"demo",true).unwrap();
+        let rows=list_local_mods(profile.path()).unwrap();
+        assert_eq!(rows.len(),1);
+        assert_eq!(rows[0].title,"Friendly mod");
+        assert_eq!(rows[0].slug,"demo");
+        assert_eq!(rows[0].number,"2.1");
+        assert_eq!(rows[0].authors,["Builder"]);
+        assert!(rows[0].enabled);
+        catalog::set_content_enabled(profile.path(),"demo",false).unwrap();
+        assert!(!list_local_mods(profile.path()).unwrap()[0].enabled);
     }
     #[test]
     fn refuses_modified_or_unknown_rust_executable() {

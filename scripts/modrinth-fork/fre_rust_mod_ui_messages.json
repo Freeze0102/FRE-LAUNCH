@@ -1,0 +1,130 @@
+{
+  "fre-rust.mods.title": [
+    "Моди",
+    "Mods"
+  ],
+  "fre-rust.mods.add": [
+    "Додати моди",
+    "Add mods"
+  ],
+  "fre-rust.mods.search": [
+    "Пошук установлених модів…",
+    "Search installed mods…"
+  ],
+  "fre-rust.mods.all": [
+    "Усі моди",
+    "All mods"
+  ],
+  "fre-rust.mods.builtin-title": [
+    "Вбудовано у FRE LAUNCH",
+    "Included in FRE LAUNCH"
+  ],
+  "fre-rust.mods.installed": [
+    "Установлені файли",
+    "Installed files"
+  ],
+  "fre-rust.mods.empty": [
+    "За цим запитом модів немає.",
+    "No mods match your search."
+  ],
+  "fre-rust.mods.import-file": [
+    "Додати з файла",
+    "Add from file"
+  ],
+  "fre-rust.mods.remove": [
+    "Видалити",
+    "Delete"
+  ],
+  "fre-rust.mods.selected": [
+    "Вибрано: {count}",
+    "{count} selected"
+  ],
+  "fre-rust.mods.settings": [
+    "Налаштування мода",
+    "Mod settings"
+  ],
+  "fre-rust.mods.confirm-remove": [
+    "Видалити вибрані моди?",
+    "Delete selected mods?"
+  ],
+  "fre-rust.mods.remove-hint": [
+    "Ці файли модів буде видалено з цієї збірки.",
+    "These mod files will be removed from this instance."
+  ],
+  "fre-rust.mods.cancel": [
+    "Скасувати",
+    "Cancel"
+  ],
+  "fre-rust.mods.close": [
+    "Закрити",
+    "Close"
+  ],
+  "fre-rust.mods.running": [
+    "Закрий гру перед зміною модів.",
+    "Close the game before changing mods."
+  ],
+  "fre-rust.mods.next-launch": [
+    "Зміни застосовуються під час наступного запуску гри.",
+    "Changes apply on the next game launch."
+  ],
+  "fre-rust.catalog.back": [
+    "До встановлених модів",
+    "Back to installed mods"
+  ],
+  "fre-rust.catalog.back-results": [
+    "До результатів пошуку",
+    "Back to results"
+  ],
+  "fre-rust.catalog.sort": [
+    "Сортування",
+    "Sort by"
+  ],
+  "fre-rust.catalog.popular": [
+    "За завантаженнями",
+    "Downloads"
+  ],
+  "fre-rust.catalog.alphabetical": [
+    "За назвою",
+    "Name"
+  ],
+  "fre-rust.catalog.view": [
+    "Показувати",
+    "View"
+  ],
+  "fre-rust.catalog.layout": [
+    "Змінити вигляд",
+    "Change layout"
+  ],
+  "fre-rust.catalog.description": [
+    "Опис",
+    "Description"
+  ],
+  "fre-rust.catalog.versions": [
+    "Версії",
+    "Versions"
+  ],
+  "fre-rust.catalog.in-instance": [
+    "У збірці",
+    "In this instance"
+  ],
+  "fre-rust.catalog.requires-build": [
+    "Потрібна збірка FRE",
+    "FRE build required"
+  ],
+  "fre-rust.catalog.auto-brief": [
+    "Файли перевіряються автоматично під час установлення.",
+    "File checks are automatic when installing."
+  ],
+  "fre-rust.catalog.builtin": [
+    "Вбудований варіант FRE доступний у списку модів цієї збірки.",
+    "A FRE implementation is available in this instance’s mod list."
+  ],
+  "fre-rust.catalog.install": [
+    "Установити",
+    "Install"
+  ],
+  "fre-rust.catalog.saved": [
+    "Файли встановлено й увімкнено для наступного запуску. Пакети-компаньйони можуть потребувати нативного мода; дивись опис.",
+    "Files installed and enabled for the next launch. Companion packages may require a native mod; see the description."
+  ]
+}

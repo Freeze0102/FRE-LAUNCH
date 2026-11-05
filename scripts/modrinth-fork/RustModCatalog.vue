@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { invoke } from '@tauri-apps/api/core'
 import { openUrl } from '@tauri-apps/plugin-opener'
-import { Button, defineMessages, useVIntl } from '@modrinth/ui'
+import { CheckIcon, DownloadIcon, GridIcon, LeftArrowIcon, ListIcon, RefreshCwIcon, SearchIcon, ShieldCheckIcon, SpinnerIcon } from '@modrinth/assets'
+import { Button, Combobox, defineMessages, IconButton, Input, NavTabs, Pagination, ProjectCard, ProjectCardList, useVIntl } from '@modrinth/ui'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 
 type File = { name: string; url: string; size: number; sha256: string; signature?: string }
@@ -10,10 +11,22 @@ type Project = { id: string; name: string; kind: string; summary: string; descri
 type Catalog = { projects: Project[]; generated: string; fetchedAt: number; stale: boolean; warning?: string }
 type Check = { code: string; state: 'pass' | 'warning' | 'fail' | 'unavailable'; detail: string }
 type Report = { projectId: string; version: string; filename: string; sha256: string; checkedAt: number; installable: boolean; checks: Check[]; facts?: { contentOnly: boolean; codeFiles: number; indicators: string[]; hooks?: number } }
-const props = defineProps<{ profileId: string; installedFiles?: string[] }>()
-const emit = defineEmits<{ installed: [] }>()
+const props = defineProps<{ profileId: string; installedFiles?: string[]; disabled?: boolean }>()
+const emit = defineEmits<{ installed: []; close: []; builtin: [key: 'zoom' | 'fpsCounter' | 'coordinates'] }>()
 const { formatMessage: t } = useVIntl()
 const m = defineMessages({
+  back: { id: 'fre-rust.catalog.back', defaultMessage: 'Back to installed mods' },
+  backResults: { id: 'fre-rust.catalog.back-results', defaultMessage: 'Back to results' },
+  sort: { id: 'fre-rust.catalog.sort', defaultMessage: 'Sort by' },
+  popular: { id: 'fre-rust.catalog.popular', defaultMessage: 'Downloads' },
+  alphabetical: { id: 'fre-rust.catalog.alphabetical', defaultMessage: 'Name' },
+  view: { id: 'fre-rust.catalog.view', defaultMessage: 'View' },
+  layout: { id: 'fre-rust.catalog.layout', defaultMessage: 'Change layout' },
+  description: { id: 'fre-rust.catalog.description', defaultMessage: 'Description' },
+  versions: { id: 'fre-rust.catalog.versions', defaultMessage: 'Versions' },
+  inInstance: { id: 'fre-rust.catalog.in-instance', defaultMessage: 'In this instance' },
+  requiresBuild: { id: 'fre-rust.catalog.requires-build', defaultMessage: 'FRE build required' },
+  autoBrief: { id: 'fre-rust.catalog.auto-brief', defaultMessage: 'File checks are automatic when installing.' },
   title: { id: "fre-rust.catalog.title", defaultMessage: "Rust catalog" },
   hint: { id: "fre-rust.catalog.hint", defaultMessage: "Mods from the public registry, with authors, versions and source links." },
   automatic: { id: "fre-rust.catalog.automatic", defaultMessage: "Automatic checks before installation and launch are enabled." },
@@ -74,7 +87,8 @@ const error = ref('')
 const notice = ref('')
 const stale = ref(false)
 const expanded = ref('')
-const visibleCount = ref(40)
+const page = ref(1), pageSize = ref(20), order = ref('downloads'), layout = ref<'list' | 'grid'>('list'), detailTab = ref(0)
+const justInstalled = ref<string[]>([])
 const reports = ref<Record<string, Report>>({})
 let generation = 0
 function version(project: Project) { return project.versions.find(v => v.game === '26.3') }
@@ -82,7 +96,7 @@ function key(project: Project) { return project.id + ':' + (version(project)?.fi
 function report(project: Project) { return reports.value[key(project)] }
 function isInstalled(project: Project) {
   const installed = new Set((props.installedFiles || []).map(file => file.toLowerCase()))
-  return project.versions.some(v => installed.has(v.file.name.toLowerCase()))
+  return justInstalled.value.includes(project.id) || project.versions.some(v => installed.has(v.file.name.toLowerCase()))
 }
 function safeSource(value: string) {
   try {
@@ -106,9 +120,19 @@ const filtered = computed(() => {
     if (kind.value === 'packs' && !['resourcepack', 'shader'].includes(project.kind)) return false
     const text = [project.name, project.id, project.summary, ...project.authors, ...project.categories, ...project.tags].join(' ').toLowerCase()
     return words.every(word => text.includes(word))
-  })
+  }).sort((a,b) => order.value === 'name' ? a.name.localeCompare(b.name) : b.downloads - a.downloads || a.name.localeCompare(b.name))
 })
-const shown = computed(() => filtered.value.slice(0, visibleCount.value))
+const pageCount = computed(() => Math.max(1, Math.ceil(filtered.value.length / pageSize.value)))
+const shown = computed(() => filtered.value.slice((page.value - 1) * pageSize.value, page.value * pageSize.value))
+const selectedProject = computed(() => projects.value.find(project => project.id === expanded.value))
+const detailTabs = computed(() => [{ label: t(m.description), href: 'description' }, { label: t(m.versions), href: 'versions' }, { label: t(m.report), href: 'checks' }])
+function switchPage(value: number) { if (Number.isInteger(value) && value >= 1 && value <= pageCount.value) page.value = value }
+function builtinKey(project: Project) { return ({ zoom: 'zoom', fps_overlay: 'fpsCounter', coords_hud: 'coordinates' } as const)[project.id as 'zoom' | 'fps_overlay' | 'coords_hud'] }
+function openBuiltin(project: Project) { const key = builtinKey(project); if (key) emit('builtin', key) }
+async function selectDetailTab(index: number) {
+  detailTab.value = index
+  if (index === 2 && selectedProject.value && !report(selectedProject.value)) await verify(selectedProject.value)
+}
 const labels = { origin: m.origin, revocation: m.revocation, hash: m.hash, signature: m.signature, archive: m.archive, antivirus: m.antivirus, execution: m.execution, compatibility: m.compatibility }
 function checkLabel(check: Check) { return check.code in labels ? t(labels[check.code as keyof typeof labels]) : check.code }
 function stateLabel(check: Check) { return t(m[check.state]) }
@@ -122,31 +146,35 @@ async function load(force = false) {
     if (request !== generation || props.profileId !== profileId) return
     projects.value = result.projects
     stale.value = result.stale
-    visibleCount.value = 40
+    page.value = Math.min(page.value, pageCount.value)
   } catch (e) { if (request === generation) error.value = String(e) }
   finally { if (request === generation) loading.value = false }
 }
-async function verify(project: Project) {
+async function verify(project: Project, showReport = true) {
   const selected = version(project)
   if (!selected || pending.value || loading.value) return
   const request = generation
   const profileId = props.profileId
   pending.value = project.id
   error.value = ''
-  expanded.value = project.id
+  if (showReport) { expanded.value = project.id; detailTab.value = 2 }
   try {
     const result = await invoke<Report>('plugin:fre-rust|rust_catalog_check', { profileId, projectId: project.id, expectedSha256: selected.file.sha256 })
     if (request !== generation || profileId !== props.profileId) return
     if (result.sha256 !== selected.file.sha256) throw new Error(t(m.changed))
     reports.value = { ...reports.value, [key(project)]: result }
+    return result
   } catch (e) { if (request === generation) error.value = String(e) }
   finally { if (request === generation) pending.value = '' }
 }
 async function install(project: Project) {
   const selected = version(project)
-  if (!selected || project.kind !== 'mod' || pending.value || loading.value || stale.value || !report(project)?.installable || isInstalled(project)) return
+  if (!selected || project.kind !== 'mod' || pending.value || loading.value || stale.value || props.disabled || isInstalled(project)) return
   const request = generation
   const profileId = props.profileId
+  const checked = report(project)?.installable ? report(project) : await verify(project, false)
+  if (request !== generation || profileId !== props.profileId || props.disabled) return
+  if (!checked?.installable) { expanded.value = project.id; detailTab.value = 2; return }
   pending.value = project.id
   installing.value = true
   error.value = ''
@@ -154,16 +182,15 @@ async function install(project: Project) {
   try {
     const result = await invoke<Report>('plugin:fre-rust|rust_catalog_install', { profileId, projectId: project.id, expectedSha256: selected.file.sha256 })
     if (request !== generation || profileId !== props.profileId) return
+    if (!result.installable) throw new Error(t(m.not_ready))
     reports.value = { ...reports.value, [key(project)]: result }
+    justInstalled.value = [...justInstalled.value, project.id]
     notice.value = t(m.saved)
     emit('installed')
   } catch (e) { if (request === generation) error.value = String(e) }
   finally { if (request === generation) { pending.value = ''; installing.value = false } }
 }
-async function details(project: Project) {
-  expanded.value = expanded.value === project.id ? '' : project.id
-  if (expanded.value && !report(project) && ['mod', 'native-mod'].includes(project.kind)) await verify(project)
-}
+function details(project: Project) { expanded.value = project.id; detailTab.value = 0 }
 async function source(project: Project) {
   const url = safeSource(project.source)
   if (url) await openUrl(url)
@@ -178,79 +205,83 @@ watch(() => props.profileId, () => {
   expanded.value = ''
   notice.value = ''
   installing.value = false
+  justInstalled.value = []
   void load()
 })
-watch([query, kind], () => { visibleCount.value = 40 })
+watch([query, kind, order, pageSize], () => { page.value = 1 })
+watch(pageCount, count => { if (page.value > count) page.value = count })
 </script>
 
 <template>
-  <section class="flex flex-col gap-4 border-t border-solid border-surface-4 pt-5">
-    <div>
-      <h3 class="m-0 text-lg font-semibold text-contrast">{{ t(m.title) }}</h3>
-      <p class="mb-0 text-sm text-secondary">{{ t(m.hint) }}</p>
+  <section class="flex flex-col gap-4">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <Button type="quiet" @click="selectedProject ? expanded = '' : emit('close')"><LeftArrowIcon />{{ selectedProject ? t(m.backResults) : t(m.back) }}</Button>
+      <div class="flex items-center gap-2 text-xs text-secondary"><ShieldCheckIcon class="size-4 text-brand" />{{ t(m.autoBrief) }}</div>
     </div>
-    <div class="rounded-xl bg-surface-3 p-3 text-sm">
-      <p class="m-0 font-semibold text-brand">{{ t(m.automatic) }}</p>
-      <p class="mb-0 mt-1 text-secondary">{{ t(m.limits) }}</p>
-    </div>
-    <div class="flex flex-wrap items-center gap-2">
-      <input v-model="query" type="search" :placeholder="t(m.search)" :aria-label="t(m.search)" class="min-w-0 flex-1 rounded-xl border border-solid border-surface-4 bg-surface-3 p-3 text-contrast" />
-      <select v-model="kind" class="rounded-xl border border-solid border-surface-4 bg-surface-3 p-3 text-contrast" :aria-label="t(m.all)">
-        <option value="mods">{{ t(m.mods) }}</option><option value="native">{{ t(m.native) }}</option>
-        <option value="data">{{ t(m.data) }}</option><option value="packs">{{ t(m.packs) }}</option><option value="all">{{ t(m.all) }}</option>
-      </select>
-      <Button type="outlined" :disabled="loading || !!pending" @click="load(true)">{{ t(m.refresh) }}</Button>
-    </div>
-    <p v-if="error" role="alert" class="m-0 text-sm text-red-400">{{ error }}</p>
+    <p v-if="error" role="alert" class="m-0 text-sm text-red">{{ error }}</p>
     <p v-if="notice" role="status" class="m-0 text-sm text-brand">{{ notice }}</p>
     <p v-if="stale" role="status" class="m-0 text-sm text-secondary">{{ t(m.stale) }}</p>
-    <p v-if="loading" class="m-0 text-sm text-secondary">{{ t(m.loading) }}</p>
-    <p v-else-if="!filtered.length" class="m-0 text-sm text-secondary">{{ t(m.empty) }}</p>
-    <p v-else class="m-0 text-xs text-secondary">{{ filtered.length }} / {{ projects.length }}</p>
-    <article v-for="project in shown" :key="project.id" class="rounded-xl border border-solid border-surface-4 bg-surface-2 p-4">
-      <div class="flex items-start gap-3">
-        <div class="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-surface-4 font-bold text-contrast">
-          <img v-if="image(project.icon)" :src="image(project.icon)" :alt="project.name" loading="lazy" referrerpolicy="no-referrer" class="h-full w-full object-cover" />
-          <span v-else>{{ project.name.slice(0, 2).toUpperCase() }}</span>
-        </div>
-        <div class="min-w-0 flex-1">
-          <h4 class="m-0 text-base font-bold text-contrast">{{ project.name }}</h4>
-          <p class="mb-1 mt-1 text-xs text-secondary">{{ project.authors.join(', ') }} · {{ t(m.license) }}: {{ project.license }}</p>
-          <p class="m-0 text-sm text-secondary">{{ project.summary }}</p>
-          <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-secondary">
-            <span>{{ t(m.version) }}: {{ version(project)?.version || '—' }}</span>
-            <span>{{ t(m.downloads) }}: {{ project.downloads.toLocaleString() }}</span>
-            <span>{{ project.categories.join(' · ') }}</span>
-          </div>
-          <p v-if="project.kind === 'native-mod'" class="mb-0 mt-2 text-xs text-secondary">{{ t(m.needs_build) }}</p>
-          <p v-if="['zoom','fps_overlay','coords_hud'].includes(project.id)" class="mb-0 mt-1 text-xs text-brand">{{ t(m.builtin) }}</p>
+    <template v-if="selectedProject">
+      <ProjectCard layout="list" :title="selectedProject.name" :icon-url="image(selectedProject.icon)" :summary="selectedProject.summary" :author="{ name: selectedProject.authors.join(', ') }" :downloads="selectedProject.downloads">
+        <template #actions>
+          <Button v-if="builtinKey(selectedProject)" type="outlined" @click="openBuiltin(selectedProject)"><CheckIcon />{{ t(m.inInstance) }}</Button>
+          <Button v-else-if="isInstalled(selectedProject)" type="outlined" @click="emit('close')"><CheckIcon />{{ t(m.inInstance) }}</Button>
+          <Button v-else-if="selectedProject.kind === 'mod'" type="colored" color="brand" :disabled="!!pending || stale || disabled || !version(selectedProject)" @click="install(selectedProject)"><SpinnerIcon v-if="pending === selectedProject.id" class="animate-spin" /><DownloadIcon v-else />{{ pending === selectedProject.id ? installing ? t(m.installing) : t(m.checking) : t(m.install) }}</Button>
+          <Button v-else type="outlined" disabled>{{ selectedProject.kind === 'native-mod' ? t(m.requiresBuild) : t(m.not_ready) }}</Button>
+        </template>
+      </ProjectCard>
+      <NavTabs mode="local" :links="detailTabs" :active-index="detailTab" @tab-click="selectDetailTab" />
+      <div v-if="detailTab === 0" class="flex flex-col gap-4 rounded-2xl bg-surface-3 p-5">
+        <p v-if="builtinKey(selectedProject)" class="m-0 text-sm text-brand">{{ t(m.builtin) }}</p>
+        <p v-else-if="selectedProject.kind === 'native-mod'" class="m-0 text-sm text-secondary">{{ t(m.needs_build) }}</p>
+        <p class="m-0 whitespace-pre-line text-sm leading-6 text-primary">{{ selectedProject.description }}</p>
+        <p class="m-0 text-xs text-secondary">{{ t(m.license) }}: {{ selectedProject.license }} · {{ selectedProject.categories.join(' · ') }}</p>
+        <Button v-if="safeSource(selectedProject.source)" type="outlined" class="self-start" @click="source(selectedProject)">{{ t(m.code) }}</Button>
+        <p v-if="!['mod','native-mod'].includes(selectedProject.kind)" class="m-0 text-sm text-secondary">{{ t(m.pack_note) }}</p>
+      </div>
+      <div v-else-if="detailTab === 1" class="overflow-hidden rounded-2xl border border-solid border-surface-4">
+        <div v-for="release in selectedProject.versions.filter(v => v.game === '26.3')" :key="release.file.sha256" class="flex flex-wrap justify-between gap-3 border-0 border-b border-solid border-surface-4 bg-surface-3 p-4">
+          <span class="font-semibold">{{ release.version }}</span><span class="text-sm text-secondary">Minecraft {{ release.game }}</span><span class="text-sm text-secondary">{{ release.published.slice(0, 10) }}</span>
         </div>
       </div>
-      <div class="mt-3 flex flex-wrap items-center gap-2">
-        <Button type="outlined" :disabled="loading || !!pending" @click="details(project)">{{ t(m.details) }}</Button>
-        <Button v-if="['mod','native-mod'].includes(project.kind)" type="outlined" :disabled="loading || !!pending || !version(project)" @click="verify(project)">
-          {{ pending === project.id && !installing ? t(m.checking) : t(m.verify) }}
-        </Button>
-        <Button v-if="project.kind === 'mod'" :disabled="loading || !!pending || stale || !report(project)?.installable || isInstalled(project)" @click="install(project)">
-          {{ isInstalled(project) ? t(m.installed) : pending === project.id && installing ? t(m.installing) : t(m.install) }}
-        </Button>
-        <Button v-if="safeSource(project.source)" type="outlined" @click="source(project)">{{ t(m.code) }}</Button>
-        <span v-if="report(project)" class="text-xs" :class="report(project)?.installable ? 'text-brand' : 'text-secondary'">{{ report(project)?.installable ? t(m.ready) : t(m.not_ready) }}</span>
-        <span v-else class="text-xs text-secondary">{{ t(m.unverified) }}</span>
-      </div>
-      <div v-if="expanded === project.id" class="mt-4 flex flex-col gap-3 border-t border-solid border-surface-4 pt-3">
-        <p class="m-0 max-h-64 overflow-y-auto whitespace-pre-line text-sm text-secondary">{{ project.description }}</p>
-        <p v-if="!['mod','native-mod'].includes(project.kind)" class="m-0 text-sm text-secondary">{{ t(m.pack_note) }}</p>
-        <template v-if="report(project)">
-          <h5 class="m-0 text-sm font-bold text-contrast">{{ t(m.report) }}</h5>
-          <div v-for="item in report(project)?.checks" :key="item.code" class="flex flex-col gap-1 rounded-lg bg-surface-3 p-3 text-sm">
-            <div class="flex justify-between gap-3"><span>{{ checkLabel(item) }}</span><span :class="item.state === 'pass' ? 'text-brand' : item.state === 'fail' ? 'text-red-400' : 'text-secondary'">{{ stateLabel(item) }}</span></div>
+      <div v-else class="flex flex-col gap-3">
+        <p class="m-0 text-sm text-secondary">{{ t(m.limits) }}</p>
+        <Button v-if="['mod','native-mod'].includes(selectedProject.kind)" type="outlined" class="self-start" :disabled="!!pending || loading" @click="verify(selectedProject)"><ShieldCheckIcon />{{ pending === selectedProject.id ? t(m.checking) : t(m.verify) }}</Button>
+        <template v-if="report(selectedProject)">
+          <div v-for="item in report(selectedProject)?.checks" :key="item.code" class="flex flex-col gap-1 rounded-xl bg-surface-3 p-3 text-sm">
+            <div class="flex justify-between gap-3"><span class="font-semibold">{{ checkLabel(item) }}</span><span :class="item.state === 'pass' ? 'text-brand' : item.state === 'fail' ? 'text-red' : 'text-secondary'">{{ stateLabel(item) }}</span></div>
             <span class="break-words text-xs text-secondary">{{ item.detail }}</span>
           </div>
-          <p v-if="report(project)?.facts?.indicators.length" class="m-0 text-sm text-secondary">{{ t(m.indicators) }} {{ report(project)?.facts?.indicators.join(', ') }}</p>
+          <p v-if="report(selectedProject)?.facts?.indicators.length" class="m-0 text-sm text-secondary">{{ t(m.indicators) }} {{ report(selectedProject)?.facts?.indicators.join(', ') }}</p>
         </template>
       </div>
-    </article>
-    <Button v-if="filtered.length > visibleCount" type="outlined" :disabled="loading || !!pending" @click="visibleCount += 40">{{ t(m.more) }}</Button>
+    </template>
+    <template v-else>
+      <Input v-model="query" :icon="SearchIcon" type="search" :placeholder="t(m.search)" :aria-label="t(m.search)" clearable />
+      <div class="flex flex-wrap items-center gap-2">
+        <Combobox v-model="kind" :options="[{ value: 'mods', label: t(m.mods) }, { value: 'native', label: t(m.native) }, { value: 'data', label: t(m.data) }, { value: 'packs', label: t(m.packs) }, { value: 'all', label: t(m.all) }]" :aria-label="t(m.all)" class="!w-48" />
+        <Combobox v-model="order" :options="[{ value: 'downloads', label: t(m.popular) }, { value: 'name', label: t(m.alphabetical) }]" :aria-label="t(m.sort)" class="!w-56 max-w-full" />
+        <Combobox v-model="pageSize" :options="[20, 40, 80].map(value => ({ value, label: String(value) }))" :aria-label="t(m.view)" class="!w-40 min-w-max"><template #prefix><span class="font-semibold">{{ t(m.view) }}</span></template></Combobox>
+        <IconButton :label="t(m.layout)" @click="layout = layout === 'list' ? 'grid' : 'list'"><GridIcon v-if="layout === 'list'" /><ListIcon v-else /></IconButton>
+        <IconButton :label="t(m.refresh)" :disabled="loading || !!pending" @click="load(true)"><RefreshCwIcon /></IconButton>
+        <Pagination class="ml-auto" :page="page" :count="pageCount" @switch-page="switchPage" />
+      </div>
+      <p v-if="loading" class="m-0 py-8 text-center text-sm text-secondary">{{ t(m.loading) }}</p>
+      <p v-else-if="!filtered.length" class="m-0 py-12 text-center text-sm text-secondary">{{ t(m.empty) }}</p>
+      <template v-else>
+        <p class="m-0 text-xs text-secondary">{{ filtered.length }} / {{ projects.length }}</p>
+        <ProjectCardList :layout="layout">
+          <ProjectCard v-for="project in shown" :key="project.id" :layout="layout" :link="() => details(project)" :title="project.name" :icon-url="image(project.icon)" :summary="project.summary" :author="{ name: project.authors.join(', ') }" :downloads="project.downloads">
+            <template #actions>
+              <Button v-if="builtinKey(project)" type="outlined" @click.stop="openBuiltin(project)"><CheckIcon />{{ t(m.inInstance) }}</Button>
+              <Button v-else-if="isInstalled(project)" type="outlined" @click.stop="emit('close')"><CheckIcon />{{ t(m.inInstance) }}</Button>
+              <Button v-else-if="project.kind === 'mod'" type="colored" color="brand" :disabled="!!pending || stale || disabled || !version(project)" @click.stop="install(project)"><SpinnerIcon v-if="pending === project.id" class="animate-spin" /><DownloadIcon v-else />{{ pending === project.id ? installing ? t(m.installing) : t(m.checking) : t(m.install) }}</Button>
+              <Button v-else type="outlined" disabled>{{ project.kind === 'native-mod' ? t(m.requiresBuild) : t(m.not_ready) }}</Button>
+            </template>
+          </ProjectCard>
+        </ProjectCardList>
+        <Pagination class="self-end" :page="page" :count="pageCount" @switch-page="switchPage" />
+      </template>
+    </template>
   </section>
 </template>

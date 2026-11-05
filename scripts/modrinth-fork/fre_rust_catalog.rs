@@ -387,6 +387,7 @@ pub async fn install(root:&Path,profile:&Path,id:&str,expected_hash:&str) -> Res
     staged_record.write_all(&serde_json::to_vec(&receipt).map_err(|e|e.to_string())?)
         .and_then(|()|staged_record.as_file().sync_all()).map_err(|e|e.to_string())?;
     staged_record.persist(&record).map_err(|e|e.to_string())?;
+    set_content_enabled(profile,id,true)?;
     staged.persist_noclobber(&target).map_err(|e|e.to_string())?;
     Ok(report)
 }
@@ -405,6 +406,43 @@ pub fn forget_removed_file(profile:&Path,filename:&str)->Result<(),String> {
         }
     }
     Ok(())
+}
+pub fn local_facts(path:&Path)->Result<mod_audit::PackageFacts,String> {
+    mod_audit::inspect(&read_bounded(path,MAX_MOD)?,"mod",None)
+}
+fn mod_settings(profile:&Path)->Result<String,String> {
+    let path=profile.join("fre-mods.txt");
+    if path.symlink_metadata().is_err_and(|error|error.kind()==std::io::ErrorKind::NotFound) { return Ok(String::new()); }
+    String::from_utf8(read_bounded(&path,256<<10)?).map_err(|_|"Mod settings are not UTF-8; preserve and repair this file before changing mods".into())
+}
+pub fn enabled_content(profile:&Path)->Result<std::collections::BTreeSet<String>,String> {
+    Ok(mod_settings(profile)?.lines().filter_map(|line|line.split_once(':'))
+        .filter(|(_,value)|value.trim()=="true").filter_map(|(key,_)|key.trim().strip_prefix("mod."))
+        .map(str::to_owned).collect())
+}
+pub fn set_content_enabled(profile:&Path,id:&str,enabled:bool)->Result<(),String> {
+    if !mod_audit::valid_id(id) { return Err("Invalid content mod ID".into()); }
+    let text=mod_settings(profile)?;
+    let key=format!("mod.{id}");
+    let mut updated:String=text.split_inclusive('\n').filter(|line|line.split_once(':').is_none_or(|(name,_)|name.trim()!=key)).collect();
+    if !updated.is_empty() && !updated.ends_with('\n') { updated.push('\n'); }
+    updated.push_str(&format!("{key}:{enabled}\n"));
+    if updated.len()>256<<10 { return Err("Mod settings exceed their size limit".into()); }
+    use std::io::Write;
+    let mut staged=tempfile::NamedTempFile::new_in(profile).map_err(|e|e.to_string())?;
+    staged.write_all(updated.as_bytes()).and_then(|()|staged.as_file().sync_all()).map_err(|e|e.to_string())?;
+    staged.persist(profile.join("fre-mods.txt")).map_err(|e|e.to_string())?;
+    Ok(())
+}
+pub async fn set_installed_enabled(root:&Path,profile:&Path,filename:&str,enabled:bool)->Result<mod_audit::PackageFacts,String> {
+    if !file_name(filename) || !filename.to_ascii_lowercase().ends_with(".hmod") { return Err("Choose a .hmod content file".into()); }
+    let facts=local_facts(&directory(profile,"fre-mods")?.join(filename))?;
+    if enabled {
+        if !facts.content_only { return Err("Executable mod code cannot be enabled here".into()); }
+        before_play(root,profile).await?;
+    }
+    set_content_enabled(profile,&facts.id,enabled)?;
+    Ok(facts)
 }
 pub async fn inspect_local(root:&Path,path:&Path) -> Result<mod_audit::PackageFacts,String> {
     regular(path,MAX_MOD)?;
@@ -488,6 +526,52 @@ mod tests {
         assert!(!receipts.join("demo.json").exists());
         assert!(receipts.join("other.json").exists());
         assert_eq!(fs::read(profile.path().join("world.dat")).unwrap(),b"preserve world");
+    }
+    #[test]
+    fn content_toggles_match_the_game_and_preserve_keys_comments_and_worlds() {
+        let profile=tempfile::tempdir().unwrap();
+        let path=profile.path().join("fre-mods.txt");
+        fs::write(&path,"# player settings\r\nkey.zoom.key:key.keyboard.c\r\nmod.demo:false\nmod.other:true\nmod.demo:true\nunknown:keep").unwrap();
+        fs::write(profile.path().join("world.dat"),b"world").unwrap();
+        set_content_enabled(profile.path(),"demo",false).unwrap();
+        assert!(!enabled_content(profile.path()).unwrap().contains("demo"));
+        assert!(enabled_content(profile.path()).unwrap().contains("other"));
+        let changed=fs::read_to_string(&path).unwrap();
+        assert!(changed.starts_with("# player settings\r\nkey.zoom.key:key.keyboard.c\r\n"));
+        assert!(changed.contains("unknown:keep\n"));
+        assert_eq!(changed.matches("mod.demo:").count(),1);
+        set_content_enabled(profile.path(),"demo",true).unwrap();
+        assert!(enabled_content(profile.path()).unwrap().contains("demo"));
+        assert_eq!(fs::read(profile.path().join("world.dat")).unwrap(),b"world");
+        let other=tempfile::tempdir().unwrap();
+        assert!(enabled_content(other.path()).unwrap().is_empty());
+    }
+    #[test]
+    fn invalid_or_oversized_game_mod_settings_are_preserved() {
+        let profile=tempfile::tempdir().unwrap();
+        let path=profile.path().join("fre-mods.txt");
+        fs::write(&path,[255u8]).unwrap();
+        assert!(set_content_enabled(profile.path(),"demo",true).is_err());
+        assert_eq!(fs::read(&path).unwrap(),[255]);
+        fs::write(&path,vec![b'x';(256<<10)+1]).unwrap();
+        assert!(set_content_enabled(profile.path(),"demo",true).is_err());
+        assert_eq!(fs::metadata(&path).unwrap().len(),(256<<10)+1);
+        assert!(set_content_enabled(profile.path(),"../demo",true).is_err());
+    }
+    #[tokio::test]
+    async fn enabling_rejects_foreign_paths_and_legacy_executable_mods_before_network_access() {
+        use std::io::{Cursor,Write};
+        let profile=tempfile::tempdir().unwrap();
+        let mods=directory(profile.path(),"fre-mods").unwrap();
+        let mut archive=zip::ZipWriter::new(Cursor::new(Vec::new()));
+        archive.start_file("fre-mod.toml",zip::write::SimpleFileOptions::default()).unwrap();
+        archive.write_all(b"id='demo'\nname='Demo'\nversion='1'\napi='0.1'\n").unwrap();
+        archive.start_file("mod.wasm",zip::write::SimpleFileOptions::default()).unwrap();
+        archive.write_all(b"\0asm").unwrap();
+        fs::write(mods.join("demo.hmod"),archive.finish().unwrap().into_inner()).unwrap();
+        assert!(set_installed_enabled(profile.path(),profile.path(),"../demo.hmod",true).await.is_err());
+        assert!(set_installed_enabled(profile.path(),profile.path(),"demo.hmod",true).await.is_err());
+        assert!(enabled_content(profile.path()).unwrap().is_empty());
     }
     #[test]
     fn unsigned_and_changed_keys_are_distinguished() {

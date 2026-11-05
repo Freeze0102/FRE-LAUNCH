@@ -63,11 +63,11 @@ function component(file, invoke, instances = [], options = {}) {
     vue: { ...vue, onMounted: f => mounted.push(f), onUnmounted: f => unmounted.push(f) },
   }
   const names = file === 'RustModCatalog.vue'
-    ? 'projects,query,kind,loading,pending,error,notice,stale,expanded,reports,filtered,shown,load,verify,install,details,source,safeSource,image,isInstalled,version,report'
+    ? 'projects,query,kind,loading,pending,error,notice,stale,expanded,reports,filtered,shown,load,verify,install,details,source,safeSource,image,isInstalled,version,report,page,pageSize,pageCount,order,layout,detailTab,selectedProject,switchPage,selectDetailTab,justInstalled'
     : file === 'RustInstanceGrid.vue'
     ? 'cards,nativeProfiles,runtime,refresh,refreshRunning,runningIds,isRunning,openCard,play,stop,cardStyle,viewInstance,detailUrl,busy,selectCard,isSelected,activateCard'
     : file === 'RustNativeMods.vue'
-    ? 'installed,busy,error,notice,load,importFile,removeMod,openFolder,settings,saving,setMod,setZoomFactor,setZoomKey,saveSettings'
+    ? 'installed,busy,error,notice,load,importFile,removeMod,openFolder,settings,saving,setMod,setZoomFactor,setZoomKey,saveSettings,blocked,rows,filtered,selected,removable,changeEnabled,bulkToggle,askRemove,confirmRemove,deleting,query,filter,catalogVisited,openBuiltin'
     : file === 'CurseForgeBrowser.vue'
     ? 'instanceId,searchText,apiKey,results,searched,loading,notice,error,installing,doSearch,install'
     : file === 'FreRustPanel.vue'
@@ -863,10 +863,15 @@ test('Catalog data installation binds the current profile and exact inspected ha
     return checked
   }, [], { props: { profileId: '456', installedFiles: [] }, emit: event => events.push(event) })
   await c.state.load()
+  c.state.stale.value = true
+  const initial = calls.length
   await c.state.install(project)
-  assert.equal(calls.filter(c => c.command.endsWith('|rust_catalog_install')).length, 0)
-  await c.state.verify(project)
+  assert.equal(calls.length, initial)
+  c.state.stale.value = false
   await c.state.install(project)
+  assert.equal(calls.filter(c => c.command.endsWith('|rust_catalog_check')).length, 1)
+  assert.equal(calls.filter(c => c.command.endsWith('|rust_catalog_install')).length, 1)
+  assert.equal(c.state.isInstalled(project), true)
   const install = calls.find(c => c.command.endsWith('|rust_catalog_install'))
   assert.deepEqual(install.args, { profileId: '456', projectId: project.id, expectedSha256: '1'.repeat(64) })
   assert.deepEqual(events, ['installed'])
@@ -886,4 +891,111 @@ test('Late catalog replies cannot expose another selected profile state', async 
   await first
   assert.equal(c.state.projects.value.length, 0)
   assert.equal(c.state.loading.value, false)
+})
+
+
+test('Native instance mod rows search real installed metadata and protect included mods from deletion', async () => {
+  const local = { project: 'demo.hmod', file: 'demo.hmod', slug: 'demo', title: 'Demo camera', number: '2', authors: ['Builder'], enabled: false }
+  const c = component('RustNativeMods.vue', async command => command.endsWith('|rust_mods') ? JSON.stringify([local]) : ({ zoom: true, zoomFactor: 4, zoomKey: 'c', fpsCounter: false, coordinates: false }), [], { props: { profileId: '123' } })
+  await c.state.load()
+  assert.equal(c.state.rows.value.length, 4)
+  assert.equal(c.state.rows.value.find(row => row.id === 'local:demo.hmod').enabled, false)
+  assert.ok(c.state.rows.value.filter(row => row.id.startsWith('builtin:')).every(row => row.hideDelete))
+  c.state.query.value = 'builder demo.hmod'
+  assert.deepEqual(c.state.filtered.value.map(row => row.id), ['local:demo.hmod'])
+  c.state.selected.value = ['builtin:zoom', 'local:demo.hmod']
+  assert.deepEqual(c.state.removable.value, ['local:demo.hmod'])
+})
+
+test('Local mod switches use the selected profile and reload the actual game state', async () => {
+  const calls = [], local = { project: 'demo.hmod', file: 'demo.hmod', slug: 'demo', title: 'Demo', number: '1', enabled: false }
+  const c = component('RustNativeMods.vue', async (command, args) => {
+    calls.push({ command, args })
+    if (command.endsWith('|rust_client_mods')) return { zoom: true, zoomFactor: 4, zoomKey: 'c', fpsCounter: false, coordinates: false }
+    if (args.action === 'list') return JSON.stringify([local])
+    local.enabled = args.action === 'enable'; return 'Changed'
+  }, [], { props: { profileId: '123' } })
+  await c.state.load()
+  await c.state.changeEnabled('local:demo.hmod', true)
+  assert.equal(c.state.rows.value.find(row => row.id === 'local:demo.hmod').enabled, true)
+  await c.state.changeEnabled('local:demo.hmod', false)
+  assert.equal(c.state.rows.value.find(row => row.id === 'local:demo.hmod').enabled, false)
+  assert.deepEqual(calls.filter(call => ['enable','disable'].includes(call.args.action)).map(call => call.args), [
+    { profileId: '123', action: 'enable', project: 'demo.hmod' }, { profileId: '123', action: 'disable', project: 'demo.hmod' },
+  ])
+})
+
+test('Bulk native mod toggles preserve unrelated settings and running instances reject changes', async () => {
+  const saves = [], props = { profileId: '123', running: false }
+  const c = component('RustNativeMods.vue', async (command, args) => {
+    if (command.endsWith('|rust_mods')) return '[]'
+    if (args.settings) saves.push(args.settings)
+    return args.settings || { zoom: true, zoomFactor: 8, zoomKey: 'v', fpsCounter: false, coordinates: false }
+  }, [], { props })
+  await c.state.load(); c.state.selected.value = ['builtin:fpsCounter','builtin:coordinates']
+  await c.state.bulkToggle(true)
+  assert.deepEqual(saves.at(-1), { zoom: true, zoomFactor: 8, zoomKey: 'v', fpsCounter: true, coordinates: true })
+  props.running = true
+  const count = saves.length
+  await c.state.setMod('zoom'); await c.state.bulkToggle(false)
+  assert.equal(saves.length, count)
+})
+
+test('Mod deletion waits for confirmation and cancels after a profile change', async () => {
+  const removals = [], props = { profileId: '123' }
+  const c = component('RustNativeMods.vue', async (command, args) => {
+    if (command.endsWith('|rust_client_mods')) return { zoom: true, zoomFactor: 4, zoomKey: 'c', fpsCounter: false, coordinates: false }
+    if (args.action === 'list') return JSON.stringify([{ project:'demo.hmod',file:'demo.hmod',slug:'demo',title:'Demo',number:'1' }])
+    removals.push(args);return 'Removed'
+  }, [], { props })
+  await c.state.load()
+  c.state.askRemove(['builtin:zoom','local:demo.hmod'])
+  assert.equal(removals.length, 0)
+  assert.deepEqual(c.state.deleting.value, ['local:demo.hmod'])
+  props.profileId = '456'; await c.state.confirmRemove()
+  assert.equal(removals.length, 0)
+  props.profileId = '123'; c.state.askRemove(['local:demo.hmod']); await c.state.confirmRemove()
+  assert.deepEqual(removals, [{ profileId:'123',action:'remove',project:'demo.hmod' }])
+})
+
+test('Multi-file mod import preserves a visible scan failure after refreshing installed files', async () => {
+  const imported = []
+  const c = component('RustNativeMods.vue', async (command,args) => {
+    if (command.endsWith('|rust_client_mods')) return { zoom:true,zoomFactor:4,zoomKey:'c',fpsCounter:false,coordinates:false }
+    if (command.endsWith('|rust_mods')) return '[]'
+    imported.push(args.source)
+    if (args.source.endsWith('bad.hmod')) throw Error('File check failed')
+    return 'Imported'
+  }, [], { props: { profileId:'123' }, open: async()=>['D:/good.hmod','D:/bad.hmod'] })
+  await c.state.load(); await c.state.importFile()
+  assert.deepEqual(imported,['D:/good.hmod','D:/bad.hmod'])
+  assert.match(c.state.error.value,/File check failed/)
+  assert.equal(c.state.busy.value,false)
+})
+
+test('One-click installation displays a failed automatic audit and never activates the file', async () => {
+  const project=catalogFixture('mod'), calls=[]
+  const c=component('RustModCatalog.vue',async(command,args)=>{
+    calls.push(command)
+    if(command.endsWith('|rust_catalog'))return {projects:[project],stale:false}
+    return {projectId:project.id,sha256:'1'.repeat(64),installable:false,checks:[{code:'archive',state:'fail',detail:'Unsupported file'}]}
+  },[],{props:{profileId:'123',installedFiles:[]}})
+  await c.state.load();await c.state.install(project)
+  assert.equal(c.state.selectedProject.value.id,project.id)
+  assert.equal(c.state.detailTab.value,2)
+  assert.equal(calls.filter(command=>command.endsWith('|rust_catalog_install')).length,0)
+})
+
+test('Catalog pagination and sorting retain the chosen search when opening a project', async () => {
+  const projects=Array.from({length:43},(_,i)=>({...catalogFixture(),id:'demo_'+i,name:'Project '+String(i).padStart(2,'0'),downloads:i}))
+  const c=component('RustModCatalog.vue',async()=>({projects,stale:false}),[],{props:{profileId:'123',installedFiles:[]}})
+  await c.state.load(); assert.equal(c.state.pageCount.value,3)
+  assert.equal(c.state.shown.value[0].downloads,42)
+  c.state.switchPage(2);assert.equal(c.state.shown.value.length,20)
+  const chosen=c.state.shown.value[0]
+  c.state.details(chosen);assert.equal(c.state.selectedProject.value.id,chosen.id)
+  c.state.expanded.value='';assert.equal(c.state.page.value,2)
+  c.state.order.value='name';await vue.nextTick()
+  assert.equal(c.state.page.value,1)
+  assert.equal(c.state.shown.value[0].name,'Project 00')
 })

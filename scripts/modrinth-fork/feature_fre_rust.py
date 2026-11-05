@@ -585,6 +585,9 @@ onUnmounted(() => {
             messages["fre-rust.catalog." + key] = {"message": pair[position]}
         for key, pair in detail_messages.items():
             messages[key] = {'message': pair[position]}
+        mod_ui_messages = json.loads((here / "fre_rust_mod_ui_messages.json").read_text(encoding="utf-8"))
+        for key, pair in mod_ui_messages.items():
+            messages[key] = {"message": pair[position]}
         locale.write_text(json.dumps(messages, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
 
     # Legacy data stays on disk but is no longer shown as a playable FRE

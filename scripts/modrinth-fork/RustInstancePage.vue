@@ -494,13 +494,8 @@ useRootBreadcrumb({
     <Transition name="fre-rust-tab" mode="out-in">
     <div :key="tab" class="min-h-0 flex-1 overflow-y-auto p-6 pt-4">
       <div v-if="tab === 'content'" class="flex flex-col gap-3">
-        <RustNativeMods v-if="kind === 'native'" :profile-id="id" />
-        <p class="m-0 text-sm text-secondary">{{ t(m.contentNote) }}</p>
-        <RustInstanceFiles
-          :key="kind + id + ':mods'"
-            :profile-id="id"
-            initial-folder="mods"
-        />
+        <RustNativeMods v-if="kind === 'native'" :profile-id="id" :running="running" :catalog-open="route.query.view === 'catalog'" @browse="router.push({ path: route.path, query: { tab: 'content', view: 'catalog' } })" @back="router.push({ path: route.path, query: { tab: 'content' } })" />
+
       </div>
       <RustInstanceFiles
         v-else-if="tab === 'files'"

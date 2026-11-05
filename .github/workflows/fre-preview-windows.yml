@@ -1,4 +1,4 @@
-name: FRE LAUNCH v0.5.13 Windows preview (not an updater)
+name: FRE LAUNCH v0.5.14 Windows preview (not an updater)
 
 # Preview builds are intentional manual operations, not every code push.
 # This avoids wasting Windows runner time while native Minecraft is in review.
@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: frelaunch-0513-preview
+  group: frelaunch-0514-preview
   cancel-in-progress: false
 
 jobs:
@@ -104,7 +104,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: preview-pending
-          key: frelaunch-0513-compiled-nsis-${{ hashFiles('scripts/modrinth-fork/*.ps1', 'vendor/fre-rust-source/FRE-VENDORED-SOURCE.json', 'scripts/modrinth-fork/*.py', 'scripts/modrinth-fork/*.rs', 'scripts/modrinth-fork/*.vue', 'scripts/modrinth-fork/*.ts', 'scripts/modrinth-fork/*.cjs', 'scripts/modrinth-fork/*.json', 'FRE-MODRINTH-LOCAL.ps1', 'update-channel.json') }}
+          key: frelaunch-0514-compiled-nsis-${{ hashFiles('scripts/modrinth-fork/*.ps1', 'vendor/fre-rust-source/FRE-VENDORED-SOURCE.json', 'scripts/modrinth-fork/*.py', 'scripts/modrinth-fork/*.rs', 'scripts/modrinth-fork/*.vue', 'scripts/modrinth-fork/*.ts', 'scripts/modrinth-fork/*.cjs', 'scripts/modrinth-fork/*.json', 'FRE-MODRINTH-LOCAL.ps1', 'update-channel.json') }}
 
       - name: Restore pinned native Rust engine if previously compiled
         id: rust-engine-cache
@@ -212,7 +212,7 @@ jobs:
           $launcher = 'FRE-Modrinth-Source/target/release/FRE LAUNCH.exe'
           if (-not (Test-Path -LiteralPath $launcher -PathType Leaf)) { throw 'Compiled Windows launcher missing' }
           New-Item -ItemType Directory -Path preview-pending -Force | Out-Null
-          Copy-Item -LiteralPath $installers[0].FullName -Destination 'preview-pending/FRE-LAUNCH-v0.5.13-Windows-x64-Setup.exe'
+          Copy-Item -LiteralPath $installers[0].FullName -Destination 'preview-pending/FRE-LAUNCH-v0.5.14-Windows-x64-Setup.exe'
           Copy-Item -LiteralPath $launcher -Destination 'preview-pending/FRE LAUNCH.exe'
           $engine = 'scripts/modrinth-fork/fre-rust-runtime/fre-rust-client.exe'
           if (-not (Test-Path -LiteralPath $engine -PathType Leaf)) { throw 'Native Rust client missing from bundle' }
@@ -220,7 +220,7 @@ jobs:
           $preparer = 'scripts/modrinth-fork/fre-rust-runtime/fre-rust-prepare.exe'
           if (-not (Test-Path -LiteralPath $preparer -PathType Leaf)) { throw 'Native resource preparer missing from build' }
           Copy-Item -LiteralPath $preparer -Destination 'preview-pending/fre-rust-prepare.exe'
-          $hashes = foreach ($name in @('FRE-LAUNCH-v0.5.13-Windows-x64-Setup.exe', 'FRE LAUNCH.exe', 'fre-rust-client.exe', 'fre-rust-prepare.exe')) {
+          $hashes = foreach ($name in @('FRE-LAUNCH-v0.5.14-Windows-x64-Setup.exe', 'FRE LAUNCH.exe', 'fre-rust-client.exe', 'fre-rust-prepare.exe')) {
             $digest = (Get-FileHash -LiteralPath (Join-Path 'preview-pending' $name) -Algorithm SHA256).Hash
             "$name|$digest"
           }
@@ -231,7 +231,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: preview-pending
-          key: frelaunch-0513-compiled-nsis-${{ hashFiles('scripts/modrinth-fork/*.ps1', 'vendor/fre-rust-source/FRE-VENDORED-SOURCE.json', 'scripts/modrinth-fork/*.py', 'scripts/modrinth-fork/*.rs', 'scripts/modrinth-fork/*.vue', 'scripts/modrinth-fork/*.ts', 'scripts/modrinth-fork/*.cjs', 'scripts/modrinth-fork/*.json', 'FRE-MODRINTH-LOCAL.ps1', 'update-channel.json') }}
+          key: frelaunch-0514-compiled-nsis-${{ hashFiles('scripts/modrinth-fork/*.ps1', 'vendor/fre-rust-source/FRE-VENDORED-SOURCE.json', 'scripts/modrinth-fork/*.py', 'scripts/modrinth-fork/*.rs', 'scripts/modrinth-fork/*.vue', 'scripts/modrinth-fork/*.ts', 'scripts/modrinth-fork/*.cjs', 'scripts/modrinth-fork/*.json', 'FRE-MODRINTH-LOCAL.ps1', 'update-channel.json') }}
 
       - name: Verify compiled preview cache and check file integrity
         shell: pwsh
@@ -239,7 +239,7 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $manifest = 'preview-pending/SHA256-MANIFEST.txt'
           if (-not (Test-Path -LiteralPath $manifest -PathType Leaf)) { throw 'Preview digest manifest missing' }
-          $expectedNames = @('FRE-LAUNCH-v0.5.13-Windows-x64-Setup.exe', 'FRE LAUNCH.exe', 'fre-rust-client.exe', 'fre-rust-prepare.exe')
+          $expectedNames = @('FRE-LAUNCH-v0.5.14-Windows-x64-Setup.exe', 'FRE LAUNCH.exe', 'fre-rust-client.exe', 'fre-rust-prepare.exe')
           $entries = @(Get-Content -LiteralPath $manifest)
           if ($entries.Count -ne $expectedNames.Count) { throw 'Incorrect preview digest manifest' }
           foreach ($i in 0..($expectedNames.Count - 1)) {
@@ -250,14 +250,14 @@ jobs:
             $actual = (Get-FileHash -LiteralPath (Join-Path 'preview-pending' $fields[0]) -Algorithm SHA256).Hash
             if ($actual -ine $fields[1]) { throw "Cached preview SHA-256 mismatch: $($fields[0])" }
           }
-          "PREVIEW_INSTALLER=$((Resolve-Path -LiteralPath 'preview-pending/FRE-LAUNCH-v0.5.13-Windows-x64-Setup.exe').ProviderPath)" >> $env:GITHUB_ENV
+          "PREVIEW_INSTALLER=$((Resolve-Path -LiteralPath 'preview-pending/FRE-LAUNCH-v0.5.14-Windows-x64-Setup.exe').ProviderPath)" >> $env:GITHUB_ENV
 
       - name: Scan preview with Microsoft Defender before sharing
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           $files = @(
-            'preview-pending/FRE-LAUNCH-v0.5.13-Windows-x64-Setup.exe',
+            'preview-pending/FRE-LAUNCH-v0.5.14-Windows-x64-Setup.exe',
             'preview-pending/FRE LAUNCH.exe',
             'preview-pending/fre-rust-client.exe',
             'preview-pending/fre-rust-prepare.exe'
@@ -268,7 +268,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $folder = Join-Path $env:RUNNER_TEMP 'FRELaunch0513Preview'
+          $folder = Join-Path $env:RUNNER_TEMP 'FRELaunch0514Preview'
           $installer = Start-Process -FilePath $env:PREVIEW_INSTALLER -ArgumentList @('/S',"/D=$folder") -WindowStyle Hidden -Wait -PassThru
           if ($installer.ExitCode -ne 0) { throw "Preview installer failed: $($installer.ExitCode)" }
           # The bundled native Rust game is also an EXE. Launch exactly FRE LAUNCH,
@@ -286,12 +286,12 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           New-Item -ItemType Directory -Force -Path preview-artifacts | Out-Null
-          $target = 'preview-artifacts/FRE-LAUNCH-v0.5.13-PREVIEW-Windows-x64-Setup.exe'
+          $target = 'preview-artifacts/FRE-LAUNCH-v0.5.14-PREVIEW-Windows-x64-Setup.exe'
           Copy-Item -LiteralPath $env:PREVIEW_INSTALLER -Destination $target
           (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash.ToLowerInvariant() |
             Set-Content -LiteralPath 'preview-artifacts/SHA256.txt'
           $notes = @(
-            "FRE LAUNCH v0.5.13 preview from main commit $env:GITHUB_SHA."
+            "FRE LAUNCH v0.5.14 preview from main commit $env:GITHUB_SHA."
             'UNSIGNED TEST BUILD, not a signed update for installed v0.5.9.'
             'Microsoft Defender scan and clean installation startup smoke passed in Windows CI.'
             'Includes Java in-app Modrinth catalog, optional approved-key CurseForge search,'
@@ -304,7 +304,7 @@ jobs:
       - name: Upload Windows preview (not official release)
         uses: actions/upload-artifact@v4
         with:
-          name: FRE-LAUNCH-v0.5.13-PREVIEW-Windows
+          name: FRE-LAUNCH-v0.5.14-PREVIEW-Windows
           path: preview-artifacts/
           if-no-files-found: error
           retention-days: 7

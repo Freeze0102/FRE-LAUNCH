@@ -9,6 +9,8 @@ const MAX_TOTAL: u64 = 128 << 20;
 #[serde(rename_all = "camelCase")]
 pub struct PackageFacts {
     pub id: String,
+    pub name: String,
+    pub authors: Vec<String>,
     pub version: String,
     pub api: String,
     pub content_only: bool,
@@ -148,7 +150,7 @@ pub fn inspect(bytes: &[u8], kind: &str, expected: Option<(&str, &str, &str)>) -
                 return Err(format!("Unexpected native bundle file: {name}"));
             }
         }
-        return Ok(PackageFacts { id:manifest.id, version:manifest.version, api, content_only:false,
+        return Ok(PackageFacts { name:manifest.id.clone(), authors:Vec::new(), id:manifest.id, version:manifest.version, api, content_only:false,
             files:files.len(), expanded_bytes:total, code_files, indicators:indicators.into_iter().collect(),
             engine_revision:Some(manifest.engine), mixins_revision:Some(manifest.mixins), hooks:manifest.hooks });
     }
@@ -157,7 +159,10 @@ pub fn inspect(bytes: &[u8], kind: &str, expected: Option<(&str, &str, &str)>) -
     if manifests.len() != 1 { return Err("Exactly one content mod manifest is required".into()); }
     let manifest: ContentManifest = toml::from_str(std::str::from_utf8(&manifests[0].1).map_err(|_| "Invalid manifest encoding")?)
         .map_err(|_| "Invalid content mod manifest")?;
-    if !valid_id(&manifest.id) || manifest.name.is_empty() || !["0.1", "0.2", "0.3"].contains(&manifest.api.as_str())
+    if !valid_id(&manifest.id) || manifest.name.is_empty() || manifest.name.len()>256
+        || manifest.version.is_empty() || manifest.version.len()>80 || manifest.description.len()>65536
+        || manifest.authors.len()>100 || manifest.authors.iter().any(|name|name.len()>256)
+        || manifest.namespaces.len()>100 || !["0.1", "0.2", "0.3"].contains(&manifest.api.as_str())
         || !["client", "server", "both"].contains(&manifest.side.as_str()) { return Err("Invalid content mod identity or API".into()); }
     if let Some((id, version, api)) = expected {
         if manifest.id != id || manifest.version != version || manifest.api != api { return Err("Content manifest does not match the catalog".into()); }
@@ -171,8 +176,8 @@ pub fn inspect(bytes: &[u8], kind: &str, expected: Option<(&str, &str, &str)>) -
         if name == "mod.wasm" { continue; }
         if !data_path(name, &namespaces) { return Err(format!("Unsupported content file or namespace: {name}")); }
     }
-    let _ = (manifest.description, manifest.authors, manifest.experimental);
-    Ok(PackageFacts { id:manifest.id, version:manifest.version, api:manifest.api, content_only,
+    let _ = (manifest.description, manifest.experimental);
+    Ok(PackageFacts { id:manifest.id, name:manifest.name, authors:manifest.authors, version:manifest.version, api:manifest.api, content_only,
         files:files.len(), expanded_bytes:total, code_files, indicators:indicators.into_iter().collect(),
         engine_revision:None, mixins_revision:None, hooks:None })
 }
@@ -208,6 +213,9 @@ mod tests {
     fn rejects_identity_changes_namespace_escapes_and_dual_manifests() {
         let data=bundle(&[("fre-mod.toml",MANIFEST)]);
         assert!(inspect(&data,"mod",Some(("other","1","0.2"))).is_err());
+        let huge_name=format!("id='demo'\nname='{}'\nversion='1'\napi='0.2'\n","x".repeat(257));
+        assert!(inspect(&bundle(&[("fre-mod.toml",huge_name.as_bytes())]),"mod",None).is_err());
+
         let data=bundle(&[("fre-mod.toml",MANIFEST),("assets/minecraft/lang/en_us.json",b"{}")]);
         assert!(inspect(&data,"mod",None).is_err());
         let data=bundle(&[("fre-mod.toml",MANIFEST),("horizon-mod.toml",MANIFEST)]);
