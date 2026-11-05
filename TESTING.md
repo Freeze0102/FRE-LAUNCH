@@ -12,7 +12,7 @@ node scripts/modrinth-fork/test_frontend.cjs FRE-Modrinth-Source
 node scripts/modrinth-fork/test_build_scripts.cjs FRE-Modrinth-Source
 node --test scripts/modrinth-fork/test_release.mjs scripts/modrinth-fork/test_content_security.cjs scripts/modrinth-fork/test_compat_frontend.cjs scripts/modrinth-fork/test_updater.cjs
 python scripts/modrinth-fork/native_branding.py
-cargo test --locked --release --manifest-path .audit/fre-native-source/current/Cargo.toml --target-dir vendor/fre-rust-source/target -p fre-core -p fre-prepare
+cargo test --locked --release --manifest-path .audit/fre-native-source/current/Cargo.toml --target-dir vendor/fre-rust-source/target -p fre-core -p fre-prepare -p fre-mods -p fre-shader-api --no-default-features --features fre-mods/index
 # Окремий мережевий тест справжнього JDK downloader: не змінює глобальну Java.
 cargo run --locked --manifest-path tests/native-jdk/Cargo.toml -- .audit/managed-jdk-check
 .\BUILD-FRE-WINDOWS.ps1 -Preview

@@ -20,6 +20,78 @@ def verify_runtime_branding(runtime: Path):
             if re.search(r'horizon(?!tal)', path.read_text(encoding='utf-8-sig'), re.I):
                 raise RuntimeError(f"Old engine branding in bundled runtime text: {path.name}")
 
+def bundle_native_runtime(root: Path, refresh=False):
+    """Validate and stage native files; refreshing keeps the compiled app intact."""
+    here = Path(__file__).resolve().parent
+    app = root / "apps/app"
+    runtime = here / "fre-rust-runtime"
+    if (runtime / "resources").exists():
+        raise RuntimeError("Minecraft resources must stay in the owner's private app cache, never in the installer.")
+    binaries = ("fre-rust-client.exe", "fre-rust-prepare.exe", "research-lock.json", "LICENSE.txt")
+    valid = all((runtime / f).is_file() for f in binaries) and (runtime / "BUILD-INFO.json").is_file()
+    if valid:
+        # These may be private Minecraft resources. Prevent symlink escapes
+        # and detect incomplete, edited or mismatched native builds before
+        # copying anything into the Tauri installer.
+        verify_runtime_branding(runtime)
+        info = json.loads((runtime / "BUILD-INFO.json").read_text(encoding="utf-8-sig"))
+        if info.get("source_commit") != "975c07d9151847e6af13afc4b5ab37b6bbe78ef5":
+            raise RuntimeError("Native Rust engine source revision is not approved.")
+        hasher = hashlib.sha256()
+        with (runtime / "fre-rust-client.exe").open("rb") as executable:
+            for block in iter(lambda: executable.read(1024 * 1024), b""):
+                hasher.update(block)
+        checksum = hasher.hexdigest()
+        if checksum.lower() != str(info.get("game_exe_sha256", "")).lower():
+            raise RuntimeError("Native Rust game SHA-256 is wrong: rebuild; do not bundle.")
+        preparer_checksum = hashlib.sha256((runtime / "fre-rust-prepare.exe").read_bytes()).hexdigest()
+        if preparer_checksum.lower() != str(info.get("prepare_exe_sha256", "")).lower():
+            raise RuntimeError("Native Rust preparer SHA-256 mismatch: rebuild; do not bundle.")
+        parity = runtime / "mods/fre/src/test/java/dev/frelaunch/parity/VanillaHeightmapOracle.java"
+        prepare_source = runtime / "crates/fre-prepare"
+        source_files = list((prepare_source / "src").glob("*.rs"))
+        if not parity.is_file() or not (prepare_source / "Cargo.toml").is_file() or not (prepare_source / "build.rs").is_file() or len(source_files) < 10:
+            raise RuntimeError("Bundled Rust preparer lacks its complete MIT source and Java exporters.")
+        if info.get("engine_license") != "MIT":
+            raise RuntimeError("Native Rust game license metadata changed.")
+        if info.get("native_tests_passed") is not True:
+            raise RuntimeError("Native runtime has not passed the required engine and package tests.")
+        from native_branding import fingerprint
+        if info.get("branding_sha256") != fingerprint() or info.get("product_name") != "FRE LAUNCH":
+            raise RuntimeError("Native runtime has outdated branding. Run BUILD-FRE-RUST.ps1 before packaging.")
+        if not (runtime / "LICENSE.txt").read_text(encoding="utf-8").startswith("MIT License"):
+            raise RuntimeError("Native Rust game attribution is missing.")
+        staged = app / "fre-rust-runtime"
+        if staged.exists():
+            if not refresh:
+                raise RuntimeError("Native Rust staging folder already exists; use a clean upstream checkout.")
+            if staged.is_symlink() or not staged.is_dir():
+                raise RuntimeError("Unsafe existing native staging directory.")
+            for existing in staged.rglob("*"):
+                if existing.is_symlink() or (existing.is_file() and not (runtime / existing.relative_to(staged)).is_file()):
+                    raise RuntimeError("Unexpected existing native staging entry; preserve it before refreshing.")
+        shutil.copytree(runtime, staged, dirs_exist_ok=refresh)
+        conf = app / "tauri.conf.json"
+        settings = json.loads(conf.read_text(encoding="utf-8"))
+        resources = settings["bundle"].setdefault("resources", {})
+        if not isinstance(resources, dict):
+            raise RuntimeError("Unexpected Tauri bundle.resources configuration.")
+        for file in binaries + ("BUILD-INFO.json",):
+            resources[f"fre-rust-runtime/{file}"] = f"fre-rust/{file}"
+        # These are original MIT exporter sources, not Mojang game files.
+        resources["fre-rust-runtime/mods/fre/src/test/java/dev/frelaunch/parity/"] = "fre-rust/mods/fre/src/test/java/dev/frelaunch/parity/"
+        resources["fre-rust-runtime/crates/fre-prepare/"] = "fre-rust/crates/fre-prepare/"
+        # PUBLIC releases carry the MIT engine only. Mojang resources are
+        # imported locally by the authenticated owner after installation.
+        conf.write_text(json.dumps(settings, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        print("Bundled independent native FRE Rust engine + resource preparer; private Minecraft assets stay on the owner's PC.")
+    else:
+        if runtime.exists():
+            raise RuntimeError("Incomplete fre-rust-runtime staging; run BUILD-FRE-RUST.ps1 again.")
+        print("Native FRE Rust engine is not yet built; Play will be disabled with an explicit explanation.")
+
+
+
 def exactly(path: Path, before: str, after: str):
     source = path.read_text(encoding="utf-8")
     occurrences = source.count(before)
@@ -502,63 +574,7 @@ onUnmounted(() => {
     # Bundle the native game only when the local build has prepared real
     # artifacts. Missing assets are an explicit Runtime: Not installed state
     # in the UI, NEVER a fake Play button.
-    runtime = here / "fre-rust-runtime"
-    if (runtime / "resources").exists():
-        raise RuntimeError("Minecraft resources must stay in the owner's private app cache, never in the installer.")
-    binaries = ("fre-rust-client.exe", "fre-rust-prepare.exe", "research-lock.json", "LICENSE.txt")
-    valid = all((runtime / f).is_file() for f in binaries) and (runtime / "BUILD-INFO.json").is_file()
-    if valid:
-        # These may be private Minecraft resources. Prevent symlink escapes
-        # and detect incomplete, edited or mismatched native builds before
-        # copying anything into the Tauri installer.
-        verify_runtime_branding(runtime)
-        info = json.loads((runtime / "BUILD-INFO.json").read_text(encoding="utf-8-sig"))
-        if info.get("source_commit") != "975c07d9151847e6af13afc4b5ab37b6bbe78ef5":
-            raise RuntimeError("Native Rust engine source revision is not approved.")
-        hasher = hashlib.sha256()
-        with (runtime / "fre-rust-client.exe").open("rb") as executable:
-            for block in iter(lambda: executable.read(1024 * 1024), b""):
-                hasher.update(block)
-        checksum = hasher.hexdigest()
-        if checksum.lower() != str(info.get("game_exe_sha256", "")).lower():
-            raise RuntimeError("Native Rust game SHA-256 is wrong: rebuild; do not bundle.")
-        preparer_checksum = hashlib.sha256((runtime / "fre-rust-prepare.exe").read_bytes()).hexdigest()
-        if preparer_checksum.lower() != str(info.get("prepare_exe_sha256", "")).lower():
-            raise RuntimeError("Native Rust preparer SHA-256 mismatch: rebuild; do not bundle.")
-        parity = runtime / "mods/fre/src/test/java/dev/frelaunch/parity/VanillaHeightmapOracle.java"
-        prepare_source = runtime / "crates/fre-prepare"
-        source_files = list((prepare_source / "src").glob("*.rs"))
-        if not parity.is_file() or not (prepare_source / "Cargo.toml").is_file() or not (prepare_source / "build.rs").is_file() or len(source_files) < 10:
-            raise RuntimeError("Bundled Rust preparer lacks its complete MIT source and Java exporters.")
-        if info.get("engine_license") != "MIT":
-            raise RuntimeError("Native Rust game license metadata changed.")
-        from native_branding import fingerprint
-        if info.get("branding_sha256") != fingerprint() or info.get("product_name") != "FRE LAUNCH":
-            raise RuntimeError("Native runtime has outdated branding. Run BUILD-FRE-RUST.ps1 before packaging.")
-        if not (runtime / "LICENSE.txt").read_text(encoding="utf-8").startswith("MIT License"):
-            raise RuntimeError("Native Rust game attribution is missing.")
-        staged = app / "fre-rust-runtime"
-        if staged.exists():
-            raise RuntimeError("Native Rust staging folder already exists; use a clean upstream checkout.")
-        shutil.copytree(runtime, staged)
-        conf = app / "tauri.conf.json"
-        settings = json.loads(conf.read_text(encoding="utf-8"))
-        resources = settings["bundle"].setdefault("resources", {})
-        if not isinstance(resources, dict):
-            raise RuntimeError("Unexpected Tauri bundle.resources configuration.")
-        for file in binaries + ("BUILD-INFO.json",):
-            resources[f"fre-rust-runtime/{file}"] = f"fre-rust/{file}"
-        # These are original MIT exporter sources, not Mojang game files.
-        resources["fre-rust-runtime/mods/fre/src/test/java/dev/frelaunch/parity/"] = "fre-rust/mods/fre/src/test/java/dev/frelaunch/parity/"
-        resources["fre-rust-runtime/crates/fre-prepare/"] = "fre-rust/crates/fre-prepare/"
-        # PUBLIC releases carry the MIT engine only. Mojang resources are
-        # imported locally by the authenticated owner after installation.
-        conf.write_text(json.dumps(settings, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-        print("Bundled independent native FRE Rust engine + resource preparer; private Minecraft assets stay on the owner's PC.")
-    else:
-        if runtime.exists():
-            raise RuntimeError("Incomplete fre-rust-runtime staging; run BUILD-FRE-RUST.ps1 again.")
-        print("Native FRE Rust engine is not yet built; Play will be disabled with an explicit explanation.")
+    bundle_native_runtime(root)
 
     from feature_rust_polish import apply as apply_rust_polish
     apply_rust_polish(root)

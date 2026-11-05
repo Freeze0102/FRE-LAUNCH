@@ -27,7 +27,7 @@ if (Test-Path -LiteralPath $runtime) {
     if ($info.source_commit -cne $Revision -or $info.source_tree -cne $sourceMeta.source_tree -or $info.engine_license -cne 'MIT') {
         throw 'Existing runtime provenance differs from the pinned engine; preserve it before rebuilding'
     }
-    if ($info.branding_sha256 -cne $brandingHash) {
+    if ($info.branding_sha256 -cne $brandingHash -or $info.native_tests_passed -ne $true) {
         $archive = Join-Path $PSScriptRoot ('fre-rust-runtime-archive-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
         if ([IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($runtime)) -ne $PSScriptRoot -or
             [IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($archive)) -ne $PSScriptRoot) {
@@ -69,7 +69,13 @@ try {
     # Reuse registry dependency objects, while compiling the renamed FRE crates.
     cargo build --locked --release --target-dir $buildTarget -p fre-client -p fre-prepare
     if ($LASTEXITCODE -ne 0) { throw 'Native engine compilation failed' }
+    cargo test --locked --release --target-dir $buildTarget -p fre-core -p fre-prepare -p fre-mods -p fre-shader-api --no-default-features --features fre-mods/index
+    if ($LASTEXITCODE -ne 0) { throw 'Native engine or package compatibility tests failed' }
 } finally { Pop-Location }
+$finalBrandingHash = (& $PythonExe $brandingScript --fingerprint).Trim()
+if ($LASTEXITCODE -ne 0 -or $finalBrandingHash -cne $brandingHash) {
+    throw 'Native branding source changed during compilation; rerun the build before packaging'
+}
 $stage = "$runtime.pending"
 if (Test-Path -LiteralPath $stage) { throw 'Previous native staging exists; inspect it before retrying' }
 New-Item -ItemType Directory -Path $stage | Out-Null
@@ -92,6 +98,7 @@ $info = [ordered]@{
     engine_license = 'MIT'
     branding_sha256 = $brandingHash
     product_name = 'FRE LAUNCH'
+    native_tests_passed = $true
     game_exe_sha256 = (Get-FileHash -LiteralPath (Join-Path $stage 'fre-rust-client.exe') -Algorithm SHA256).Hash.ToLowerInvariant()
     prepare_exe_sha256 = (Get-FileHash -LiteralPath (Join-Path $stage 'fre-rust-prepare.exe') -Algorithm SHA256).Hash.ToLowerInvariant()
     proprietary_minecraft_assets_included = $false

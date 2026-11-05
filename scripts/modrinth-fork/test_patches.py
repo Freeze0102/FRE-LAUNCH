@@ -113,6 +113,19 @@ class PatchTests(unittest.TestCase):
             icon_scope = app_config['app']['security']['assetProtocol']['scope']
             for extension in ('png', 'jpg', 'webp'):
                 self.assertIn(f'$APPDATA/fre-rust-minecraft/profiles/*/icon.{extension}', icon_scope)
+            runtime = REPOSITORY / 'scripts/modrinth-fork/fre-rust-runtime'
+            if runtime.is_dir():
+                from feature_fre_rust import bundle_native_runtime
+                with self.assertRaisesRegex(RuntimeError, 'already exists'):
+                    bundle_native_runtime(root)
+                bundle_native_runtime(root, refresh=True)
+                self.assertEqual(main.read_bytes(), before)
+                unexpected = root / 'apps/app/fre-rust-runtime/unexpected.txt'
+                unexpected.write_text('preserve this file')
+                with self.assertRaisesRegex(RuntimeError, 'Unexpected existing'):
+                    bundle_native_runtime(root, refresh=True)
+                self.assertEqual(unexpected.read_text(), 'preserve this file')
+                unexpected.unlink()
             # Optionally retain this exact verified result for local compilation.
             destination = os.environ.get('FRE_AUDIT_SOURCE')
             if destination:

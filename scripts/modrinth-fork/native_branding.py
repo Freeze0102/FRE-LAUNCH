@@ -27,6 +27,18 @@ def identifier(text):
 
 
 def transform(text, suffix=""):
+    credits = []
+    def preserve(match):
+        credits.append(match[0])
+        return f"__FRE_CREDIT_{len(credits) - 1}__"
+    # Third-party package authorship is attribution, not the fork's UI brand.
+    patterns = {
+        ".toml": r"(?m)^\s*authors\s*=\s*\[[^\]]*\]",
+        ".rs": r"(?m)(?:^\s*authors\s*(?::\s*vec!|=\s*)\[[^\]]*\]|assert_eq!\(\s*[\w.]+\.authors\s*,\s*\[[^\]]*\])",
+        ".json": r'"authors"\s*:\s*\[[^\]]*\]',
+    }
+    if suffix in patterns:
+        text = re.sub(patterns[suffix], preserve, text)
     text = text.replace("https://github.com/horizon-rust/horizon", "https://github.com/Freeze0102/FRE-LAUNCH")
     text = text.replace("https://playhorizon.dev", "https://github.com/Freeze0102/FRE-LAUNCH/releases")
     text = text.replace("playhorizon.dev", "github.com/Freeze0102/FRE-LAUNCH")
@@ -34,13 +46,19 @@ def transform(text, suffix=""):
     # keys, environment variables and paths must remain valid identifiers.
     if suffix in {".rs", ".java", ".json", ".toml"}:
         text = STRING.sub(lambda m: re.sub(r"\b(?:Horizon|HORIZON)\b", "FRE LAUNCH", m[0]), text)
-    return identifier(text)
+    if suffix == ".md":
+        text = re.sub(r"\b(?:Horizon|HORIZON)\b", "FRE LAUNCH", text)
+    text = identifier(text)
+    for index, credit in enumerate(credits):
+        text = text.replace(f"__FRE_CREDIT_{index}__", credit)
+    return text
 
 
 def fingerprint():
     from prepare import ico, png
     script = Path(__file__).read_bytes().replace(b"\r\n", b"\n")
-    return hashlib.sha256(script + native_source.SOURCE_TREE.encode() + png(64) + ico(png(256))).hexdigest()
+    formats = Path(__file__).with_name("native_formats.py").read_bytes().replace(b"\r\n", b"\n")
+    return hashlib.sha256(script + formats + native_source.SOURCE_TREE.encode() + png(64) + ico(png(256))).hexdigest()
 
 
 def patch(text, before, after):
@@ -94,6 +112,8 @@ def build_tree(destination):
                     text = patch(text, "&w[22..26]", "&w[MARK.len() - 5..MARK.len() - 1]")
                 if name == "crates/horizon-client/src/main.rs":
                     text = patch(text, "static MOD_API_LEVEL: [u8; 27]", "static MOD_API_LEVEL: [u8; fre_mods::api_level::MARK.len()]")
+                from native_formats import apply as apply_formats
+                text = apply_formats(name, text, patch)
                 data = text.encode("utf-8")
         # Replace upstream window/taskbar art with FRE's existing original icon.
         if name == "crates/horizon-theme/icons/horizon-64.png":

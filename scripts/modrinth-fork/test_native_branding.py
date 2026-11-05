@@ -9,6 +9,18 @@ import native_branding as branding
 
 
 class NativeBrandingTests(unittest.TestCase):
+    def test_package_authorship_survives_product_rebranding(self):
+        source = 'authors = ["Horizon"]\ndescription = "Horizon client"\n'
+        result = branding.transform(source, '.toml')
+        self.assertIn('authors = ["Horizon"]', result)
+        self.assertIn('FRE LAUNCH client', result)
+        result = branding.transform('    authors: vec!["Horizon".into()],', '.rs')
+        self.assertIn('authors: vec!["Horizon".into()]', result)
+        embedded = 'let manifest = r#"\nauthors = ["Horizon"]\n"#;'
+        self.assertIn('authors = ["Horizon"]', branding.transform(embedded, '.rs'))
+        assertion = 'assert_eq!(m.authors, ["Horizon"]);'
+        self.assertEqual(branding.transform(assertion, '.rs'), assertion)
+
     def test_packaged_runtime_rejects_old_brand_in_filenames_and_sources(self):
         from feature_fre_rust import verify_runtime_branding
         with tempfile.TemporaryDirectory(dir=branding.REPO / '.audit') as parent:
@@ -45,6 +57,8 @@ class NativeBrandingTests(unittest.TestCase):
         result = branding.transform('horizon_client::open("Horizon", "horizon-resources.json", "HORIZON_HOME");', '.rs')
         self.assertEqual(result, 'fre_client::open("FRE LAUNCH", "fre-resources.json", "FRE_HOME");')
         self.assertNotIn('playhorizon', branding.transform('https://playhorizon.dev', '.rs'))
+        self.assertEqual(branding.transform('Horizon puts the prelude before your files.', '.md'),
+            'FRE LAUNCH puts the prelude before your files.')
 
     def test_complete_branded_tree_preserves_licenses_and_has_valid_cargo_manifests(self):
         # Use the same deterministic generator as the local and CI packager.
