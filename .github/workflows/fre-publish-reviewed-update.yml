@@ -46,8 +46,8 @@ jobs:
           echo "$data" | jq -e --arg source "$GITHUB_SHA" \
             '.conclusion == "success" and .status == "completed" and .head_sha == $source and .head_branch == "main" and (.path | contains("fre-modrinth-rust-update.yml"))' \
             >/dev/null || { echo 'Review run is not a successful native Vue/Rust build of current main'; exit 1; }
-          if gh release view v0.5.12 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo 'Version v0.5.12 already exists, no replacement allowed'
+          if gh release view v0.5.13 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo 'Version v0.5.13 already exists, no replacement allowed'
             exit 1
           fi
 
@@ -57,16 +57,16 @@ jobs:
           REVIEW_RUN_ID: ${{ inputs.review_run_id }}
         run: |
           set -euo pipefail
-          mkdir -p release-staging/v0.5.12
+          mkdir -p release-staging/v0.5.13
           gh run download "$REVIEW_RUN_ID" --repo "$GITHUB_REPOSITORY" \
-            -n 'FRE-LAUNCH-v0.5.12-Vue-Rust-Windows-REVIEW' \
-            -D release-staging/v0.5.12
-          test -s release-staging/v0.5.12/FRE-LAUNCH-Windows-x64-Setup.exe
-          test -s release-staging/v0.5.12/latest.json
-          test -s release-staging/v0.5.12/PROVENANCE.json
+            -n 'FRE-LAUNCH-v0.5.13-Vue-Rust-Windows-REVIEW' \
+            -D release-staging/v0.5.13
+          test -s release-staging/v0.5.13/FRE-LAUNCH-Windows-x64-Setup.exe
+          test -s release-staging/v0.5.13/latest.json
+          test -s release-staging/v0.5.13/PROVENANCE.json
           jq -e --arg sha "$GITHUB_SHA" \
             '.sourceCommit == $sha and .proprietaryMinecraftAssetsIncluded == false and .defender.active == true and .defender.threatsFound == 0 and .defender.launcherExitCode == 0 and .defender.installerExitCode == 0' \
-            release-staging/v0.5.12/PROVENANCE.json >/dev/null
+            release-staging/v0.5.13/PROVENANCE.json >/dev/null
 
       - name: Cryptographically verify update, signatures, Defender report and commit
         shell: bash
@@ -86,7 +86,7 @@ jobs:
           set -euo pipefail
           for attempt in 1 2 3 4; do
             if node scripts/modrinth-fork/smoke-update.mjs 0.5.9; then
-              echo 'Anonymous signed v0.5.12 FRE LAUNCH auto-update is available'
+              echo 'Anonymous signed v0.5.13 FRE LAUNCH auto-update is available'
               exit 0
             fi
             sleep 15

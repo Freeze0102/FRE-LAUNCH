@@ -25,8 +25,15 @@ for (const name of fs.readdirSync(workflows).filter(x => x.endsWith('.yml'))) {
   }
 }
 for (const name of ['BUILD-FRE-RUST.ps1', 'BUILD-FRE-WINDOWS.ps1', 'FRE-MODRINTH-LOCAL.ps1',
-  'scripts/modrinth-fork/ci-build-native-engine.ps1', 'scripts/modrinth-fork/vendor-native-rust-source.ps1']) {
+  'scripts/modrinth-fork/ci-build-native-engine.ps1', 'scripts/modrinth-fork/vendor-native-rust-source.ps1',
+  '.github/scripts/scan-preview-defender.ps1']) {
   blocks.push({ name, code: fs.readFileSync(path.join(repo, name), 'utf8') })
+}
+const catalogBackend = fs.readFileSync(path.join(repo, 'scripts/modrinth-fork/fre_rust_catalog.rs'), 'utf8')
+for (const name of ['WINDOWS_DOWNLOAD', 'SCAN_SCRIPT']) {
+  const code = new RegExp(`const ${name}:&str=r#"([\\s\\S]*?)"#;`).exec(catalogBackend)?.[1]
+  assert.ok(code, `Missing embedded PowerShell: ${name}`)
+  blocks.push({ name: `fre_rust_catalog.rs/${name}`, code })
 }
 const check = spawnSync('pwsh', ['-NoProfile', '-NonInteractive', '-Command', `
   $ErrorActionPreference = 'Stop'

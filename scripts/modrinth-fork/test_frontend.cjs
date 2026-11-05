@@ -59,9 +59,12 @@ function component(file, invoke, instances = [], options = {}) {
     },
     'vue-router': { useRouter: () => ({ push: options.push || (async () => {}) }) },
     '@/components/ui/library/instance-group/instance-card-view.vue': {},
+    '@/components/ui/RustModCatalog.vue': {},
     vue: { ...vue, onMounted: f => mounted.push(f), onUnmounted: f => unmounted.push(f) },
   }
-  const names = file === 'RustInstanceGrid.vue'
+  const names = file === 'RustModCatalog.vue'
+    ? 'projects,query,kind,loading,pending,error,notice,stale,expanded,reports,filtered,shown,load,verify,install,details,source,safeSource,image,isInstalled,version,report'
+    : file === 'RustInstanceGrid.vue'
     ? 'cards,nativeProfiles,runtime,refresh,refreshRunning,runningIds,isRunning,openCard,play,stop,cardStyle,viewInstance,detailUrl,busy,selectCard,isSelected,activateCard'
     : file === 'RustNativeMods.vue'
     ? 'installed,busy,error,notice,load,importFile,removeMod,openFolder,settings,saving,setMod,setZoomFactor,setZoomKey,saveSettings'
@@ -721,7 +724,7 @@ test('Rust profile icon settings save the selected image, support reset, and ign
 
 test('Rust resource setup and native mod browser compile without an external launcher', () => {
   const compiler = rootRequire('@vue/compiler-sfc')
-  for (const file of ['RustNativeMods.vue', 'RustInstancePage.vue', 'FreRustPanel.vue']) {
+  for (const file of ['RustNativeMods.vue', 'RustModCatalog.vue', 'RustInstancePage.vue', 'FreRustPanel.vue']) {
     const sourceText = fs.readFileSync(path.join(__dirname, file), 'utf8')
     const { descriptor, errors } = compiler.parse(sourceText, { filename: file })
     assert.deepEqual(errors, [], file + ' parse failed')
@@ -809,4 +812,78 @@ test('A late Rust mod response cannot replace the newly selected profile setting
   assert.equal(c.state.settings.value.zoomFactor, 8)
   assert.equal(c.state.settings.value.zoom, false)
   assert.equal(c.state.busy.value, false)
+})
+
+
+function catalogFixture(kind = 'native-mod') {
+  return { id: 'catalog_demo', name: 'Catalog Demo', kind, summary: 'Camera tool', description: 'Source package', authors: ['ExampleAuthor'], license: 'MIT', source: 'https://github.com/example/demo', categories: ['utility'], tags: ['zoom'], downloads: 50, versions: [{ version: '1', game: '26.3', api: kind === 'mod' ? '0.2' : 'native-1/pins', published: '2026-11-05', file: { name: kind === 'mod' ? 'demo.hmod' : 'demo.hnmod', url: 'https://github.com/example/demo/releases/download/v1/demo.hnmod', size: 100, sha256: '1'.repeat(64) } }] }
+}
+test('Rust catalog searches authors and tags and restricts external source/image links', async () => {
+  const native = catalogFixture()
+  const pack = { ...catalogFixture(), id: 'pack', name: 'Pack', kind: 'shader' }
+  const c = component('RustModCatalog.vue', async () => ({ projects: [native, pack], generated: '', fetchedAt: 1, stale: false }), [], { props: { profileId: '123', installedFiles: [] } })
+  await c.state.load()
+  assert.equal(c.state.filtered.value.length, 1)
+  c.state.query.value = 'exampleauthor zoom'
+  assert.equal(c.state.filtered.value.length, 1)
+  c.state.query.value = 'not-found'
+  assert.equal(c.state.filtered.value.length, 0)
+  c.state.query.value = ''
+  c.state.kind.value = 'all'
+  assert.equal(c.state.filtered.value.length, 2)
+  assert.equal(c.state.safeSource('javascript:alert(1)'), null)
+  assert.equal(c.state.safeSource('https://github.com.evil/repo'), null)
+  assert.equal(c.state.image('http://localhost/private'), undefined)
+  assert.equal(c.state.image('https://evil.test/track.png'), undefined)
+})
+test('Catalog verification reports native code without enabling installation or execution', async () => {
+  const project = catalogFixture()
+  const calls = []
+  const c = component('RustModCatalog.vue', async (command, args) => {
+    calls.push({ command, args })
+    if (command.endsWith('|rust_catalog')) return { projects: [project], generated: '', fetchedAt: 1, stale: false }
+    assert.equal(command, 'plugin:fre-rust|rust_catalog_check')
+    assert.equal(args.expectedSha256, '1'.repeat(64))
+    return { projectId: project.id, version: '1', sha256: '1'.repeat(64), installable: false, checks: [{ code: 'execution', state: 'warning', detail: 'Native build required' }] }
+  }, [], { props: { profileId: '123', installedFiles: [] } })
+  await c.state.load()
+  await c.state.verify(project)
+  await c.state.install(project)
+  assert.equal(c.state.report(project).installable, false)
+  assert.equal(c.state.pending.value, '')
+  assert.equal(calls.filter(c => c.command.endsWith('|rust_catalog_install')).length, 0)
+})
+test('Catalog data installation binds the current profile and exact inspected hash', async () => {
+  const project = catalogFixture('mod')
+  const calls = [], events = []
+  const checked = { projectId: project.id, version: '1', sha256: '1'.repeat(64), installable: true, checks: [] }
+  const c = component('RustModCatalog.vue', async (command, args) => {
+    calls.push({ command, args })
+    if (command.endsWith('|rust_catalog')) return { projects: [project], generated: '', fetchedAt: 1, stale: false }
+    return checked
+  }, [], { props: { profileId: '456', installedFiles: [] }, emit: event => events.push(event) })
+  await c.state.load()
+  await c.state.install(project)
+  assert.equal(calls.filter(c => c.command.endsWith('|rust_catalog_install')).length, 0)
+  await c.state.verify(project)
+  await c.state.install(project)
+  const install = calls.find(c => c.command.endsWith('|rust_catalog_install'))
+  assert.deepEqual(install.args, { profileId: '456', projectId: project.id, expectedSha256: '1'.repeat(64) })
+  assert.deepEqual(events, ['installed'])
+  c.state.stale.value = true
+  const count = calls.length
+  await c.state.install(project)
+  assert.equal(calls.length, count)
+})
+test('Late catalog replies cannot expose another selected profile state', async () => {
+  const previous = deferred()
+  const props = { profileId: '123' }
+  const c = component('RustModCatalog.vue', async (command,args) => args.profileId === '123' ? previous.promise : { projects: [], generated: '', fetchedAt: 1, stale: false }, [], { props })
+  const first = c.state.load()
+  props.profileId = '456'
+  await c.state.load()
+  previous.resolve({ projects: [catalogFixture()], generated: '', fetchedAt: 1, stale: false })
+  await first
+  assert.equal(c.state.projects.value.length, 0)
+  assert.equal(c.state.loading.value, false)
 })

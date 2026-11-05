@@ -22,6 +22,10 @@ mod managed_jdk;
 mod migration;
 #[path = "fre_client_mods.rs"]
 mod client_mods;
+#[path = "fre_rust_mod_audit.rs"]
+mod mod_audit;
+#[path = "fre_rust_catalog.rs"]
+mod catalog;
 static CLIENT_MOD_SETTINGS: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 const MAX_NAME: usize = 64;
@@ -104,6 +108,9 @@ pub fn init<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
             rust_import_resources,
             rust_mods,
             rust_client_mods,
+            rust_catalog,
+            rust_catalog_check,
+            rust_catalog_install,
             rust_import_mod,
             rust_launch,
             rust_running,
@@ -753,6 +760,31 @@ async fn rust_client_mods<R: tauri::Runtime>(
     client_mods::read(&dir)
 }
 
+#[tauri::command]
+async fn rust_catalog<R: tauri::Runtime>(app: tauri::AppHandle<R>, profile_id: String, force: bool) -> Result<catalog::View,String> {
+    let root=base(&app)?;
+    let dir=profile_dir(&root,&profile_id)?;
+    read_profile(&dir,&profile_id).ok_or("Rust profile does not exist.")?;
+    catalog::view(&root,force).await
+}
+#[tauri::command]
+async fn rust_catalog_check<R: tauri::Runtime>(app: tauri::AppHandle<R>, profile_id: String, project_id: String, expected_sha256: String) -> Result<catalog::Report,String> {
+    let root=base(&app)?;
+    let dir=profile_dir(&root,&profile_id)?;
+    read_profile(&dir,&profile_id).ok_or("Rust profile does not exist.")?;
+    catalog::inspect_project(&root,&project_id,&expected_sha256).await
+}
+#[tauri::command]
+async fn rust_catalog_install<R: tauri::Runtime>(app: tauri::AppHandle<R>, profile_id: String, project_id: String, expected_sha256: String) -> Result<catalog::Report,String> {
+    let _profile_guard=PROFILE_CREATION.lock().await;
+    if RUNNING_PROFILES.lock().await.contains(&profile_id) { return Err("Close the Rust game before installing a mod.".into()); }
+    let root=base(&app)?;
+    let dir=profile_dir(&root,&profile_id)?;
+    read_profile(&dir,&profile_id).ok_or("Rust profile does not exist.")?;
+    migration::profile(&dir)?;
+    catalog::install(&root,&dir,&project_id,&expected_sha256).await
+}
+
 /// FRE-owned mods: .hmod are data-only, whereas native .hnmod source
 /// mixins require a separate trusted native rebuild and are not installed here.
 fn mod_filename_safe(name: &str) -> bool {
@@ -805,6 +837,7 @@ async fn rust_mods<R: tauri::Runtime>(
     action: String,
     project: Option<String>,
 ) -> Result<String, String> {
+    let _profile_guard=PROFILE_CREATION.lock().await;
     let dir = profile_dir(&base(&app)?, &profile_id)?;
     read_profile(&dir, &profile_id).ok_or("Rust profile does not exist.")?;
     match action.as_str() {
@@ -823,6 +856,7 @@ async fn rust_mods<R: tauri::Runtime>(
                 return Err("Refusing to remove a non-regular mod.".into());
             }
             fs::remove_file(file).map_err(|e| format!("Cannot remove mod: {e}"))?;
+            catalog::forget_removed_file(&dir,filename)?;
             Ok(format!("Removed {filename} from this Rust instance."))
         }
         _ => Err("Use local .hmod import. Native .hnmod code requires a separate trusted native build.".into()),
@@ -833,6 +867,7 @@ async fn rust_mods<R: tauri::Runtime>(
 async fn rust_import_mod<R: tauri::Runtime>(
     app: tauri::AppHandle<R>, profile_id: String, source: String,
 ) -> Result<String, String> {
+    let _profile_guard=PROFILE_CREATION.lock().await;
     if RUNNING_PROFILES.lock().await.contains(&profile_id) {
         return Err("Close the Rust game before importing a mod.".into());
     }
@@ -859,22 +894,29 @@ async fn rust_import_mod<R: tauri::Runtime>(
     if target.symlink_metadata().is_ok() {
         return Err("A content mod with this filename already exists. Remove it first.".into());
     }
-    let staged = target.with_extension("hmod.pending");
+    let staged = target.with_extension(format!("hmod.{}.pending",uuid::Uuid::new_v4()));
+    if staged.symlink_metadata().is_ok() { return Err("A previous pending import must be preserved before retrying.".into()); }
+    let mut staged_owned = false;
     let result: Result<(), String> = (|| {
         let input = fs::File::open(&source).map_err(|e| e.to_string())?;
         let mut output = fs::OpenOptions::new().create_new(true).write(true)
             .open(&staged).map_err(|e| e.to_string())?;
+        staged_owned = true;
         let count = std::io::copy(&mut input.take(32 * 1024 * 1024 + 1), &mut output)
             .map_err(|e| e.to_string())?;
         if count != meta.len() {
             return Err("Mod changed during import; try again.".into());
         }
         drop(output);
-        fs::rename(&staged, &target).map_err(|e| e.to_string())?;
         Ok(())
     })();
-    if result.is_err() { let _ = fs::remove_file(&staged); }
+    if result.is_err() && staged_owned { let _ = fs::remove_file(&staged); }
     result?;
+    if let Err(error) = catalog::inspect_local(&base(&app)?,&staged).await {
+        let _ = fs::remove_file(&staged);
+        return Err(error);
+    }
+    fs::rename(&staged,&target).map_err(|e|e.to_string())?;
     Ok(format!("Imported {filename}. Turn it on in the game's Mods options to activate it."))
 }
 
@@ -922,6 +964,7 @@ async fn rust_launch<R: tauri::Runtime>(
         return Err("This Rust Minecraft profile is already running.".into());
     }
     migration::profile(&dir)?;
+    catalog::before_play(&root,&dir).await?;
     let runtime_dir = bundle(&app)?;
     let runtime = ready(&runtime_dir, &root);
     if let Some(message) = runtime.reason {

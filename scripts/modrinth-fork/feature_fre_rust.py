@@ -162,7 +162,7 @@ pub async fn get_default_user()""",
             '''            .plugin(
                 "fre-rust",
                 InlinedPlugin::new()
-                    .commands(&["rust_profiles", "rust_create_profile", "rust_rename_profile", "rust_set_profile_icon", "rust_delete_profile", "rust_runtime", "rust_import_resources", "rust_mods", "rust_client_mods", "rust_import_mod", "rust_launch", "rust_running", "rust_stop", "rust_logs", "rust_open_folder", "rust_list_files"])
+                    .commands(&["rust_profiles", "rust_create_profile", "rust_rename_profile", "rust_set_profile_icon", "rust_delete_profile", "rust_runtime", "rust_import_resources", "rust_mods", "rust_client_mods", "rust_catalog", "rust_catalog_check", "rust_catalog_install", "rust_import_mod", "rust_launch", "rust_running", "rust_stop", "rust_logs", "rust_open_folder", "rust_list_files"])
                     .default_permission(DefaultPermissionRule::AllowAllCommands),
             )
             .plugin(
@@ -580,6 +580,9 @@ onUnmounted(() => {
             'fre-rust.mods.open-folder': ('Відкрити папку модів', 'Open mods folder'),
             'fre-rust.mods.none': ('Моди не знайдено.', 'No matching native mods found.'),
         }
+        catalog_messages = json.loads((here / "fre_rust_catalog_messages.json").read_text(encoding="utf-8"))
+        for key, pair in catalog_messages.items():
+            messages["fre-rust.catalog." + key] = {"message": pair[position]}
         for key, pair in detail_messages.items():
             messages[key] = {'message': pair[position]}
         locale.write_text(json.dumps(messages, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
@@ -590,6 +593,10 @@ onUnmounted(() => {
     # artifacts. Missing assets are an explicit Runtime: Not installed state
     # in the UI, NEVER a fake Play button.
     (app / "src/api/fre_client_mods.rs").write_bytes((here / "fre_client_mods.rs").read_bytes())
+    for name in ("fre_rust_catalog.rs", "fre_rust_mod_audit.rs", "fre_rust_catalog_keys.json"):
+        (app / "src/api" / name).write_bytes((here / name).read_bytes())
+    (frontend / "src/components/ui/RustModCatalog.vue").write_bytes((here / "RustModCatalog.vue").read_bytes())
+    exactly(app / "Cargo.toml", 'tempfile = { workspace = true }', 'tempfile = { workspace = true }\ntoml = { workspace = true }')
     bundle_native_runtime(root)
 
     from feature_rust_polish import apply as apply_rust_polish

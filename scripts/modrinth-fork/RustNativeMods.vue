@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-dialog'
 import { Button, defineMessages, useVIntl } from '@modrinth/ui'
 import { onMounted, onUnmounted, ref, watch } from 'vue'
+import RustModCatalog from '@/components/ui/RustModCatalog.vue'
 
 type ClientMods = {
   zoom: boolean
@@ -200,6 +201,7 @@ watch(() => props.profileId, () => {
         </Button>
       </article>
     </div>
+    <RustModCatalog :profile-id="props.profileId" :installed-files="installed.map(mod => mod.file)" @installed="load" />
     <h4 class="m-0 mt-3 text-base font-semibold text-contrast">{{ t(m.installed) }}</h4>
     <div class="flex flex-wrap items-center gap-2">
       <Button :disabled="busy || saving" @click="importFile">{{ t(m.importFile) }}</Button>

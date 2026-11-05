@@ -1,0 +1,198 @@
+{
+  "title": [
+    "Каталог Rust",
+    "Rust catalog"
+  ],
+  "hint": [
+    "Моди з відкритого каталогу: автор, версія та джерело показані для кожного проєкту.",
+    "Mods from the public registry, with authors, versions and source links."
+  ],
+  "automatic": [
+    "Автоперевірка перед установленням і запуском увімкнена.",
+    "Automatic checks before installation and launch are enabled."
+  ],
+  "limits": [
+    "Перевірки підтверджують файл і виявляють відомі проблеми. Вони не гарантують безпечність нативного коду.",
+    "Checks confirm the file and detect known problems. They do not guarantee that native code is safe."
+  ],
+  "search": [
+    "Назва, автор або тег…",
+    "Name, author or tag…"
+  ],
+  "all": [
+    "Усі типи",
+    "All types"
+  ],
+  "mods": [
+    "Моди",
+    "Mods"
+  ],
+  "native": [
+    "Нативні моди",
+    "Native mods"
+  ],
+  "data": [
+    "Пакети даних модів",
+    "Mod data packages"
+  ],
+  "packs": [
+    "Паки й шейдери",
+    "Packs and shaders"
+  ],
+  "refresh": [
+    "Оновити каталог",
+    "Refresh catalog"
+  ],
+  "loading": [
+    "Завантаження каталогу…",
+    "Loading catalog…"
+  ],
+  "empty": [
+    "За цим запитом модів немає.",
+    "No mods match this search."
+  ],
+  "verify": [
+    "Перевірити файл",
+    "Check file"
+  ],
+  "checking": [
+    "Перевірка…",
+    "Checking…"
+  ],
+  "install": [
+    "Установити файли",
+    "Install files"
+  ],
+  "installing": [
+    "Установлення…",
+    "Installing…"
+  ],
+  "installed": [
+    "Файли встановлено",
+    "Files installed"
+  ],
+  "report": [
+    "Результати перевірки",
+    "Verification results"
+  ],
+  "details": [
+    "Опис і перевірка",
+    "Description and checks"
+  ],
+  "code": [
+    "Код на GitHub",
+    "Source on GitHub"
+  ],
+  "needs-build": [
+    "Нативний код: потрібна перевірена збірка FRE",
+    "Native code: a reviewed FRE build is required"
+  ],
+  "legacy": [
+    "Застарілий формат коду не запускається цією грою.",
+    "This game does not run the legacy code format."
+  ],
+  "ready": [
+    "Перевірки файлу пройдені",
+    "File checks passed"
+  ],
+  "not-ready": [
+    "Установлення поки недоступне",
+    "Installation is not available yet"
+  ],
+  "unverified": [
+    "Файл ще не перевірено",
+    "File not checked yet"
+  ],
+  "stale": [
+    "Показано збережений каталог. Для встановлення потрібне свіже з’єднання.",
+    "Showing a cached catalog. Installation requires a fresh connection."
+  ],
+  "version": [
+    "Версія",
+    "Version"
+  ],
+  "license": [
+    "Ліцензія",
+    "License"
+  ],
+  "downloads": [
+    "Завантажень",
+    "Downloads"
+  ],
+  "more": [
+    "Показати ще",
+    "Show more"
+  ],
+  "incompatible": [
+    "Немає версії для Minecraft 26.3",
+    "No Minecraft 26.3 version"
+  ],
+  "origin": [
+    "Джерело завантаження",
+    "Download origin"
+  ],
+  "revocation": [
+    "Відкликані версії",
+    "Revoked releases"
+  ],
+  "hash": [
+    "Розмір і SHA-256",
+    "Size and SHA-256"
+  ],
+  "signature": [
+    "Підпис автора",
+    "Publisher signature"
+  ],
+  "archive": [
+    "Структура й межі архіву",
+    "Archive structure and limits"
+  ],
+  "antivirus": [
+    "Microsoft Defender",
+    "Microsoft Defender"
+  ],
+  "execution": [
+    "Тип вмісту та запуск",
+    "Payload type and execution"
+  ],
+  "compatibility": [
+    "Сумісність формату",
+    "Format compatibility"
+  ],
+  "pass": [
+    "Пройдено",
+    "Passed"
+  ],
+  "warning": [
+    "Застереження",
+    "Warning"
+  ],
+  "fail": [
+    "Не пройдено",
+    "Failed"
+  ],
+  "unavailable": [
+    "Перевірку не завершено",
+    "Check incomplete"
+  ],
+  "indicators": [
+    "У коді є операції, що потребують ручного огляду:",
+    "Source operations requiring manual review:"
+  ],
+  "builtin": [
+    "Варіант FRE уже є в розділі «Готові до гри».",
+    "A FRE implementation is already available under Ready to play."
+  ],
+  "saved": [
+    "Файли встановлено. Пакети-компаньйони можуть потребувати нативного мода; це вказано в описі. Увімкни сумісний пакет у налаштуваннях «Моди» самої гри.",
+    "Files installed. Companion packages may need a native mod; see the description. Enable a compatible package in the game Mods settings."
+  ],
+  "changed": [
+    "Версія змінилася. Онови каталог перед продовженням.",
+    "The version changed. Refresh the catalog before continuing."
+  ],
+  "pack-note": [
+    "Цей тип пакета показано для перегляду; його встановлення тут не підтримується.",
+    "This pack type is listed for browsing; installation here is not supported."
+  ]
+}
