@@ -9,6 +9,7 @@ use url::Url;
 const INDEX_URL: &str = "https://horizon-rust.github.io/horizon-mods/index.json";
 const MAX_INDEX: u64 = 16 << 20;
 const MAX_MOD: u64 = 32 << 20;
+const NATIVE_HOOKS: u64 = 80;
 pub static OPERATIONS: Mutex<()> = Mutex::const_new(());
 static CACHE: LazyLock<Mutex<Option<(u64, Index)>>> = LazyLock::new(|| Mutex::new(None));
 fn now() -> u64 { SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs() }
@@ -31,6 +32,9 @@ pub struct Project {
 pub struct Version {
     pub version: String, pub api: String, pub game: String,
     #[serde(default)] pub published: String, pub file: File,
+    #[serde(default)] pub hooks: Option<u64>,
+    #[serde(skip_deserializing)] pub supported: bool,
+    #[serde(skip_deserializing)] pub unsupported_reason: Option<String>,
 }
 #[derive(Clone, Deserialize, Serialize)]
 pub struct File { pub name: String, pub url: String, pub size: u64, pub sha256: String, #[serde(default)] pub signature: Option<String> }
@@ -242,8 +246,28 @@ async fn index(root: &Path, force: bool) -> Result<(Index,bool,Option<String>),S
         Err(error)=>Err(error),
     }
 }
+fn unsupported_version(kind:&str,version:&Version)->Option<String> {
+    if version.game!="26.3" { return Some("This release requires another Minecraft version".into()); }
+    if kind=="native-mod" {
+        if !version.api.starts_with("native-1/") { return Some("This release requires a newer native mod format".into()); }
+        if version.hooks.is_some_and(|hooks|hooks>NATIVE_HOOKS) {
+            return Some(format!("This release needs native hook API {}, but FRE supports up to {}. Choose a compatible release.",version.hooks.unwrap(),NATIVE_HOOKS));
+        }
+    }
+    None
+}
+fn recommended_version<'a>(index:&Index,project:&'a Project)->Option<&'a Version> {
+    project.versions.iter().find(|version|unsupported_version(&project.kind,version).is_none() && revoked(index,&project.id,&version.file.sha256).is_none())
+}
 pub async fn view(root:&Path, force:bool) -> Result<View,String> {
     let (mut value,stale,warning)=index(root,force).await?;
+    let snapshot=value.clone();
+    for project in &mut value.projects {
+        for version in &mut project.versions {
+            version.unsupported_reason=unsupported_version(&project.kind,version).or_else(||revoked(&snapshot,&project.id,&version.file.sha256));
+            version.supported=version.unsupported_reason.is_none();
+        }
+    }
     value.projects.sort_by(|a,b|b.downloads.cmp(&a.downloads).then_with(||a.name.cmp(&b.name)));
     Ok(View {projects:value.projects,generated:value.generated,fetched_at:now(),stale,warning})
 }
@@ -300,7 +324,7 @@ async fn defender(path:&Path) -> Result<(),String> {
 }
 fn select<'a>(index:&'a Index,id:&str) -> Result<(&'a Project,&'a Version),String> {
     let project=index.projects.iter().find(|p|p.id==id).ok_or("Mod is not in the current catalog")?;
-    let version=project.versions.iter().find(|v|v.game=="26.3").ok_or("No Minecraft 26.3 version")?;
+    let version=recommended_version(index,project).ok_or("No compatible, non-revoked Minecraft 26.3 release is available for this FRE engine")?;
     Ok((project,version))
 }
 async fn inspect_download(root:&Path,id:&str,expected_hash:&str) -> Result<(Report,PathBuf),String> {
@@ -328,7 +352,7 @@ async fn inspect_download(root:&Path,id:&str,expected_hash:&str) -> Result<(Repo
     };
     report.checks.push(check("archive","pass",format!("{} bounded entries, {} expanded bytes",facts.files,facts.expanded_bytes)));
     if project.kind=="native-mod" {
-        let compatible=facts.hooks.map_or(facts.engine_revision.as_deref()==Some("975c07d9151847e6af13afc4b5ab37b6bbe78ef5"),|hooks|hooks<=80);
+        let compatible=facts.hooks.map_or(facts.engine_revision.as_deref()==Some("975c07d9151847e6af13afc4b5ab37b6bbe78ef5"),|hooks|u64::from(hooks)<=NATIVE_HOOKS);
         report.checks.push(check("compatibility",if compatible {"pass"}else{"warning"},if compatible {"Declared hooks/source match the bundled engine; FRE builds it locally"}else{"This native mod targets another engine revision or newer hook API"}));
     } else {
         report.checks.push(check("compatibility",if facts.content_only {"pass"}else{"warning"},if facts.content_only {"Data format 0.2; companion native mods may still be required (see description)"}else{"Legacy executable .hmod code is not supported"}));
@@ -664,5 +688,35 @@ mod tests {
         assert_eq!(verify_signature(&p,&p.versions[0],b"demo"),Ok(false));
         p.key=Some("not-pinned".into());
         assert!(verify_signature(&p,&p.versions[0],b"demo").is_err());
+    }
+}
+
+#[cfg(test)]
+mod release_selection_tests {
+    use super::*;
+    fn registry()->Index {
+        serde_json::from_value(serde_json::json!({"schema":1,"projects":[{
+            "id":"appleskin","kind":"native-mod","name":"AppleSkin","license":"MIT","source":"https://github.com/example/appleskin",
+            "versions":[
+                {"version":"0.1.3","game":"26.3","api":"native-1/new/new","hooks":139,"supported":true,"file":{"name":"appleskin-0.1.3.hnmod","url":"https://github.com/example/appleskin/releases/download/v3/appleskin.hnmod","size":1,"sha256":"a".repeat(64)}},
+                {"version":"0.1.2","game":"26.3","api":"native-1/old/old","hooks":1,"file":{"name":"appleskin-0.1.2.hnmod","url":"https://github.com/example/appleskin/releases/download/v2/appleskin.hnmod","size":1,"sha256":"b".repeat(64)}}
+            ]
+        }]})).unwrap()
+    }
+    #[test] fn appleskin_selects_the_compatible_signed_release_instead_of_newer_hooks() {
+        let index=registry();let project=&index.projects[0];
+        assert!(!project.versions[0].supported,"registry cannot set the computed compatibility flag");
+        assert!(unsupported_version(&project.kind,&project.versions[0]).unwrap().contains("139"));
+        assert_eq!(recommended_version(&index,project).unwrap().version,"0.1.2");
+        assert_eq!(select(&index,"appleskin").unwrap().1.file.sha256,"b".repeat(64));
+    }
+    #[test] fn a_revoked_older_version_is_not_used_as_a_fallback() {
+        let mut index=registry();index.revoked.push(Revoked{id:"appleskin".into(),sha256:Some("b".repeat(64)),reason:"withdrawn".into()});
+        assert!(recommended_version(&index,&index.projects[0]).is_none());
+        assert!(select(&index,"appleskin").is_err());
+    }
+    #[test] fn incompatible_releases_never_become_installable_from_registry_flags() {
+        let mut index=registry();index.projects[0].versions.truncate(1);
+        assert!(recommended_version(&index,&index.projects[0]).is_none());
     }
 }

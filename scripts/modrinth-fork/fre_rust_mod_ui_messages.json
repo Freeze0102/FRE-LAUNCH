@@ -206,5 +206,17 @@
   "fre-rust.catalog.scanning": [
     "Перевірка готової гри Захисником Windows…",
     "Checking the compiled game with Defender…"
+  ],
+  "fre-rust.catalog.incompatible": [
+    "Немає сумісної версії для цього рушія FRE",
+    "No compatible release for this FRE engine"
+  ],
+  "fre-rust.catalog.compatible-release": [
+    "Сумісна версія: {version}",
+    "Compatible release: {version}"
+  ],
+  "fre-rust.catalog.check-failed": [
+    "Установлення заблоковано. Причину наведено в результатах перевірки нижче.",
+    "Installation was blocked. See the verification results below."
   ]
 }

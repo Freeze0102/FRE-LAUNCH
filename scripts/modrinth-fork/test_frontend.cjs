@@ -1063,3 +1063,26 @@ test('Catalog instructions use FRE Play while preserving author metadata and fea
   }
   assert.equal(c.state.descriptionForFre(catalogFixture()), 'Source package')
 })
+
+
+test('AppleSkin installs the compatible release while skipping a newer unsupported hook API', async () => {
+  const base=catalogFixture(), latest={...base.versions[0],version:'0.1.3',hooks:139,supported:false}, older={...base.versions[0],version:'0.1.2',hooks:1,supported:true,file:{...base.versions[0].file,name:'appleskin-0.1.2.hnmod',sha256:'2'.repeat(64)}}
+  const project={...base,id:'appleskin',name:'AppleSkin',versions:[latest,older]},calls=[]
+  const report={projectId:project.id,version:older.version,sha256:older.file.sha256,installable:true,checks:[]}
+  const c=component('RustModCatalog.vue',async(command,args)=>{calls.push({command,args});return command.endsWith('|rust_catalog')?{projects:[project],stale:false}:report},[],{props:{profileId:'123',installedFiles:[]}})
+  await c.state.load();assert.equal(c.state.version(project),older)
+  await c.state.install(project)
+  const install=calls.find(c=>c.command.endsWith('|rust_catalog_install'))
+  assert.equal(install.args.expectedSha256,older.file.sha256)
+  assert.ok(c.state.isInstalled(project));assert.equal(c.state.error.value,'')
+})
+test('Unsupported mods and failed checks produce an explicit outcome without an installation request', async () => {
+  const base=catalogFixture(), calls=[]
+  const project={...base,versions:[{...base.versions[0],supported:false}]}
+  const c=component('RustModCatalog.vue',async(command)=>{calls.push(command);return {installable:false,sha256:base.versions[0].file.sha256,checks:[{code:'compatibility',state:'fail',detail:'Newer API'}]}},[],{props:{profileId:'123'}})
+  assert.equal(c.state.version(project),undefined)
+  await c.state.install(project);assert.equal(calls.length,0)
+  await c.state.install(base)
+  assert.equal(c.state.detailTab.value,2);assert.ok(c.state.error.value.includes('blocked'))
+  assert.ok(!calls.some(command=>command.endsWith('|rust_catalog_install')))
+})

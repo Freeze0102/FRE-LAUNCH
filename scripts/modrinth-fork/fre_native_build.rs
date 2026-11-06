@@ -541,6 +541,28 @@ mod tests {
         )
         .unwrap();
     }
+    #[tokio::test]
+    #[ignore = "Downloads the compiler and builds the real compatible AppleSkin release"]
+    async fn real_native_appleskin_fallback_builds_a_scanned_game() {
+        let repo=PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..").canonicalize().unwrap();
+        let root=repo.join(".audit/appleskin-builder-e2e");let profile=root.join("profile");
+        fs::create_dir_all(&profile).unwrap();
+        let view=catalog::view(&root,true).await.unwrap();
+        let project=view.projects.iter().find(|project|project.id=="appleskin").unwrap();
+        let release=project.versions.iter().find(|release|release.supported).unwrap();
+        assert!(release.hooks.is_none_or(|hooks|hooks<=80));
+        eprintln!("AppleSkin compatible release: {} {}",release.version,release.file.sha256);
+        if !profile.join("fre-mods").join(&release.file.name).is_file() {
+            let report=catalog::install(&root,&profile,"appleskin",&release.file.sha256).await.unwrap();
+            assert!(report.installable);
+        }
+        let runtime=repo.join("scripts/modrinth-fork/fre-rust-runtime");
+        let binary=ensure_with_progress(&root,&profile,&runtime,std::sync::Arc::new(|stage|eprintln!("AppleSkin build: {stage}"))).await.unwrap().unwrap();
+        assert!(binary.is_file());
+        let reused=ensure_with_progress(&root,&profile,&runtime,std::sync::Arc::new(|_|panic!("A verified AppleSkin build must be reused"))).await.unwrap().unwrap();
+        assert_eq!(binary,reused);
+        fs::write(root.join("verified-game-path.txt"),binary.to_string_lossy().as_bytes()).unwrap();
+    }
     #[cfg(windows)]
     #[test]
     fn compiler_paths_strip_windows_verbatim_prefixes_after_validation() {

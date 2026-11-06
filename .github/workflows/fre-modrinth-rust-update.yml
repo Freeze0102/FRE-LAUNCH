@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       publish:
-        description: 'Publish approved signed v0.5.15 to in-launcher updates (requires FRE_LAUNCH_SECURITY_APPROVED=true)'
+        description: 'Publish approved signed v0.5.16 to in-launcher updates (requires FRE_LAUNCH_SECURITY_APPROVED=true)'
         type: boolean
         required: true
         default: false
@@ -40,7 +40,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $channel = Get-Content 'update-channel.json' -Raw | ConvertFrom-Json
-          if ($channel.version -ne '0.5.15') { throw 'Review the versioned workflow before running it for any other release' }
+          if ($channel.version -ne '0.5.16') { throw 'Review the versioned workflow before running it for any other release' }
           if (!$env:TAURI_SIGNING_PRIVATE_KEY) {
             throw 'Missing FRE_TAURI_SIGNING_PRIVATE_KEY secret. Use the EXISTING 0.5.9 Tauri updater key, not a newly generated key.'
           }
@@ -219,23 +219,23 @@ jobs:
       - name: Upload reviewable EXE, signature and update manifest
         uses: actions/upload-artifact@v4
         with:
-          name: FRE-LAUNCH-v0.5.15-Vue-Rust-Windows-REVIEW
+          name: FRE-LAUNCH-v0.5.16-Vue-Rust-Windows-REVIEW
           path: |
-            release-staging/v0.5.15/FRE-LAUNCH-Windows-x64-Setup.exe
-            release-staging/v0.5.15/FRE-LAUNCH-Windows-x64-Setup.exe.sig
-            release-staging/v0.5.15/latest.json
-            release-staging/v0.5.15/SHA256SUMS.txt
-            release-staging/v0.5.15/PROVENANCE.json
-            release-staging/v0.5.15/NOTES.md
+            release-staging/v0.5.16/FRE-LAUNCH-Windows-x64-Setup.exe
+            release-staging/v0.5.16/FRE-LAUNCH-Windows-x64-Setup.exe.sig
+            release-staging/v0.5.16/latest.json
+            release-staging/v0.5.16/SHA256SUMS.txt
+            release-staging/v0.5.16/PROVENANCE.json
+            release-staging/v0.5.16/NOTES.md
           if-no-files-found: error
           retention-days: 7
 
-      - name: Publish signed v0.5.15 to the installed launcher
+      - name: Publish signed v0.5.16 to the installed launcher
         if: github.event_name == 'workflow_dispatch' && inputs.publish == true && vars.FRE_LAUNCH_SECURITY_APPROVED == 'true'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = '0.5.15'
+          $version = '0.5.16'
           $stage = $env:FRE_REVIEW_STAGE
           $tag = "v$version"
           $files = @('FRE-LAUNCH-Windows-x64-Setup.exe','FRE-LAUNCH-Windows-x64-Setup.exe.sig',

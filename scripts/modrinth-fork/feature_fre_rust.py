@@ -25,6 +25,7 @@ def bundle_native_runtime(root: Path, refresh=False):
     here = Path(__file__).resolve().parent
     app = root / "apps/app"
     runtime = here / "fre-rust-runtime"
+    from native_runtime_payload import embed
     if (runtime / "resources").exists():
         raise RuntimeError("Minecraft resources must stay in the owner's private app cache, never in the installer.")
     binaries = ("fre-rust-client.exe", "fre-rust-prepare.exe", "research-lock.json", "LICENSE.txt")
@@ -87,6 +88,7 @@ def bundle_native_runtime(root: Path, refresh=False):
         if tool_info["source_branding_sha256"]!=fingerprint():raise RuntimeError("Native mod build source is stale")
         for file in tools:
             resources[f"fre-rust-runtime/{file}"]=f"fre-rust/{file}"
+        embed(runtime, app / "src/fre-native-runtime.zip")
         # These are original MIT exporter sources, not Mojang game files.
         resources["fre-rust-runtime/mods/fre/src/test/java/dev/frelaunch/parity/"] = "fre-rust/mods/fre/src/test/java/dev/frelaunch/parity/"
         resources["fre-rust-runtime/crates/fre-prepare/"] = "fre-rust/crates/fre-prepare/"
@@ -97,6 +99,7 @@ def bundle_native_runtime(root: Path, refresh=False):
     else:
         if runtime.exists():
             raise RuntimeError("Incomplete fre-rust-runtime staging; run BUILD-FRE-RUST.ps1 again.")
+        embed(None, app / "src/fre-native-runtime.zip")
         print("Native FRE Rust engine is not yet built; Play will be disabled with an explicit explanation.")
 
 
@@ -122,6 +125,7 @@ def apply(root: Path):
     config_path.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
     shutil.copyfile(here / "fre_rust_backend.rs", app / "src/api/fre_rust.rs")
+    shutil.copyfile(here / "fre_runtime_bundle.rs", app / "src/api/fre_runtime_bundle.rs")
     shutil.copyfile(here / "fre_rust_setup.rs", app / "src/api/fre_rust_setup.rs")
     shutil.copyfile(here / "fre_rust_jdk.rs", app / "src/api/fre_rust_jdk.rs")
     shutil.copyfile(here / "fre_rust_migration.rs", app / "src/api/fre_rust_migration.rs")

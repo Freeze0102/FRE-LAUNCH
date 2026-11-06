@@ -7,7 +7,7 @@ import { Button, Combobox, defineMessages, IconButton, Input, NavTabs, Paginatio
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 
 type File = { name: string; url: string; size: number; sha256: string; signature?: string }
-type Version = { version: string; game: string; api: string; published: string; file: File }
+type Version = { supported?: boolean; unsupported_reason?: string; hooks?: number; version: string; game: string; api: string; published: string; file: File }
 type Project = { id: string; name: string; kind: string; summary: string; description: string; authors: string[]; license: string; source: string; icon?: string; categories: string[]; tags: string[]; downloads: number; versions: Version[] }
 type Catalog = { projects: Project[]; generated: string; fetchedAt: number; stale: boolean; warning?: string }
 type Check = { code: string; state: 'pass' | 'warning' | 'fail' | 'unavailable'; detail: string }
@@ -65,7 +65,9 @@ const m = defineMessages({
   license: { id: "fre-rust.catalog.license", defaultMessage: "License" },
   downloads: { id: "fre-rust.catalog.downloads", defaultMessage: "Downloads" },
   more: { id: "fre-rust.catalog.more", defaultMessage: "Show more" },
-  incompatible: { id: "fre-rust.catalog.incompatible", defaultMessage: "No Minecraft 26.3 version" },
+  incompatible: { id: "fre-rust.catalog.incompatible", defaultMessage: "No compatible release for this FRE engine" },
+  compatibleRelease: { id: 'fre-rust.catalog.compatible-release', defaultMessage: 'Compatible release: {version}' },
+  checkFailed: { id: 'fre-rust.catalog.check-failed', defaultMessage: 'Installation was blocked. See the verification results below.' },
   origin: { id: "fre-rust.catalog.origin", defaultMessage: "Download origin" },
   revocation: { id: "fre-rust.catalog.revocation", defaultMessage: "Revoked releases" },
   hash: { id: "fre-rust.catalog.hash", defaultMessage: "Size and SHA-256" },
@@ -101,7 +103,7 @@ let disposed = false
 const justInstalled = ref<string[]>([])
 const reports = ref<Record<string, Report>>({})
 let generation = 0
-function version(project: Project) { return project.versions.find(v => v.game === '26.3') }
+function version(project: Project) { return project.versions.find(v => v.game === '26.3' && v.supported !== false) }
 function key(project: Project) { return project.id + ':' + (version(project)?.file.sha256 || '') }
 function report(project: Project) { return reports.value[key(project)] }
 function isInstalled(project: Project) {
@@ -192,7 +194,7 @@ async function install(project: Project) {
   const profileId = props.profileId
   const checked = report(project)?.installable ? report(project) : await verify(project, false)
   if (request !== generation || profileId !== props.profileId || props.disabled) return
-  if (!checked?.installable) { expanded.value = project.id; detailTab.value = 2; return }
+  if (!checked?.installable) { expanded.value = project.id; detailTab.value = 2; error.value = error.value || t(m.checkFailed); return }
   pending.value = project.id
   installing.value = true
   error.value = ''
@@ -250,10 +252,12 @@ watch(pageCount, count => { if (page.value > count) page.value = count })
         <template #actions>
           <Button v-if="builtinKey(selectedProject)" type="outlined" @click="openBuiltin(selectedProject)"><CheckIcon />{{ t(m.inInstance) }}</Button>
           <Button v-else-if="isInstalled(selectedProject)" type="outlined" @click="emit('close')"><CheckIcon />{{ t(m.inInstance) }}</Button>
-          <Button v-else-if="['mod', 'native-mod'].includes(selectedProject.kind)" type="colored" color="brand" :disabled="!!pending || stale || disabled || !version(selectedProject)" @click="install(selectedProject)"><SpinnerIcon v-if="pending === selectedProject.id" class="animate-spin" /><DownloadIcon v-else />{{ pending === selectedProject.id ? installing ? t(m.installing) : t(m.checking) : t(m.install) }}</Button>
-          <Button v-else type="outlined" disabled>{{ t(m.not_ready) }}</Button>
+          <Button v-else-if="['mod', 'native-mod'].includes(selectedProject.kind) && version(selectedProject)" type="colored" color="brand" :disabled="!!pending || stale || disabled || !version(selectedProject)" @click="install(selectedProject)"><SpinnerIcon v-if="pending === selectedProject.id" class="animate-spin" /><DownloadIcon v-else />{{ pending === selectedProject.id ? installing ? t(m.installing) : t(m.checking) : t(m.install) }}</Button>
+          <Button v-else type="outlined" disabled>{{ t(m.incompatible) }}</Button>
         </template>
       </ProjectCard>
+      <p v-if="version(selectedProject) && selectedProject.versions[0] !== version(selectedProject)" role="status" class="m-0 text-sm text-brand">{{ t(m.compatibleRelease, { version: version(selectedProject)!.version }) }}</p>
+      <p v-if="!version(selectedProject)" role="alert" class="m-0 text-sm text-red">{{ t(m.incompatible) }}</p>
       <NavTabs mode="local" :links="detailTabs" :active-index="detailTab" @tab-click="selectDetailTab" />
       <div v-if="detailTab === 0" class="flex flex-col gap-4 rounded-2xl bg-surface-3 p-5">
         <p v-if="builtinKey(selectedProject)" class="m-0 text-sm text-brand">{{ t(m.builtin) }}</p>
@@ -265,7 +269,7 @@ watch(pageCount, count => { if (page.value > count) page.value = count })
       </div>
       <div v-else-if="detailTab === 1" class="overflow-hidden rounded-2xl border border-solid border-surface-4">
         <div v-for="release in selectedProject.versions.filter(v => v.game === '26.3')" :key="release.file.sha256" class="flex flex-wrap justify-between gap-3 border-0 border-b border-solid border-surface-4 bg-surface-3 p-4">
-          <span class="font-semibold">{{ release.version }}</span><span class="text-sm text-secondary">Minecraft {{ release.game }}</span><span class="text-sm text-secondary">{{ release.published.slice(0, 10) }}</span>
+          <span class="font-semibold">{{ release.version }}</span><span v-if="release.supported === false" class="text-sm text-red">{{ release.unsupported_reason || t(m.incompatible) }}</span><span class="text-sm text-secondary">Minecraft {{ release.game }}</span><span class="text-sm text-secondary">{{ release.published.slice(0, 10) }}</span>
         </div>
       </div>
       <div v-else class="flex flex-col gap-3">
@@ -299,8 +303,8 @@ watch(pageCount, count => { if (page.value > count) page.value = count })
             <template #actions>
               <Button v-if="builtinKey(project)" type="outlined" @click.stop="openBuiltin(project)"><CheckIcon />{{ t(m.inInstance) }}</Button>
               <Button v-else-if="isInstalled(project)" type="outlined" @click.stop="emit('close')"><CheckIcon />{{ t(m.inInstance) }}</Button>
-              <Button v-else-if="['mod', 'native-mod'].includes(project.kind)" type="colored" color="brand" :disabled="!!pending || stale || disabled || !version(project)" @click.stop="install(project)"><SpinnerIcon v-if="pending === project.id" class="animate-spin" /><DownloadIcon v-else />{{ pending === project.id ? installing ? t(m.installing) : t(m.checking) : t(m.install) }}</Button>
-              <Button v-else type="outlined" disabled>{{ t(m.not_ready) }}</Button>
+              <Button v-else-if="['mod', 'native-mod'].includes(project.kind) && version(project)" type="colored" color="brand" :disabled="!!pending || stale || disabled || !version(project)" @click.stop="install(project)"><SpinnerIcon v-if="pending === project.id" class="animate-spin" /><DownloadIcon v-else />{{ pending === project.id ? installing ? t(m.installing) : t(m.checking) : t(m.install) }}</Button>
+              <Button v-else type="outlined" disabled>{{ t(m.incompatible) }}</Button>
             </template>
           </ProjectCard>
         </ProjectCardList>

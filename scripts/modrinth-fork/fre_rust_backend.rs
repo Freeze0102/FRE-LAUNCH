@@ -30,6 +30,8 @@ mod catalog;
 mod instance;
 #[path="fre_native_build.rs"]
 mod native_build;
+#[path="fre_runtime_bundle.rs"]
+mod runtime_bundle;
 static CLIENT_MOD_SETTINGS: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 const MAX_NAME: usize = 64;
@@ -141,10 +143,9 @@ fn base<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Result<PathBuf, String>
 }
 
 fn bundle<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Result<PathBuf, String> {
-    app.path()
-        .resource_dir()
-        .map(|p| p.join("fre-rust"))
-        .map_err(|e| format!("Cannot resolve FRE LAUNCH bundled files: {e}"))
+    let external=app.path().resource_dir()
+        .map_err(|e| format!("Cannot resolve FRE LAUNCH bundled files: {e}"))?.join("fre-rust");
+    runtime_bundle::resolve(&base(app)?,&external)
 }
 
 fn profile_id_valid(id: &str) -> bool {
