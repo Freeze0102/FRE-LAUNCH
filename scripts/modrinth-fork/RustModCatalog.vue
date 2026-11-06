@@ -137,6 +137,13 @@ const shown = computed(() => filtered.value.slice((page.value - 1) * pageSize.va
 const selectedProject = computed(() => projects.value.find(project => project.id === expanded.value))
 const detailTabs = computed(() => [{ label: t(m.description), href: 'description' }, { label: t(m.versions), href: 'versions' }, { label: t(m.report), href: 'checks' }])
 function switchPage(value: number) { if (Number.isInteger(value) && value >= 1 && value <= pageCount.value) page.value = value }
+// The registry's old launcher/build paragraph conflicts with FRE's Play workflow.
+// Keep the remaining author text, license, source URL and verified metadata intact.
+function descriptionForFre(project: Project) {
+  return project.description.split(/(?:\r?\n){2,}/)
+    .filter(paragraph => !/^\s*(?:\*\*)?A native Horizon mod(?:\*\*)?\s*:/i.test(paragraph))
+    .join('\n\n')
+}
 function builtinKey(project: Project) { return ({ zoom: 'zoom', fps_overlay: 'fpsCounter', coords_hud: 'coordinates' } as const)[project.id as 'zoom' | 'fps_overlay' | 'coords_hud'] }
 function openBuiltin(project: Project) { const key = builtinKey(project); if (key) emit('builtin', key) }
 async function selectDetailTab(index: number) {
@@ -251,7 +258,7 @@ watch(pageCount, count => { if (page.value > count) page.value = count })
       <div v-if="detailTab === 0" class="flex flex-col gap-4 rounded-2xl bg-surface-3 p-5">
         <p v-if="builtinKey(selectedProject)" class="m-0 text-sm text-brand">{{ t(m.builtin) }}</p>
         <p v-else-if="selectedProject.kind === 'native-mod'" class="m-0 text-sm text-secondary">{{ t(m.needs_build) }}</p>
-        <p class="m-0 whitespace-pre-line text-sm leading-6 text-primary">{{ selectedProject.description }}</p>
+        <p class="m-0 whitespace-pre-line text-sm leading-6 text-primary">{{ descriptionForFre(selectedProject) }}</p>
         <p class="m-0 text-xs text-secondary">{{ t(m.license) }}: {{ selectedProject.license }} · {{ selectedProject.categories.join(' · ') }}</p>
         <Button v-if="safeSource(selectedProject.source)" type="outlined" class="self-start" @click="source(selectedProject)">{{ t(m.code) }}</Button>
         <p v-if="!['mod','native-mod'].includes(selectedProject.kind)" class="m-0 text-sm text-secondary">{{ t(m.pack_note) }}</p>

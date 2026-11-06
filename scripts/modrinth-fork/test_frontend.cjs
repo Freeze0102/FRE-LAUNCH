@@ -68,7 +68,7 @@ function component(file, invoke, instances = [], options = {}) {
   const names = file === 'RustLogs.vue' ? 'logLines,names,selected,loading,sources,activeName,parse,refresh'
     : file === 'RustWorlds.vue' ? 'worlds,query,filter,busy,states,shown,load,ping,play,save,serverName,serverAddress,removing'
     : file === 'RustModCatalog.vue'
-    ? 'projects,query,kind,loading,pending,error,notice,stale,expanded,reports,filtered,shown,load,verify,install,details,source,safeSource,image,isInstalled,version,report,page,pageSize,pageCount,order,layout,detailTab,selectedProject,switchPage,selectDetailTab,justInstalled'
+    ? 'projects,query,kind,loading,pending,error,notice,stale,expanded,reports,filtered,shown,load,verify,install,details,source,safeSource,image,isInstalled,version,report,page,pageSize,pageCount,order,layout,detailTab,selectedProject,switchPage,selectDetailTab,justInstalled,descriptionForFre'
     : file === 'RustInstanceGrid.vue'
     ? 'cards,nativeProfiles,runtime,refresh,refreshRunning,runningIds,isRunning,openCard,play,stop,cardStyle,viewInstance,detailUrl,busy,selectCard,isSelected,activateCard'
     : file === 'RustNativeMods.vue'
@@ -1050,4 +1050,16 @@ test('Native catalog source mods can be installed and built directly after autom
   assert.deepEqual(events,['installed'])
   assert.equal(c.state.isInstalled(project),true)
   c.unmount()
+})
+
+
+test('Catalog instructions use FRE Play while preserving author metadata and feature commands', () => {
+  const c=component('RustModCatalog.vue', async()=>({projects:[],stale:false}), [], {props:{profileId:'123'}})
+  for (const prefix of ['A native Horizon mod:', '**A native Horizon mod**:']) {
+    const project={...catalogFixture(), description:prefix+" the launcher builds it into the game (install it on the launcher's Mods page, then press Build there).\n\nUse /gamma 700% to adjust brightness.\n\nOriginal author ExampleAuthor; MIT."}
+    const original=JSON.stringify(project)
+    assert.equal(c.state.descriptionForFre(project), 'Use /gamma 700% to adjust brightness.\n\nOriginal author ExampleAuthor; MIT.')
+    assert.equal(JSON.stringify(project), original)
+  }
+  assert.equal(c.state.descriptionForFre(catalogFixture()), 'Source package')
 })
