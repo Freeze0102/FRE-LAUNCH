@@ -57,7 +57,9 @@ async function refreshFreRustInstances() {
             icon_path: profile.iconPath ?? null,
             modified: profile.modified ?? 0,
             created: new Date(profile.created * 1000).toISOString(),
-            last_played: null,
+            last_played: profile.lastPlayed ? new Date(profile.lastPlayed).toISOString() : null,
+            recent_time_played: profile.playtime ?? 0,
+            total_time_played: profile.playtime ?? 0,
             install_stage: 'installed',
             quarantined: false,
         })

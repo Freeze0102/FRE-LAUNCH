@@ -13,7 +13,7 @@ import type { GameInstance } from '@/helpers/types'
 // Rust has its own real game engine. Only the VISUAL Java card is reused;
 // a Rust profile must never be passed to Java's installer, process manager,
 // bulk-delete routines or instance query APIs.
-type NativeProfile = { id: string; name: string; created: number; modified?: number; iconPath?: string | null }
+type NativeProfile = { playtime?: number; lastPlayed?: number | null; id: string; name: string; created: number; modified?: number; iconPath?: string | null }
 type Runtime = { installed: boolean; prepared: boolean; version: string; reason: string | null }
 type Card = {
   key: string
@@ -24,6 +24,8 @@ type Card = {
   version: string
   ready: boolean
   created?: number
+  playtime?: number
+  lastPlayed?: number | null
   modified?: number
 }
 
@@ -71,7 +73,7 @@ const cards = computed<Card[]>(() => {
     version: runtime.value?.version || '26.3',
     ready: runtime.value?.installed === true && runtime.value?.prepared === true,
     created: profile.created,
-    modified: profile.modified,
+    modified: profile.modified, playtime: profile.playtime, lastPlayed: profile.lastPlayed,
   }))
   const term = props.search.trim().toLocaleLowerCase()
   return native.filter(card =>
@@ -114,6 +116,8 @@ function viewInstance(card: Card): GameInstance {
     game_version: card.version,
     icon_path: card.iconPath ?? null,
     modified: card.modified ?? card.created ?? 0,
+    last_played: card.lastPlayed ? new Date(card.lastPlayed).toISOString() : null,
+    recent_time_played: card.playtime ?? 0, total_time_played: card.playtime ?? 0,
   } as unknown as GameInstance
 }
 
@@ -263,7 +267,7 @@ onUnmounted(() => {
             v-tooltip="formatMessage(isRunning(card) ? messages.stop : messages.start, { name: card.name })"
             :label="formatMessage(isRunning(card) ? messages.stop : messages.start, { name: card.name })"
             type="colored"
-            color="brand"
+            :color="isRunning(card) ? 'red' : 'brand'"
             :size="compact ? 'md' : 'lg'"
             class="origin-bottom scale-75 opacity-0 transition-opacity group-hover/card:scale-100 group-hover/card:opacity-100"
             @click.stop="isRunning(card) ? stop(card) : play(card)"

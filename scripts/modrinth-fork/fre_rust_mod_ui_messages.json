@@ -60,12 +60,12 @@
     "Close"
   ],
   "fre-rust.mods.running": [
-    "Закрий гру перед зміною модів.",
-    "Close the game before changing mods."
+    "Гра запущена. Вбудовані моди можна налаштовувати зараз; для зміни завантажених модів закрий гру.",
+    "The game is running. Built-in mod settings can be changed now; close the game to change downloaded mods."
   ],
   "fre-rust.mods.next-launch": [
-    "Зміни застосовуються під час наступного запуску гри.",
-    "Changes apply on the next game launch."
+    "Утримуй клавішу зуму й крути коліщатко для зміни наближення у грі. Вбудовані налаштування застосовуються одразу, завантажений вміст — після запуску гри.",
+    "Hold the zoom key and scroll to adjust magnification while playing. Built-in settings apply immediately; downloaded content applies on the next launch."
   ],
   "fre-rust.catalog.back": [
     "До встановлених модів",
@@ -126,5 +126,85 @@
   "fre-rust.catalog.saved": [
     "Файли встановлено й увімкнено для наступного запуску. Пакети-компаньйони можуть потребувати нативного мода; дивись опис.",
     "Files installed and enabled for the next launch. Companion packages may require a native mod; see the description."
+  ],
+  "fre-launch.account.mode.account": [
+    "Акаунт",
+    "Account"
+  ],
+  "fre-launch.account.mode.nickname": [
+    "Нікнейм",
+    "Nickname"
+  ],
+  "fre-rust.page.playtime": [
+    "Зіграно: {minutes} хв",
+    "{minutes} min played"
+  ],
+  "fre-rust.page.last-played": [
+    "Востаннє зіграно: {time}",
+    "Last played: {time}"
+  ],
+  "fre-rust.worlds.search": [
+    "Пошук світів і серверів…",
+    "Search worlds and servers…"
+  ],
+  "fre-rust.worlds.add": [
+    "Додати сервер",
+    "Add server"
+  ],
+  "fre-rust.worlds.empty": [
+    "Світів і серверів ще немає. Створи світ у грі або додай сервер тут.",
+    "No worlds or servers yet. Create a world in the game or add a server here."
+  ],
+  "fre-rust.worlds.address": [
+    "Адреса сервера",
+    "Server address"
+  ],
+  "fre-rust.worlds.remove": [
+    "Видалити збережений сервер",
+    "Remove saved server"
+  ],
+  "fre-rust.worlds.all": [
+    "Усі",
+    "All"
+  ],
+  "fre-rust.worlds.online": [
+    "У мережі",
+    "Online"
+  ],
+  "fre-rust.worlds.offline": [
+    "Поза мережею",
+    "Offline"
+  ],
+  "fre-rust.catalog.needs-build": [
+    "Завантажуй нативні моди тут. FRE збере всі ввімкнені моди разом після натискання «Грати». Перша збірка завантажить власний компілятор. Нативний код має права твого облікового запису; автоматичні перевірки не гарантують безпеку.",
+    "Download native source mods here. FRE builds all enabled mods together when you press Play. The first build downloads a private compiler. Native code has your account permissions; automatic checks cannot guarantee safety."
+  ],
+  "fre-rust.catalog.installing": [
+    "Установлення / збирання…",
+    "Installing / building…"
+  ],
+  "fre-rust.catalog.build-progress": [
+    "Збирання гри з твоїми модами:",
+    "Building your modded game:"
+  ],
+  "fre-rust.catalog.compiler": [
+    "Підготовка власного компілятора Rust…",
+    "Preparing the private Rust compiler…"
+  ],
+  "fre-rust.catalog.dependencies": [
+    "Завантаження закріплених залежностей…",
+    "Downloading pinned build dependencies…"
+  ],
+  "fre-rust.catalog.applying": [
+    "Поєднання вибраних модів…",
+    "Combining the selected mods…"
+  ],
+  "fre-rust.catalog.compiling": [
+    "Компіляція гри. Перша збірка може тривати довго…",
+    "Compiling the game. The first build can take a while…"
+  ],
+  "fre-rust.catalog.scanning": [
+    "Перевірка готової гри Захисником Windows…",
+    "Checking the compiled game with Defender…"
   ]
 }

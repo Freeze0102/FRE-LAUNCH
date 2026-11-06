@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { invoke } from '@tauri-apps/api/core'
+import { listen } from '@tauri-apps/api/event'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { CheckIcon, DownloadIcon, GridIcon, LeftArrowIcon, ListIcon, RefreshCwIcon, SearchIcon, ShieldCheckIcon, SpinnerIcon } from '@modrinth/assets'
 import { Button, Combobox, defineMessages, IconButton, Input, NavTabs, Pagination, ProjectCard, ProjectCardList, useVIntl } from '@modrinth/ui'
@@ -15,6 +16,12 @@ const props = defineProps<{ profileId: string; installedFiles?: string[]; disabl
 const emit = defineEmits<{ installed: []; close: []; builtin: [key: 'zoom' | 'fpsCounter' | 'coordinates'] }>()
 const { formatMessage: t } = useVIntl()
 const m = defineMessages({
+  buildProgress: { id: 'fre-rust.catalog.build-progress', defaultMessage: 'Building your modded game:' },
+  compiler: { id: 'fre-rust.catalog.compiler', defaultMessage: 'Preparing the private Rust compiler…' },
+  dependencies: { id: 'fre-rust.catalog.dependencies', defaultMessage: 'Downloading pinned build dependencies…' },
+  applying: { id: 'fre-rust.catalog.applying', defaultMessage: 'Combining the selected mods…' },
+  compiling: { id: 'fre-rust.catalog.compiling', defaultMessage: 'Compiling the game. The first build can take a while…' },
+  scanning: { id: 'fre-rust.catalog.scanning', defaultMessage: 'Checking the compiled game with Defender…' },
   back: { id: 'fre-rust.catalog.back', defaultMessage: 'Back to installed mods' },
   backResults: { id: 'fre-rust.catalog.back-results', defaultMessage: 'Back to results' },
   sort: { id: 'fre-rust.catalog.sort', defaultMessage: 'Sort by' },
@@ -88,6 +95,9 @@ const notice = ref('')
 const stale = ref(false)
 const expanded = ref('')
 const page = ref(1), pageSize = ref(20), order = ref('downloads'), layout = ref<'list' | 'grid'>('list'), detailTab = ref(0)
+const buildStage = ref('')
+let unlistenBuild: (() => void) | undefined
+let disposed = false
 const justInstalled = ref<string[]>([])
 const reports = ref<Record<string, Report>>({})
 let generation = 0
@@ -169,7 +179,8 @@ async function verify(project: Project, showReport = true) {
 }
 async function install(project: Project) {
   const selected = version(project)
-  if (!selected || project.kind !== 'mod' || pending.value || loading.value || stale.value || props.disabled || isInstalled(project)) return
+  buildStage.value = ''
+  if (!selected || !['mod', 'native-mod'].includes(project.kind) || pending.value || loading.value || stale.value || props.disabled || isInstalled(project)) return
   const request = generation
   const profileId = props.profileId
   const checked = report(project)?.installable ? report(project) : await verify(project, false)
@@ -188,15 +199,20 @@ async function install(project: Project) {
     notice.value = t(m.saved)
     emit('installed')
   } catch (e) { if (request === generation) error.value = String(e) }
-  finally { if (request === generation) { pending.value = ''; installing.value = false } }
+  finally { if (request === generation) { pending.value = ''; installing.value = false; buildStage.value = '' } }
 }
 function details(project: Project) { expanded.value = project.id; detailTab.value = 0 }
 async function source(project: Project) {
   const url = safeSource(project.source)
   if (url) await openUrl(url)
 }
-onMounted(() => { void load() })
-onUnmounted(() => { generation++ })
+onMounted(() => {
+  void load()
+  void listen<{ profileId: string; stage: string }>('fre-rust-mod-build', event => {
+    if (event.payload.profileId === props.profileId) buildStage.value = event.payload.stage
+  }).then(unlisten => { if (disposed) unlisten(); else unlistenBuild = unlisten }).catch(() => {})
+})
+onUnmounted(() => { disposed = true; generation++; unlistenBuild?.() })
 watch(() => props.profileId, () => {
   generation++
   projects.value = []
@@ -218,6 +234,7 @@ watch(pageCount, count => { if (page.value > count) page.value = count })
       <Button type="quiet" @click="selectedProject ? expanded = '' : emit('close')"><LeftArrowIcon />{{ selectedProject ? t(m.backResults) : t(m.back) }}</Button>
       <div class="flex items-center gap-2 text-xs text-secondary"><ShieldCheckIcon class="size-4 text-brand" />{{ t(m.autoBrief) }}</div>
     </div>
+    <p v-if="installing && buildStage" role="status" class="m-0 rounded-xl bg-surface-3 p-4 text-brand">{{ t(m.buildProgress) }} {{ t(m[buildStage as keyof typeof m] ?? m.compiling) }}</p>
     <p v-if="error" role="alert" class="m-0 text-sm text-red">{{ error }}</p>
     <p v-if="notice" role="status" class="m-0 text-sm text-brand">{{ notice }}</p>
     <p v-if="stale" role="status" class="m-0 text-sm text-secondary">{{ t(m.stale) }}</p>
@@ -226,8 +243,8 @@ watch(pageCount, count => { if (page.value > count) page.value = count })
         <template #actions>
           <Button v-if="builtinKey(selectedProject)" type="outlined" @click="openBuiltin(selectedProject)"><CheckIcon />{{ t(m.inInstance) }}</Button>
           <Button v-else-if="isInstalled(selectedProject)" type="outlined" @click="emit('close')"><CheckIcon />{{ t(m.inInstance) }}</Button>
-          <Button v-else-if="selectedProject.kind === 'mod'" type="colored" color="brand" :disabled="!!pending || stale || disabled || !version(selectedProject)" @click="install(selectedProject)"><SpinnerIcon v-if="pending === selectedProject.id" class="animate-spin" /><DownloadIcon v-else />{{ pending === selectedProject.id ? installing ? t(m.installing) : t(m.checking) : t(m.install) }}</Button>
-          <Button v-else type="outlined" disabled>{{ selectedProject.kind === 'native-mod' ? t(m.requiresBuild) : t(m.not_ready) }}</Button>
+          <Button v-else-if="['mod', 'native-mod'].includes(selectedProject.kind)" type="colored" color="brand" :disabled="!!pending || stale || disabled || !version(selectedProject)" @click="install(selectedProject)"><SpinnerIcon v-if="pending === selectedProject.id" class="animate-spin" /><DownloadIcon v-else />{{ pending === selectedProject.id ? installing ? t(m.installing) : t(m.checking) : t(m.install) }}</Button>
+          <Button v-else type="outlined" disabled>{{ t(m.not_ready) }}</Button>
         </template>
       </ProjectCard>
       <NavTabs mode="local" :links="detailTabs" :active-index="detailTab" @tab-click="selectDetailTab" />
@@ -275,8 +292,8 @@ watch(pageCount, count => { if (page.value > count) page.value = count })
             <template #actions>
               <Button v-if="builtinKey(project)" type="outlined" @click.stop="openBuiltin(project)"><CheckIcon />{{ t(m.inInstance) }}</Button>
               <Button v-else-if="isInstalled(project)" type="outlined" @click.stop="emit('close')"><CheckIcon />{{ t(m.inInstance) }}</Button>
-              <Button v-else-if="project.kind === 'mod'" type="colored" color="brand" :disabled="!!pending || stale || disabled || !version(project)" @click.stop="install(project)"><SpinnerIcon v-if="pending === project.id" class="animate-spin" /><DownloadIcon v-else />{{ pending === project.id ? installing ? t(m.installing) : t(m.checking) : t(m.install) }}</Button>
-              <Button v-else type="outlined" disabled>{{ project.kind === 'native-mod' ? t(m.requiresBuild) : t(m.not_ready) }}</Button>
+              <Button v-else-if="['mod', 'native-mod'].includes(project.kind)" type="colored" color="brand" :disabled="!!pending || stale || disabled || !version(project)" @click.stop="install(project)"><SpinnerIcon v-if="pending === project.id" class="animate-spin" /><DownloadIcon v-else />{{ pending === project.id ? installing ? t(m.installing) : t(m.checking) : t(m.install) }}</Button>
+              <Button v-else type="outlined" disabled>{{ t(m.not_ready) }}</Button>
             </template>
           </ProjectCard>
         </ProjectCardList>

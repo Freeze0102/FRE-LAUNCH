@@ -1,2 +1,3 @@
 # Preserve the pinned engine's exact Git blobs across Windows checkouts.
 vendor/fre-rust-source/** -text
+vendor/fre-mixins-source/** -text

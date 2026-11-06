@@ -71,7 +71,7 @@ def verify(root):
         "packages/app-lib/src/api/minecraft_auth.rs":["pub async fn create_offline_user","pub fn guest_credentials","pub async fn lookup_java_nickname","api.minecraftservices.com/minecraft/profile/lookup/name","StatusCode::NOT_FOUND","OfflinePlayer:","md5::compute","mark_logged_into_minecraft"],
         "packages/app-lib/src/state/minecraft_auth.rs":["pub fn is_offline_profile","fre-offline:"],
         "packages/app-lib/src/launcher/args.rs":['access_token.starts_with("fre-offline:")'],
-        "apps/app-frontend/src/features/minecraft-accounts/accounts-card.vue":["OfflineProfileCreator", "fre-launch-offline-account-created", "confirmRemove", "messages.microsoft", "useSavedAccount", "guestNickname", "fre-launch.guest.use-account", "onGuestSkinFilePicked", "plugin:auth|save_guest_skin", "plugin:auth|lookup_java_nickname", "javaNicknameStatus", "javaNickLookupSequence", "guestNicknameValid", "guestNicknameIsSaved", "messages.guestServerCheck"],
+        "apps/app-frontend/src/features/minecraft-accounts/accounts-card.vue":["OfflineProfileCreator", "fre-launch-offline-account-created", "confirmRemove", "messages.microsoft", "useSavedAccount", "guestNickname", "fre-launch.account.mode.account", "fre-launch.account.mode.nickname", "onGuestSkinFilePicked", "plugin:auth|save_guest_skin", "plugin:auth|lookup_java_nickname", "javaNicknameStatus", "javaNickLookupSequence", "guestNicknameValid", "guestNicknameIsSaved", "messages.guestServerCheck"],
         "apps/app-frontend/src/features/minecraft-accounts/offline-profile-creator.vue":["v-model.trim","create_offline_user","@submit.prevent"],
         "apps/app-frontend/src/helpers/auth.js":["plugin:auth|create_offline_user"],
         "apps/app-frontend/src/helpers/instance.ts":["plugin:instance|instance_run_guest","fre-launch-guest-nickname"],
@@ -302,6 +302,9 @@ def verify(root):
     assert "rustLibraryGroupId(displayState.value.group)" in rust_library_shell
     assert "rustProfileNames" in rust_library_shell
     assert "fre-rust-library-refresh" in rust_library_shell
+    native_action_bar=(root/'apps/app-frontend/src/app/shell/title-bar/action-bar.vue').read_text(encoding='utf-8')
+    for marker in ('plugin:fre-rust|rust_running','plugin:fre-rust|rust_stop','/rust-instance/native/','freRustId','nativeProcessUnlisten'):
+        assert marker in native_action_bar, f'Native process controls missing from title bar: {marker}'
     # Native Rust uses the EXACT same visual card and page-level building
     # blocks as Java. No bespoke library card, modal or Java game dispatch.
     for marker in ('<InstanceCardView', ':instance="viewInstance(card)"',
@@ -314,7 +317,7 @@ def verify(root):
     )
     for marker in ('<PageHeader', '<PageHeaderActions', '<PageHeaderMetadata',
                    '<NavTabs', '<RustInstanceFiles', '<ConfirmDeleteInstanceModal',
-                   '<TabbedModal', 'query="tab"', 'fre-rust-tab', 'rust_rename_profile', 'rust_delete_profile',
+                   '<TabbedModal', 'mode="local"', ':active-index=', '<RustWorlds', '<RustLogs', 'fre-rust-tab', 'rust_rename_profile', 'rust_delete_profile',
                    'useRootBreadcrumb',
                    'plugin:fre-rust|rust_launch', 'plugin:fre-rust|rust_running',
                    'plugin:fre-rust|rust_stop', 'plugin:fre-rust|rust_import_resources'):

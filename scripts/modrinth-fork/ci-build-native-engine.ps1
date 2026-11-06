@@ -61,6 +61,8 @@ if (Test-Path -LiteralPath $runtime) {
         (Get-FileHash -LiteralPath (Join-Path $source 'LICENSE')).Hash) { throw 'Cached MIT attribution differs' }
     if (Test-Path -LiteralPath (Join-Path $runtime 'resources')) { throw 'Private Minecraft resources in redistributable runtime' }
     Write-Host 'Reused verified native game and preparer. No rebuild or upstream download needed.'
+    & $PythonExe (Join-Path $PSScriptRoot 'native_mod_builder_assets.py') --build-tools
+    if ($LASTEXITCODE -ne 0) { throw 'Native mod build tool packaging failed' }
     return
 }
 $buildTarget = Join-Path $root 'vendor/fre-rust-source/target'
@@ -106,3 +108,6 @@ $info = [ordered]@{
 $info | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $stage 'BUILD-INFO.json') -Encoding utf8
 Move-Item -LiteralPath $stage -Destination $runtime
 Write-Host "Packaged MIT game + preparer from $Revision. No proprietary Minecraft assets."
+
+& $PythonExe (Join-Path $PSScriptRoot 'native_mod_builder_assets.py') --build-tools
+if ($LASTEXITCODE -ne 0) { throw 'Native mod build tool packaging failed' }

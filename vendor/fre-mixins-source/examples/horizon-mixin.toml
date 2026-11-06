@@ -1,0 +1,16 @@
+# A loadable declaration for the pinned tiny workspace (fixtures/game).
+# For the complete passing two-mod compilation fixture, use fixtures/mods.
+[mod]
+id = "example"
+version = "0.1.0"
+priority = 100
+
+[[injection]]
+id = "before-second-call"
+target = "fixture_game::calls::compute"
+kind = "BEFORE_CALL"
+selector = "consume"
+ordinal = 1
+require = 2
+helper = "before.rs"
+bindings = [{ name = "log", ty = "&mut Vec<&'static str>", value = "&mut *log" }]

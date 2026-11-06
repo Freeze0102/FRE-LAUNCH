@@ -54,6 +54,7 @@ const zoomModal = ref<InstanceType<typeof NewModal>>()
 const deleteModal = ref<InstanceType<typeof NewModal>>()
 const deleting = ref<string[]>([])
 let deletionProfile = '', loadId = 0
+const settingsBlocked = computed(() => busy.value || saving.value)
 const blocked = computed(() => busy.value || saving.value || !!props.running)
 const builtinKeys: ModKey[] = ['zoom', 'fpsCounter', 'coordinates']
 function builtinIcon(key: ModKey) {
@@ -66,7 +67,7 @@ const rows = computed<ContentCardTableItem[]>(() => {
     project: { id: key, slug: key, title: t(key === 'zoom' ? m.zoom : key === 'fpsCounter' ? m.fps : m.coords), icon_url: builtinIcon(key) },
     version: { id: key, version_number: '26.3', file_name: t(m.builtinTitle) },
     owner: { id: 'fre', name: 'FRE LAUNCH', type: 'organization' as const },
-    enabled: settings.value[key], hideDelete: true, hideSwitchVersion: true, disabled: blocked.value,
+    enabled: settings.value[key], hideDelete: true, hideSwitchVersion: true, disabled: settingsBlocked.value,
     overflowOptions: key === 'zoom' ? [{ id: 'settings', label: t(m.settings), icon: SettingsIcon, action: () => zoomModal.value?.show() }] : [],
   }))
   const local = installed.value.map(mod => ({
@@ -103,7 +104,7 @@ async function load(clearFeedback = true) {
   finally { if (request === loadId) busy.value = false }
 }
 async function saveSettings(next: ClientMods) {
-  if (blocked.value) return
+  if (settingsBlocked.value) return
   const profileId = props.profileId, request = loadId
   saving.value = true; error.value = ''; notice.value = ''
   try {
@@ -124,9 +125,9 @@ async function saveZoomKey(value: unknown) {
 async function setZoomFactor(event: Event) { await saveZoomFactor((event.target as HTMLSelectElement).value) }
 async function setZoomKey(event: Event) { await saveZoomKey((event.target as HTMLSelectElement).value) }
 async function changeEnabled(id: string, enabled: boolean) {
-  if (blocked.value) return
   const key = id.slice(8) as ModKey
   if (id.startsWith('builtin:') && builtinKeys.includes(key)) { await saveSettings({ ...settings.value, [key]: enabled }); return }
+  if (blocked.value) return
   const mod = installed.value.find(mod => 'local:' + mod.file === id)
   if (!mod) return
   const profileId = props.profileId
@@ -226,8 +227,8 @@ watch(() => props.profileId, () => {
     </div>
     <NewModal ref="zoomModal" :header="t(m.zoom)" max-width="440px">
       <div class="flex flex-col gap-4">
-        <label class="flex flex-col gap-2 font-semibold">{{ t(m.zoomFactor) }}<Combobox :model-value="settings.zoomFactor" :options="[2, 4, 6, 8, 10].map(value => ({ value, label: value + '×' }))" :disabled="blocked" @update:model-value="saveZoomFactor" /></label>
-        <label class="flex flex-col gap-2 font-semibold">{{ t(m.zoomKey) }}<Combobox :model-value="settings.zoomKey" :options="['c', 'v', 'z'].map(value => ({ value, label: value.toUpperCase() }))" :disabled="blocked" @update:model-value="saveZoomKey" /></label>
+        <label class="flex flex-col gap-2 font-semibold">{{ t(m.zoomFactor) }}<Combobox :model-value="settings.zoomFactor" :options="[2, 4, 6, 8, 10].map(value => ({ value, label: value + '×' }))" :disabled="settingsBlocked" @update:model-value="saveZoomFactor" /></label>
+        <label class="flex flex-col gap-2 font-semibold">{{ t(m.zoomKey) }}<Combobox :model-value="settings.zoomKey" :options="['c', 'v', 'z'].map(value => ({ value, label: value.toUpperCase() }))" :disabled="settingsBlocked" @update:model-value="saveZoomKey" /></label>
         <p class="m-0 text-sm text-secondary">{{ t(m.nextLaunch) }}</p>
       </div>
       <template #actions><Button @click="zoomModal?.hide()">{{ t(m.close) }}</Button></template>

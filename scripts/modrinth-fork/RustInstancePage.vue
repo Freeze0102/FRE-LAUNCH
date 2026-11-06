@@ -7,7 +7,7 @@ import {
 } from '@modrinth/assets'
 import {
   Avatar, Button, commonMessages, defineMessages, IconButton, NavTabs, TabbedModal,
-  PageHeader, PageHeaderActions, PageHeaderMetadata, PageHeaderMetadataItem, TagIcon,
+  useRelativeTime, PageHeader, PageHeaderActions, PageHeaderMetadata, PageHeaderMetadataItem, TagIcon,
   TeleportOverflowMenu, useVIntl, injectNotificationManager,
 } from '@modrinth/ui'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
@@ -15,17 +15,20 @@ import { useRoute, useRouter } from 'vue-router'
 
 import RustInstanceFiles from '@/components/ui/RustInstanceFiles.vue'
 import RustNativeMods from '@/components/ui/RustNativeMods.vue'
+import RustWorlds from '@/components/ui/RustWorlds.vue'
+import RustLogs from '@/components/ui/RustLogs.vue'
 import ConfirmDeleteInstanceModal from '@/components/ui/modal/ConfirmDeleteInstanceModal.vue'
 import type { GameInstance } from '@/helpers/types'
 import { useRootBreadcrumb } from '@/shared/breadcrumbs'
 
-type NativeProfile = { id: string; name: string; created: number; modified?: number; iconPath?: string | null }
+type NativeProfile = { playtime?: number; lastPlayed?: number | null; id: string; name: string; created: number; modified?: number; iconPath?: string | null }
 type Runtime = { installed: boolean; prepared: boolean; version: string; reason: string | null }
-type Profile = { id: string; name: string; modified?: number; iconPath?: string | null; version: string; ready: boolean }
+type Profile = { playtime?: number; lastPlayed?: number | null; id: string; name: string; modified?: number; iconPath?: string | null; version: string; ready: boolean }
 
 const route = useRoute()
 const router = useRouter()
 const { formatMessage: t } = useVIntl()
+const relativeTime = useRelativeTime()
 const { handleError } = injectNotificationManager()
 const m = defineMessages({
   content: { id: 'app.instance.tab.content', defaultMessage: 'Content' },
@@ -39,6 +42,14 @@ const m = defineMessages({
   settings: { id: 'fre-rust.grid.settings', defaultMessage: 'Settings' },
   starting: { id: 'fre-rust.grid.starting', defaultMessage: 'Starting…' },
   openFolder: { id: 'fre-rust.grid.open-folder', defaultMessage: 'Open folder' },
+  buildProgress: { id: 'fre-rust.catalog.build-progress', defaultMessage: 'Building your modded game:' },
+  compiler: { id: 'fre-rust.catalog.compiler', defaultMessage: 'Preparing the private Rust compiler…' },
+  dependencies: { id: 'fre-rust.catalog.dependencies', defaultMessage: 'Downloading pinned build dependencies…' },
+  applying: { id: 'fre-rust.catalog.applying', defaultMessage: 'Combining the selected mods…' },
+  compiling: { id: 'fre-rust.catalog.compiling', defaultMessage: 'Compiling the game. The first build can take a while…' },
+  scanning: { id: 'fre-rust.catalog.scanning', defaultMessage: 'Checking the compiled game with Defender…' },
+  playtime: { id: 'fre-rust.page.playtime', defaultMessage: '{minutes} min played' },
+  lastPlayed: { id: 'fre-rust.page.last-played', defaultMessage: 'Last played: {time}' },
   neverPlayed: { id: 'instance.playtime.never-played', defaultMessage: 'Never played' },
   unavailable: { id: 'fre-rust.page.unavailable', defaultMessage: 'The Rust profile was not found.' },
   contentNote: {
@@ -92,6 +103,7 @@ const deleting = ref(false)
 const editedName = ref('')
 const setupError = ref('')
 const prepareStage = ref('')
+const buildStage = ref('')
 const settingsModal = ref<InstanceType<typeof TabbedModal>>()
 const deleteModal = ref<InstanceType<typeof ConfirmDeleteInstanceModal>>()
 const displayInstance = computed(() => profile.value ? ({
@@ -102,7 +114,6 @@ const displayInstance = computed(() => profile.value ? ({
   game_version: profile.value.version,
   modified: profile.value.modified ?? 0,
 }) as unknown as GameInstance : null)
-const logs = ref('')
 const basePath = computed(() =>
   '/rust-instance/' + encodeURIComponent(kind.value) + '/' + encodeURIComponent(id.value),
 )
@@ -111,7 +122,7 @@ const tab = computed(() => {
   return value === 'files' || value === 'worlds' || value === 'logs' ? value : 'content'
 })
 const tabs = computed(() => [
-  { label: t(m.content), href: 'content', icon: BoxesIcon },
+  { label: t(m.content), href: 'content', icon: BoxesIcon, subpages: [''] },
   { label: t(m.files), href: 'files', icon: FolderOpenIcon },
   { label: t(m.worlds), href: 'worlds', icon: GlobeIcon },
   { label: t(m.logs), href: 'logs', icon: TerminalSquareIcon },
@@ -164,10 +175,9 @@ async function refresh() {
     if (!found) throw new Error(t(m.unavailable))
     profile.value = {
       id: found.id, name: found.name, iconPath: found.iconPath,
-      modified: found.modified,
+      modified: found.modified, playtime: found.playtime, lastPlayed: found.lastPlayed,
       version: status.version || '26.3', ready: status.installed && status.prepared,
     }
-    if (tab.value === 'logs') void loadLogs()
   } catch (err) {
     if (current !== generation) return
     profile.value = null
@@ -255,7 +265,7 @@ async function chooseResources() {
     setupError.value = err instanceof Error ? err.message : String(err)
   } finally { preparing.value = false }
 }
-async function play() {
+async function play(destination?: { world?: string; server?: string }) {
   if (!profile.value || launching.value || stopping.value || running.value) return
   // Play remains the only primary action, just like Fabric. If native
   // resources are missing, first attempt an authorized local preparation,
@@ -267,8 +277,9 @@ async function play() {
     }
   }
   launching.value = true
+  buildStage.value = ''
   try {
-    await invoke('plugin:fre-rust|rust_launch', { profileId: id.value })
+    await invoke('plugin:fre-rust|rust_launch', { profileId: id.value, world: destination?.world ?? null, server: destination?.server ?? null })
     await refreshRunning()
   } catch (err) {
     handleError(err instanceof Error ? err : new Error(String(err)))
@@ -280,6 +291,9 @@ async function refreshRunning() {
   try {
     const active = await invoke<string[]>('plugin:fre-rust|rust_running')
     running.value = active.includes(id.value)
+    const profiles = await invoke<NativeProfile[]>('plugin:fre-rust|rust_profiles')
+    const current = profiles.find(item => item.id === id.value)
+    if (profile.value && current) { profile.value.playtime = current.playtime; profile.value.lastPlayed = current.lastPlayed }
   } catch { /* The profile's other tabs remain usable. */ }
 }
 async function stop() {
@@ -301,29 +315,24 @@ async function openFolder(folder = 'root') {
     handleError(err instanceof Error ? err : new Error(String(err)))
   }
 }
-async function loadLogs() {
-  logs.value = ''
-  try {
-    logs.value = await invoke<string>('plugin:fre-rust|rust_logs', { profileId: id.value })
-  } catch {
-    logs.value = ''
-  }
-}
 watch(() => [route.params.kind, route.params.id], () => { void refresh() }, { immediate: true })
-watch(tab, next => { if (next === 'logs') void loadLogs() })
 const onRefresh = () => { void refresh() }
 let unlistenPrepareStage: (() => void) | null = null
 let unlistenProcess: (() => void) | null = null
+let unlistenBuild: (() => void) | null = null
 let stageListenerDisposed = false
 onMounted(() => {
   stageListenerDisposed = false
+  void listen<{ profileId: string; stage: string }>('fre-rust-mod-build', event => {
+    if (event.payload.profileId === id.value) buildStage.value = event.payload.stage
+  }).then(unlisten => { if (stageListenerDisposed) unlisten(); else unlistenBuild = unlisten }).catch(() => {})
   void listen<string>('fre-rust-prepare-stage', event => {
     if (kind.value === 'native' && preparing.value) prepareStage.value = event.payload
   }).then(unlisten => {
     if (stageListenerDisposed) unlisten()
     else unlistenPrepareStage = unlisten
   }).catch(() => { /* Stage indicators are optional, not proof of success. */ })
-  void listen('fre-rust-process-changed', () => { void refreshRunning() })
+  void listen('fre-rust-process-changed', () => { void refresh() })
     .then(unlisten => {
       if (stageListenerDisposed) unlisten()
       else unlistenProcess = unlisten
@@ -336,6 +345,7 @@ onUnmounted(() => {
   stageListenerDisposed = true
   unlistenPrepareStage?.()
   unlistenPrepareStage = null
+  unlistenBuild?.()
   unlistenProcess?.()
   unlistenProcess = null
   window.removeEventListener('fre-rust-library-refresh', onRefresh)
@@ -421,7 +431,8 @@ useRootBreadcrumb({
           <p v-if="preparing && prepareStageText" role="status" class="m-0 text-sm text-brand">{{ prepareStageText }}</p>
           <p v-if="kind === 'native' && !profile.ready" class="m-0 text-sm text-secondary">{{ t(m.firstRunHint) }}</p>
           <p v-if="!profile.ready" class="m-0 text-sm text-secondary">{{ t(m.notDownloaded) }}</p>
-          <p v-if="setupError" role="alert" class="m-0 text-sm text-red-400">{{ setupError }}</p>
+          <p v-if="launching && buildStage" role="status" class="mt-4 rounded-xl bg-surface-3 p-4 text-brand">{{ t(m.buildProgress) }} {{ t(m[buildStage as keyof typeof m] ?? m.compiling) }}</p>
+      <p v-if="setupError" role="alert" class="m-0 text-sm text-red-400">{{ setupError }}</p>
         </div>
       </template>
     </TabbedModal>
@@ -441,8 +452,9 @@ useRootBreadcrumb({
             <PageHeaderMetadataItem :icon="TagIcon">
               Rust {{ profile.version }}
             </PageHeaderMetadataItem>
+            <PageHeaderMetadataItem v-if="profile.playtime" :icon="ClockIcon">{{ t(m.playtime, { minutes: Math.floor(profile.playtime / 60) }) }}</PageHeaderMetadataItem>
             <PageHeaderMetadataItem :icon="ClockIcon">
-              {{ t(m.neverPlayed) }}
+              {{ profile.lastPlayed ? t(m.lastPlayed, { time: relativeTime(new Date(profile.lastPlayed)) }) : t(m.neverPlayed) }}
             </PageHeaderMetadataItem>
           </PageHeaderMetadata>
         </template>
@@ -450,11 +462,11 @@ useRootBreadcrumb({
           <PageHeaderActions>
             <Button
               type="colored"
-              color="brand"
+              :color="running ? 'red' : 'brand'"
               size="xl"
               native-type="button"
               :disabled="launching || stopping || preparing"
-              @click="running ? stop() : play()"
+              @click="running ? stop() : play(undefined)"
             >
               <StopCircleIcon v-if="running" />
               <PlayIcon v-else />
@@ -484,7 +496,8 @@ useRootBreadcrumb({
     </div>
 
     <div class="shrink-0 px-6">
-      <NavTabs :links="tabs" query="tab" />
+      <NavTabs :links="tabs" mode="local" :active-index="['content', 'files', 'worlds', 'logs'].indexOf(tab)" @tab-click="index => router.push({ path: route.path, query: { tab: ['content', 'files', 'worlds', 'logs'][index] } })" />
+      <p v-if="launching && buildStage" role="status" class="mt-4 rounded-xl bg-surface-3 p-4 text-brand">{{ t(m.buildProgress) }} {{ t(m[buildStage as keyof typeof m] ?? m.compiling) }}</p>
       <p v-if="setupError" role="alert" class="mt-4 text-sm text-red-400">{{ setupError }}</p>
       <p v-if="!profile.ready" class="mt-4 rounded-xl border border-solid border-surface-4 bg-surface-2 p-4 text-sm text-secondary">
         {{ statusText }}
@@ -494,7 +507,7 @@ useRootBreadcrumb({
     <Transition name="fre-rust-tab" mode="out-in">
     <div :key="tab" class="min-h-0 flex-1 overflow-y-auto p-6 pt-4">
       <div v-if="tab === 'content'" class="flex flex-col gap-3">
-        <RustNativeMods v-if="kind === 'native'" :profile-id="id" :running="running" :catalog-open="route.query.view === 'catalog'" @browse="router.push({ path: route.path, query: { tab: 'content', view: 'catalog' } })" @back="router.push({ path: route.path, query: { tab: 'content' } })" />
+        <RustNativeMods v-if="kind === 'native'" :profile-id="id" :running="running || launching" :catalog-open="route.query.view === 'catalog'" @browse="router.push({ path: route.path, query: { tab: 'content', view: 'catalog' } })" @back="router.push({ path: route.path, query: { tab: 'content' } })" />
 
       </div>
       <RustInstanceFiles
@@ -503,19 +516,8 @@ useRootBreadcrumb({
         :profile-id="id"
         initial-folder="root"
       />
-      <RustInstanceFiles
-        v-else-if="tab === 'worlds'"
-        :key="kind + id + ':worlds'"
-        :profile-id="id"
-        initial-folder="saves"
-      />
-      <div v-else-if="tab === 'logs'" class="flex flex-col gap-4">
-        <div class="flex justify-end">
-          <Button @click="loadLogs">{{ t(m.retry) }}</Button>
-        </div>
-        <pre v-if="logs" class="m-0 max-h-full overflow-auto rounded-xl border border-solid border-surface-4 bg-surface-2 p-4 font-mono text-sm text-contrast">{{ logs }}</pre>
-        <p v-else class="py-12 text-center text-secondary">{{ t(m.noLogs) }}</p>
-      </div>
+      <RustWorlds v-else-if="tab === 'worlds'" :profile-id="id" :running="running" :starting="launching" @play="play" @stop="stop" />
+      <RustLogs v-else-if="tab === 'logs'" :profile-id="id" :running="running" class="h-full min-h-[28rem]" />
     </div>
     </Transition>
   </div>

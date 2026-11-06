@@ -26,6 +26,10 @@ mod client_mods;
 mod mod_audit;
 #[path = "fre_rust_catalog.rs"]
 mod catalog;
+#[path = "fre_rust_instance.rs"]
+mod instance;
+#[path="fre_native_build.rs"]
+mod native_build;
 static CLIENT_MOD_SETTINGS: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 const MAX_NAME: usize = 64;
@@ -74,6 +78,10 @@ struct RustProfile {
     created: u64,
     #[serde(default)]
     modified: u64,
+    #[serde(default)]
+    playtime: u64,
+    #[serde(default)]
+    last_played: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     icon_path: Option<String>,
 }
@@ -116,6 +124,9 @@ pub fn init<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
             rust_running,
             rust_stop,
             rust_logs,
+            instance::rust_log_sources,
+            instance::rust_worlds,
+            instance::rust_server_edit,
             rust_open_folder,
             rust_list_files,
         ])
@@ -186,6 +197,9 @@ fn read_profile(dir: &Path, id: &str) -> Option<RustProfile> {
         .and_then(|meta| meta.modified().ok())
         .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
         .map(|duration| duration.as_micros() as u64).unwrap_or_default();
+    let stats = instance::read_playtime(dir).unwrap_or_default();
+    profile.playtime = stats.seconds;
+    profile.last_played = stats.last_played;
     Some(profile)
 }
 
@@ -210,7 +224,11 @@ fn list(root: &Path) -> Result<Vec<RustProfile>, String> {
 async fn rust_profiles<R: tauri::Runtime>(
     app: tauri::AppHandle<R>,
 ) -> Result<Vec<RustProfile>, String> {
-    let profiles = list(&base(&app)?)?;
+    let mut profiles = list(&base(&app)?)?;
+    let sessions = instance::SESSIONS.lock().await;
+    for profile in &mut profiles {
+        if let Some(session) = sessions.get(&profile.id) { profile.playtime = session.total(); }
+    }
     for profile in &profiles { allow_profile_icon(&app, profile)?; }
     Ok(profiles)
 }
@@ -299,7 +317,7 @@ async fn rust_create_profile<R: tauri::Runtime>(
                     }
                     Some(target.to_string_lossy().into_owned())
                 } else { None };
-                let profile = RustProfile { id, name, created, modified: 0, icon_path: saved_icon };
+                let profile = RustProfile { id, name, created, modified: 0, playtime: 0, last_played: None, icon_path: saved_icon };
                 let metadata = serde_json::to_vec_pretty(&profile).map_err(|e| e.to_string())?;
                 let path = dir.join("profile.json");
                 let written = fs::OpenOptions::new()
@@ -750,10 +768,6 @@ async fn rust_client_mods<R: tauri::Runtime>(
     let dir = profile_dir(&base(&app)?, &profile_id)?;
     read_profile(&dir, &profile_id).ok_or("Rust profile does not exist.")?;
     if let Some(settings) = settings {
-        let running = RUNNING_PROFILES.lock().await;
-        if running.contains(&profile_id) {
-            return Err("Close the Rust game before changing client mods.".into());
-        }
         client_mods::write(&dir, &settings)?;
         return Ok(settings);
     }
@@ -786,9 +800,9 @@ async fn rust_catalog_install<R: tauri::Runtime>(app: tauri::AppHandle<R>, profi
 }
 
 /// FRE-owned mods: .hmod are data-only, whereas native .hnmod source
-/// mixins require a separate trusted native rebuild and are not installed here.
+/// mixins are downloaded here and compiled together before the next Play.
 fn mod_filename_safe(name: &str) -> bool {
-    name.len() > 5 && name.len() <= 128 && name.to_ascii_lowercase().ends_with(".hmod")
+    name.len() > 5 && name.len() <= 128 && (name.to_ascii_lowercase().ends_with(".hmod") || name.to_ascii_lowercase().ends_with(".hnmod"))
         && name.bytes().all(|c| c.is_ascii_alphanumeric() || matches!(c, b'.' | b'-' | b'_'))
         && !name.starts_with('.')
 }
@@ -823,7 +837,7 @@ fn list_local_mods(dir: &Path) -> Result<Vec<LocalRustMod>, String> {
         let file = entry.file_name().to_string_lossy().into_owned();
         if !mod_filename_safe(&file) { continue; }
         let facts=catalog::local_facts(&entry.path()).ok();
-        let slug=facts.as_ref().map(|facts|facts.id.clone()).unwrap_or_else(||file[..file.len()-5].to_owned());
+        let slug=facts.as_ref().map(|facts|facts.id.clone()).unwrap_or_else(||file.rsplit_once('.').map_or(file.as_str(), |(name,_)|name).to_owned());
         let on=enabled.contains(&slug);
         files.push(LocalRustMod {
             project:file.clone(), slug:slug.clone(),
@@ -875,7 +889,7 @@ async fn rust_mods<R: tauri::Runtime>(
             catalog::forget_removed_file(&dir,filename)?;
             Ok(format!("Removed {filename} from this Rust instance."))
         }
-        _ => Err("Use local .hmod import. Native .hnmod code requires a separate trusted native build.".into()),
+        _ => Err("Choose a catalog mod or import a data-only .hmod content file.".into()),
     }
 }
 /// Local import only. Never uses the external external launcher or its account.
@@ -892,7 +906,7 @@ async fn rust_import_mod<R: tauri::Runtime>(
     let source = PathBuf::from(source);
     let filename = source.file_name().and_then(|name| name.to_str())
         .ok_or("Invalid content mod file name.")?;
-    if !mod_filename_safe(filename) {
+    if !mod_filename_safe(filename) || !filename.ends_with(".hmod") {
         return Err("Select a .hmod content mod. Java JAR and .hnmod code are not supported.".into());
     }
     let meta = source.symlink_metadata().map_err(|e| format!("Cannot read mod: {e}"))?;
@@ -968,6 +982,7 @@ async fn rust_stop(profile_id: String) -> Result<String, String> {
 #[tauri::command]
 async fn rust_launch<R: tauri::Runtime>(
     app: tauri::AppHandle<R>, profile_id: String,
+    world: Option<String>, server: Option<String>,
 ) -> Result<String, String> {
     // Hold the same profile lifecycle lock as Rename/Delete until this
     // launch has registered its running instance. Otherwise a concurrent
@@ -981,6 +996,7 @@ async fn rust_launch<R: tauri::Runtime>(
         return Err("This Rust Minecraft profile is already running.".into());
     }
     migration::profile(&dir)?;
+    instance::validate_destination(&dir, world.as_deref(), server.as_deref())?;
     catalog::before_play(&root,&dir).await?;
     let runtime_dir = bundle(&app)?;
     let runtime = ready(&runtime_dir, &root);
@@ -989,6 +1005,7 @@ async fn rust_launch<R: tauri::Runtime>(
     }
     verify_native_client(&runtime_dir)?;
     let (client, _) = runtime_files(&runtime_dir);
+    let client = native_build::ensure(&app,&root,&dir,&runtime_dir,&profile_id).await?.unwrap_or(client);
     let resources = local_resources(&root, &runtime_dir);
     let client = client.canonicalize().map_err(|e| e.to_string())?;
     let resources = resources.canonicalize().map_err(|e| e.to_string())?;
@@ -1033,6 +1050,8 @@ async fn rust_launch<R: tauri::Runtime>(
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .kill_on_drop(false);
+    if let Some(world) = &world { cmd.arg("--quickPlaySingleplayer").arg(world); }
+    if let Some(server) = &server { cmd.arg("--quickPlayMultiplayer").arg(server); }
     #[cfg(windows)]
     cmd.creation_flags(0x08000000);
     // Two simultaneous launches of one game directory can corrupt a saved
@@ -1065,6 +1084,11 @@ async fn rust_launch<R: tauri::Runtime>(
         return Err(format!("Could not securely hand the Minecraft account to the Rust game: {error}"));
     }
     drop(stdin);
+    let session = match instance::Session::start(&dir) {
+        Ok(session)=>session,
+        Err(error)=>{let _=child.kill().await;RUNNING_PROFILES.lock().await.retain(|id|id!=&profile_id);return Err(error);}
+    };
+    instance::SESSIONS.lock().await.insert(profile_id.clone(), session.clone());
     let pid = child.id().unwrap_or_default();
     let active_id = profile_id.clone();
     let (stop_tx, stop_rx) = tokio::sync::oneshot::channel::<()>();
@@ -1076,9 +1100,16 @@ async fn rust_launch<R: tauri::Runtime>(
     let mut task = tokio::spawn(async move {
         // Child::wait is cancellation-safe. The stop request is delivered to
         // this exact child, not to every executable with the same filename.
-        let waited = tokio::select! {
-            result = child.wait() => Some(result),
-            _ = stop_rx => None,
+        let mut stop_rx = stop_rx;
+        let mut checkpoint = tokio::time::interval(Duration::from_secs(30));
+        let waited = loop {
+            tokio::select! {
+                result = child.wait() => break Some(result),
+                _ = &mut stop_rx => break None,
+                _ = checkpoint.tick() => {
+                    if let Err(error) = session.save(&dir) { eprintln!("FRE LAUNCH playtime: {error}"); }
+                }
+            }
         };
         let result = match waited {
             Some(result) => result,
@@ -1087,6 +1118,8 @@ async fn rust_launch<R: tauri::Runtime>(
                 child.wait().await
             }
         };
+        if let Err(error) = session.save(&dir) { eprintln!("FRE LAUNCH playtime: {error}"); }
+        instance::SESSIONS.lock().await.remove(&active_id);
         STOP_SIGNALS.lock().await.remove(&active_id);
         RUNNING_PROFILES.lock().await.retain(|id| id != &active_id);
         let _ = app_for_exit.emit("fre-rust-process-changed", serde_json::json!({
@@ -1195,20 +1228,11 @@ async fn rust_open_folder<R: tauri::Runtime>(
 
 #[tauri::command]
 async fn rust_logs<R: tauri::Runtime>(
-    app: tauri::AppHandle<R>, profile_id: String,
+    app: tauri::AppHandle<R>, profile_id: String, filename: Option<String>,
 ) -> Result<String, String> {
-    let root = base(&app)?;
-    let dir = profile_dir(&root, &profile_id)?;
-    if read_profile(&dir, &profile_id).is_none() {
-        return Err("Rust profile not found.".into());
-    }
-    let logfile = dir.join("logs").join("latest.log");
-    let metadata = logfile.metadata().map_err(|e| format!("No local game log found: {e}"))?;
-    if metadata.len() > 32 * 1024 * 1024 {
-        return Err("Game log is too large to display. Open the log file locally.".into());
-    }
-    let content = fs::read_to_string(&logfile).map_err(|e| e.to_string())?;
-    Ok(content.chars().rev().take(12_000).collect::<String>().chars().rev().collect())
+    let dir = profile_dir(&base(&app)?, &profile_id)?;
+    read_profile(&dir, &profile_id).ok_or("Rust profile not found.")?;
+    instance::read_log(&dir, filename.as_deref().unwrap_or("latest.log"))
 }
 
 #[cfg(test)]
@@ -1286,7 +1310,7 @@ mod tests {
         let root = tempfile::tempdir().unwrap();
         let dir = profile_dir(root.path(), "123456789").unwrap();
         fs::create_dir_all(&dir).unwrap();
-        let expected = RustProfile { id: "123456789".into(), name: "Тест Rust".into(), created: 1234, modified: 0, icon_path: None };
+        let expected = RustProfile { id: "123456789".into(), name: "Тест Rust".into(), created: 1234, modified: 0, playtime: 0, last_played: None, icon_path: None };
         fs::write(dir.join("profile.json"), serde_json::to_vec(&expected).unwrap()).unwrap();
         assert_eq!(read_profile(&dir, "123456789").unwrap().name, "Тест Rust");
         // A read profile must keep the original name and owner-supplied metadata.

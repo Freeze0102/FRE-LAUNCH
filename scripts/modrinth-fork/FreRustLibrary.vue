@@ -189,7 +189,7 @@ onUnmounted(() => {
           </div>
         </div>
         <div class="flex gap-2">
-          <button type="button" class="flex-1 cursor-pointer rounded-lg border-0 bg-brand px-4 py-2 text-sm font-semibold text-white disabled:opacity-40" :disabled="!!loading || (!playable && !isRunning(profile))" @click="isRunning(profile) ? stop(profile) : play(profile)">
+          <button type="button" class="flex-1 cursor-pointer rounded-lg border-0 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40" :class="isRunning(profile) ? 'bg-red' : 'bg-brand'" :disabled="!!loading || (!playable && !isRunning(profile))" @click="isRunning(profile) ? stop(profile) : play(profile)">
             {{ loading === profile.id ? t(m.playing) : isRunning(profile) ? t(m.stop) : t(m.play) }}
           </button>
           <button type="button" class="cursor-pointer rounded-lg bg-button-bg px-3 py-2 text-sm text-contrast" @click="openFiles(profile)">{{ t(m.files) }}</button>

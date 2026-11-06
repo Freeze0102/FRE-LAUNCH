@@ -56,13 +56,18 @@ function component(file, invoke, instances = [], options = {}) {
         m.defaultMessage.replace(/\{(\w+)\}/g, (_, k) => String(args[k])) }),
       injectNotificationManager: () => ({ handleError: options.handleError || (() => {}) }),
       IconButton: {},
+      provideConsoleManager: value => options.consoleManager?.(value),
     },
     'vue-router': { useRouter: () => ({ push: options.push || (async () => {}) }) },
     '@/components/ui/library/instance-group/instance-card-view.vue': {},
     '@/components/ui/RustModCatalog.vue': {},
+    '@/components/ui/world/WorldItem.vue': {},
+    '@/helpers/worlds': { get_server_status: options.getServerStatus || (async () => ({ players: { online: 1, max: 20 } })) },
     vue: { ...vue, onMounted: f => mounted.push(f), onUnmounted: f => unmounted.push(f) },
   }
-  const names = file === 'RustModCatalog.vue'
+  const names = file === 'RustLogs.vue' ? 'logLines,names,selected,loading,sources,activeName,parse,refresh'
+    : file === 'RustWorlds.vue' ? 'worlds,query,filter,busy,states,shown,load,ping,play,save,serverName,serverAddress,removing'
+    : file === 'RustModCatalog.vue'
     ? 'projects,query,kind,loading,pending,error,notice,stale,expanded,reports,filtered,shown,load,verify,install,details,source,safeSource,image,isInstalled,version,report,page,pageSize,pageCount,order,layout,detailTab,selectedProject,switchPage,selectDetailTab,justInstalled'
     : file === 'RustInstanceGrid.vue'
     ? 'cards,nativeProfiles,runtime,refresh,refreshRunning,runningIds,isRunning,openCard,play,stop,cardStyle,viewInstance,detailUrl,busy,selectCard,isSelected,activateCard'
@@ -475,7 +480,7 @@ test('Native Rust uses native game launch, page-specific Files and settings, nev
   assert.match(page, /plugin:fre-rust\|rust_import_resources/)
   assert.match(page, /running \? t\(m.stop\) : t\(m.play\)/)
   assert.match(page, /<NavTabs/)
-  assert.match(page, /query="tab"/)
+  assert.match(page, /mode="local" :active-index=/)
   assert.match(page, /<Transition name="fre-rust-tab"/)
   assert.match(page, /<RustInstanceFiles/)
   assert.match(page, /plugin:fre-rust\|rust_launch/)
@@ -836,7 +841,7 @@ test('Rust catalog searches authors and tags and restricts external source/image
   assert.equal(c.state.image('http://localhost/private'), undefined)
   assert.equal(c.state.image('https://evil.test/track.png'), undefined)
 })
-test('Catalog verification reports native code without enabling installation or execution', async () => {
+test('Native compatibility failures stay unavailable after inspection', async () => {
   const project = catalogFixture()
   const calls = []
   const c = component('RustModCatalog.vue', async (command, args) => {
@@ -844,7 +849,7 @@ test('Catalog verification reports native code without enabling installation or 
     if (command.endsWith('|rust_catalog')) return { projects: [project], generated: '', fetchedAt: 1, stale: false }
     assert.equal(command, 'plugin:fre-rust|rust_catalog_check')
     assert.equal(args.expectedSha256, '1'.repeat(64))
-    return { projectId: project.id, version: '1', sha256: '1'.repeat(64), installable: false, checks: [{ code: 'execution', state: 'warning', detail: 'Native build required' }] }
+    return { projectId: project.id, version: '1', sha256: '1'.repeat(64), installable: false, checks: [{ code: 'execution', state: 'warning', detail: 'Unsupported hook API' }] }
   }, [], { props: { profileId: '123', installedFiles: [] } })
   await c.state.load()
   await c.state.verify(project)
@@ -925,7 +930,7 @@ test('Local mod switches use the selected profile and reload the actual game sta
   ])
 })
 
-test('Bulk native mod toggles preserve unrelated settings and running instances reject changes', async () => {
+test('Builtin mod settings can change during play while downloaded content stays locked', async () => {
   const saves = [], props = { profileId: '123', running: false }
   const c = component('RustNativeMods.vue', async (command, args) => {
     if (command.endsWith('|rust_mods')) return '[]'
@@ -937,8 +942,11 @@ test('Bulk native mod toggles preserve unrelated settings and running instances 
   assert.deepEqual(saves.at(-1), { zoom: true, zoomFactor: 8, zoomKey: 'v', fpsCounter: true, coordinates: true })
   props.running = true
   const count = saves.length
-  await c.state.setMod('zoom'); await c.state.bulkToggle(false)
-  assert.equal(saves.length, count)
+  await c.state.setMod('zoom')
+  assert.equal(saves.length, count + 1)
+  assert.equal(saves.at(-1).zoom, false)
+  await c.state.bulkToggle(false)
+  assert.equal(saves.length, count + 1)
 })
 
 test('Mod deletion waits for confirmation and cancels after a profile change', async () => {
@@ -998,4 +1006,48 @@ test('Catalog pagination and sorting retain the chosen search when opening a pro
   c.state.order.value='name';await vue.nextTick()
   assert.equal(c.state.page.value,1)
   assert.equal(c.state.shown.value[0].name,'Project 00')
+})
+
+
+test('Native worlds and servers launch the selected destination through native events', async () => {
+  const events = [], calls = []
+  const worlds = [{ type: 'singleplayer', name: 'Home', path: 'World One', display_status: 'normal', hardcore: false, locked: false, game_mode: 'survival' }, { type: 'server', name: 'Friends', address: 'localhost:25565', index: 0, pack_status: 'prompt', display_status: 'normal' }]
+  const c = component('RustWorlds.vue', async (command, args) => { calls.push([command,args]); return worlds }, [], { props: { profileId: '123' }, emit: (...args) => events.push(args) })
+  c.state.play(worlds[0]); c.state.play(worlds[1])
+  assert.deepEqual(events, [['play', {world:'World One'}], ['play',{server:'localhost:25565'}]])
+  await c.state.load()
+  c.state.query.value = 'friends'; assert.equal(c.state.shown.value.length, 1)
+  c.state.serverName.value = 'New'; c.state.serverAddress.value = 'example.org'
+  await c.state.save('add')
+  assert.ok(calls.some(([command,args]) => command==='plugin:fre-rust|rust_server_edit' && args.action==='add' && args.address==='example.org'))
+  assert.ok(calls.every(([command]) => command.startsWith('plugin:fre-rust|')))
+  c.unmount()
+})
+
+test('Native console parses log levels, clears CRLF live output and selects saved logs', async () => {
+  let manager, content = '[12:00:00] [Render thread/INFO]: Ready\r\n', calls = []
+  const c = component('RustLogs.vue', async (command,args) => { calls.push([command,args]); return command.endsWith('|rust_log_sources') ? ['latest.log','2026-11-05-1.log.gz'] : content }, [], { props: { profileId:'123', running:true }, consoleManager: value => {manager=value} })
+  await c.state.refresh(true)
+  assert.equal(c.state.logLines.value[0].level,'info')
+  manager.onClear(); content += '[12:00:01] [worker/WARN]: Warning\r\n'
+  await c.state.refresh()
+  assert.equal(c.state.logLines.value.length,1)
+  assert.equal(c.state.logLines.value[0].level,'warn')
+  c.state.selected.value=1; await vue.nextTick(); await new Promise(resolve=>setImmediate(resolve))
+  assert.equal(calls.at(-1)[1].filename,'2026-11-05-1.log.gz')
+  assert.equal(manager.showCommandInput,false)
+  assert.equal(manager.shareDisabled.value,true)
+  c.unmount()
+})
+
+test('Native catalog source mods can be installed and built directly after automatic checks', async () => {
+  const project=catalogFixture(), commands=[], events=[]
+  const report={projectId:project.id,version:'1',filename:'demo.hnmod',sha256:'1'.repeat(64),installable:true,checks:[]}
+  const c=component('RustModCatalog.vue',async(command,args)=>{commands.push(command);return command.endsWith('|rust_catalog') ? {projects:[project],stale:false} : report},[],{props:{profileId:'123',installedFiles:[]},emit:event=>events.push(event)})
+  await c.state.load(); await c.state.install(project)
+  assert.ok(commands.includes('plugin:fre-rust|rust_catalog_check'))
+  assert.ok(commands.includes('plugin:fre-rust|rust_catalog_install'))
+  assert.deepEqual(events,['installed'])
+  assert.equal(c.state.isInstalled(project),true)
+  c.unmount()
 })

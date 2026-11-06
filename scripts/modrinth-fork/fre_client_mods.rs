@@ -36,6 +36,12 @@ impl ClientMods {
         (self.zoom && held && playing && !scoping).then_some(f32::from(self.zoom_factor))
     }
 }
+/// A quarter turn doubles the magnification. Fractional trackpad input is retained.
+pub fn scroll_zoom(factor: f32, delta: f32) -> f32 {
+    if !delta.is_finite() { return factor; }
+    (factor * 2.0_f32.powf(delta.clamp(-32.0, 32.0) / 4.0)).clamp(1.0, 64.0)
+}
+
 fn regular(path: &Path) -> Result<bool, String> {
     match path.symlink_metadata() {
         Ok(meta) if meta.file_type().is_file() && meta.len() <= MAX_BYTES => Ok(true),
@@ -84,6 +90,15 @@ pub fn write(root: &Path, settings: &ClientMods) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn wheel_zoom_is_continuous_bounded_and_reversible() {
+        assert_eq!(scroll_zoom(4.0, 4.0), 8.0);
+        assert_eq!(scroll_zoom(8.0, -4.0), 4.0);
+        assert!(scroll_zoom(4.0, 0.25) > 4.0);
+        assert_eq!(scroll_zoom(64.0, 5.0), 64.0);
+        assert_eq!(scroll_zoom(1.0, -5.0), 1.0);
+        assert_eq!(scroll_zoom(4.0, f32::NAN), 4.0);
+    }
     #[test]
     fn zoom_respects_release_menus_spyglass_and_disabled_state() {
         let mut settings = ClientMods::default();

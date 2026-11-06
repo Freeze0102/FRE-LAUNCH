@@ -329,7 +329,7 @@ async fn inspect_download(root:&Path,id:&str,expected_hash:&str) -> Result<(Repo
     report.checks.push(check("archive","pass",format!("{} bounded entries, {} expanded bytes",facts.files,facts.expanded_bytes)));
     if project.kind=="native-mod" {
         let compatible=facts.hooks.map_or(facts.engine_revision.as_deref()==Some("975c07d9151847e6af13afc4b5ab37b6bbe78ef5"),|hooks|hooks<=80);
-        report.checks.push(check("compatibility",if compatible {"pass"}else{"warning"},if compatible {"Declared hook/source level matches this engine; a reviewed FRE build is still required"}else{"This native mod targets another engine revision or newer hook API"}));
+        report.checks.push(check("compatibility",if compatible {"pass"}else{"warning"},if compatible {"Declared hooks/source match the bundled engine; FRE builds it locally"}else{"This native mod targets another engine revision or newer hook API"}));
     } else {
         report.checks.push(check("compatibility",if facts.content_only {"pass"}else{"warning"},if facts.content_only {"Data format 0.2; companion native mods may still be required (see description)"}else{"Legacy executable .hmod code is not supported"}));
     }
@@ -347,7 +347,13 @@ async fn inspect_download(root:&Path,id:&str,expected_hash:&str) -> Result<(Repo
         report.checks.push(check("execution","pass","No native/WASM code; Minecraft data functions may affect the world (see description)"));
         report.installable=report.checks.iter().all(|c|c.state=="pass" || (c.code=="signature" && c.state=="warning"));
     } else {
-        report.checks.push(check("execution","warning","Native/legacy executable code is not installed or run by this catalog. A reviewed compatible FRE build is required."));
+        report.checks.push(check("execution","warning","Native code runs with your account permissions. Archive, signature and antivirus checks cannot guarantee that code is safe."));
+        if project.kind=="native-mod" {
+            match native_source_policy(&bytes) {
+                Ok(())=>report.installable=report.checks.iter().all(|c|c.state=="pass" || (matches!(c.code,"signature"|"execution") && c.state=="warning")),
+                Err(error)=>report.checks.push(check("compatibility","fail",error)),
+            }
+        }
     }
     report.facts=Some(facts);
     Ok((report,path))
@@ -361,13 +367,14 @@ struct Receipt { project:String, version:String, filename:String, sha256:String 
 pub async fn install(root:&Path,profile:&Path,id:&str,expected_hash:&str) -> Result<Report,String> {
     let _guard=OPERATIONS.lock().await;
     let (report,path)=inspect_download(root,id,expected_hash).await?;
-    if !report.installable { return Err("This file did not pass all installation checks or needs a reviewed native FRE build. Open the verification report.".into()); }
+    if !report.installable { return Err("This file did not pass all installation checks or has an unsupported native format. Open the verification report.".into()); }
     let mods=directory(profile,"fre-mods")?;
     for entry in fs::read_dir(&mods).map_err(|e|e.to_string())? {
         let entry=entry.map_err(|e|e.to_string())?;
-        if entry.path().extension().is_some_and(|ext|ext.eq_ignore_ascii_case("hmod")) {
+        if entry.path().extension().is_some_and(|ext|ext.eq_ignore_ascii_case("hmod") || ext.eq_ignore_ascii_case("hnmod")) {
             let old=read_bounded(&entry.path(),MAX_MOD)?;
-            if mod_audit::inspect(&old,"mod",None).is_ok_and(|facts|facts.id==id) {
+            let kind=if entry.path().extension().is_some_and(|ext|ext.eq_ignore_ascii_case("hnmod")) {"native-mod"}else{"mod"};
+            if mod_audit::inspect(&old,kind,None).is_ok_and(|facts|facts.id==id) {
                 return Err("A version of this mod is already installed. Remove its file explicitly before replacing it.".into());
             }
         }
@@ -408,7 +415,7 @@ pub fn forget_removed_file(profile:&Path,filename:&str)->Result<(),String> {
     Ok(())
 }
 pub fn local_facts(path:&Path)->Result<mod_audit::PackageFacts,String> {
-    mod_audit::inspect(&read_bounded(path,MAX_MOD)?,"mod",None)
+    mod_audit::inspect(&read_bounded(path,MAX_MOD)?,if path.extension().is_some_and(|ext|ext.eq_ignore_ascii_case("hnmod")){"native-mod"}else{"mod"},None)
 }
 fn mod_settings(profile:&Path)->Result<String,String> {
     let path=profile.join("fre-mods.txt");
@@ -435,10 +442,10 @@ pub fn set_content_enabled(profile:&Path,id:&str,enabled:bool)->Result<(),String
     Ok(())
 }
 pub async fn set_installed_enabled(root:&Path,profile:&Path,filename:&str,enabled:bool)->Result<mod_audit::PackageFacts,String> {
-    if !file_name(filename) || !filename.to_ascii_lowercase().ends_with(".hmod") { return Err("Choose a .hmod content file".into()); }
+    if !file_name(filename) || !(filename.to_ascii_lowercase().ends_with(".hmod") || filename.to_ascii_lowercase().ends_with(".hnmod")) { return Err("Choose a .hmod content file".into()); }
     let facts=local_facts(&directory(profile,"fre-mods")?.join(filename))?;
     if enabled {
-        if !facts.content_only { return Err("Executable mod code cannot be enabled here".into()); }
+        if !facts.content_only && !filename.ends_with(".hnmod") { return Err("Legacy executable mod code cannot be enabled here".into()); }
         before_play(root,profile).await?;
     }
     set_content_enabled(profile,&facts.id,enabled)?;
@@ -486,9 +493,87 @@ pub async fn before_play(root:&Path,profile:&Path) -> Result<(),String> {
     Ok(())
 }
 
+/// Restrict code placement to the game's source. In particular, a manifest
+/// cannot inject modules into a Cargo build script or a compiler/tool crate.
+fn native_game_targets(value:&toml::Value)->Result<(),String> {
+    match value {
+        toml::Value::Table(table)=>for (key,value) in table {
+            if key=="target" {
+                let target=value.as_str().ok_or("A native target must name a game function")?;
+                if !target.starts_with("horizon_client::game::") && !target.starts_with("fre_client::game::") {
+                    return Err("FRE currently supports game hooks only; compiler, build-script and other crate targets are not enabled".into());
+                }
+            }
+            if key=="file" {
+                let file=value.as_str().ok_or("A native module must name a game source file")?;
+                let game=file.strip_prefix("crates/horizon-client/src/").or_else(||file.strip_prefix("crates/fre-client/src/"));
+                if !game.is_some_and(|path|path=="game.rs" || path.starts_with("game/")) || file.contains("..") || file.contains('\\') {
+                    return Err("Native modules may only extend game source files, never build scripts or compiler configuration".into());
+                }
+            }
+            native_game_targets(value)?;
+        },
+        toml::Value::Array(values)=>for value in values {native_game_targets(value)?;},
+        _=>{},
+    }Ok(())
+}
+/// Only source mixins with the engine's locked dependencies are compiled.
+/// Build programs and extra native crates need a separate reviewed integration.
+fn native_source_policy(bytes:&[u8])->Result<(),String> {
+    use std::io::Read;
+    let mut archive=zip::ZipArchive::new(std::io::Cursor::new(bytes)).map_err(|e|e.to_string())?;
+    for i in 0..archive.len() {
+        let mut entry=archive.by_index(i).map_err(|e|e.to_string())?;
+        let name=entry.name().to_owned();
+        if name.contains("native-crates/") || name.ends_with("build.rs") {return Err("This mod supplies extra native crates or build programs; FRE supports source mixins with the locked engine dependencies".into());}
+        if name.ends_with("mixin.toml") {
+            let mut text=String::new();entry.read_to_string(&mut text).map_err(|e|e.to_string())?;
+            let value:toml::Value=toml::from_str(&text).map_err(|e|e.to_string())?;
+            native_game_targets(&value)?;
+            if value.get("crate").is_some() || value.get("post_build").is_some(){return Err("This mod needs extra crates or post-build programs that FRE has not enabled".into());}
+        }
+    }Ok(())
+}
+pub async fn scan_native_executable(path:&Path)->Result<(),String> { defender(path).await }
+pub async fn verified_native(root:&Path,profile:&Path,enabled:&std::collections::BTreeSet<String>)->Result<Vec<(String,Vec<u8>)>,String> {
+    let folder=directory(profile,"fre-mods")?;
+    let mut archives=Vec::new();
+    for entry in fs::read_dir(&folder).map_err(|e|e.to_string())? {
+        let entry=entry.map_err(|e|e.to_string())?;
+        if !entry.path().extension().is_some_and(|ext|ext.eq_ignore_ascii_case("hnmod")){continue;}
+        let bytes=read_bounded(&entry.path(),MAX_MOD)?;
+        let facts=mod_audit::inspect(&bytes,"native-mod",None)?;
+        if enabled.contains(&facts.id){archives.push((entry.path(),bytes,facts));}
+        if archives.len()>100{return Err("Too many active native mods".into());}
+    }
+    if archives.is_empty(){return Ok(Vec::new());}
+    let (index,_,_)=index(root,true).await?;let mut result=Vec::new();
+    for (path,bytes,facts) in archives {
+        native_source_policy(&bytes)?;
+        let record:Receipt=serde_json::from_slice(&read_bounded(&profile.join(".fre-mod-receipts").join(format!("{}.json",facts.id)),16384)?).map_err(|_|"Install native mods through the checked FRE catalog")?;
+        let project=index.projects.iter().find(|p|p.id==record.project).ok_or("Native mod is no longer in the catalog")?;
+        let version=project.versions.iter().find(|v|v.version==record.version && v.file.sha256==record.sha256).ok_or("Native release is no longer in the catalog")?;
+        validate_file(project,version)?;
+        if project.kind!="native-mod" || facts.id!=record.project || facts.version!=record.version || digest(&bytes)!=record.sha256 || path.file_name().and_then(|n|n.to_str())!=Some(record.filename.as_str()){return Err("Native mod differs from its checked receipt".into());}
+        if let Some(reason)=revoked(&index,&facts.id,&record.sha256){return Err(format!("Native mod revoked: {reason}"));}
+        verify_signature(project,version,&bytes)?;defender(&path).await?;
+        if digest(&read_bounded(&path,MAX_MOD)?)!=record.sha256{return Err("Native mod changed during scan".into());}
+        result.push((facts.id,bytes));
+    }
+    result.sort_by(|a,b|a.0.cmp(&b.0));Ok(result)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn native_manifests_cannot_place_code_in_build_scripts_or_compiler_targets() {
+        let game:toml::Value=toml::from_str("[[injection]]\ntarget=\"horizon_client::game::native_hooks::Game<'_>::native_frame\"\n[[module]]\nfile=\"crates/horizon-client/src/game.rs\"\n").unwrap();
+        assert!(native_game_targets(&game).is_ok());
+        for source in ["[[module]]\nfile='crates/horizon-client/build.rs'", "[[module]]\nfile='crates/horizon-client/src/game/../../build.rs'", "[[injection]]\ntarget='build_script_build::main'", "[[module]]\nfile='.cargo/config.toml'"] {
+            let value:toml::Value=toml::from_str(source).unwrap();assert!(native_game_targets(&value).is_err(),"{source}");
+        }
+    }
     fn project() -> Project {
         serde_json::from_value(serde_json::json!({"id":"demo","kind":"mod","name":"Demo","license":"MIT","source":"https://github.com/owner/demo","versions":[{"version":"1","api":"0.2","game":"26.3","file":{"name":"demo-1.hmod","url":"https://github.com/owner/demo/releases/download/v1/demo-1.hmod","size":10,"sha256":"1".repeat(64)}}]})).unwrap()
     }

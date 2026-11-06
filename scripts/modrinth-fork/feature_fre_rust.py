@@ -78,6 +78,15 @@ def bundle_native_runtime(root: Path, refresh=False):
             raise RuntimeError("Unexpected Tauri bundle.resources configuration.")
         for file in binaries + ("BUILD-INFO.json",):
             resources[f"fre-rust-runtime/{file}"] = f"fre-rust/{file}"
+        tools = ("fre-mixins.exe", "fre-mixins-LICENSE.txt", "fre-engine-source.zip", "fre-build-tools.json")
+        if not all((runtime/name).is_file() for name in tools):
+            raise RuntimeError("Native mod build tools are incomplete; run native_mod_builder_assets.py before packaging.")
+        tool_info=json.loads((runtime/"fre-build-tools.json").read_text(encoding="utf-8"))
+        for file,key in (("fre-mixins.exe","mixins_sha256"),("fre-engine-source.zip","source_sha256")):
+            if hashlib.sha256((runtime/file).read_bytes()).hexdigest()!=tool_info[key]:raise RuntimeError("Native build tool checksum mismatch")
+        if tool_info["source_branding_sha256"]!=fingerprint():raise RuntimeError("Native mod build source is stale")
+        for file in tools:
+            resources[f"fre-rust-runtime/{file}"]=f"fre-rust/{file}"
         # These are original MIT exporter sources, not Mojang game files.
         resources["fre-rust-runtime/mods/fre/src/test/java/dev/frelaunch/parity/"] = "fre-rust/mods/fre/src/test/java/dev/frelaunch/parity/"
         resources["fre-rust-runtime/crates/fre-prepare/"] = "fre-rust/crates/fre-prepare/"
@@ -604,4 +613,6 @@ onUnmounted(() => {
 
     from feature_rust_polish import apply as apply_rust_polish
     apply_rust_polish(root)
+    from feature_rust_instance_parity import apply as apply_instance_parity
+    apply_instance_parity(root)
     print("Integrated Rust instances into the existing Java quick switcher, selection and bulk delete.")
