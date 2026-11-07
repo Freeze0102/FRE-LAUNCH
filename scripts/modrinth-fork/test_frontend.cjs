@@ -1086,3 +1086,19 @@ test('Unsupported mods and failed checks produce an explicit outcome without an 
   assert.equal(c.state.detailTab.value,2);assert.ok(c.state.error.value.includes('blocked'))
   assert.ok(!calls.some(command=>command.endsWith('|rust_catalog_install')))
 })
+
+
+test('Installed Rust mods retain catalog icons, display names and authors without replacing archive files', async () => {
+  const mods=[
+    {project:'appleskin-0.1.2.hnmod',slug:'appleskin',title:'AppleSkin',number:'0.1.2',file:'appleskin-0.1.2.hnmod',source:'FRE LAUNCH',enabled:true,authors:['soufi'],icon_url:'https://horizon-rust.github.io/horizon-mods/icons/appleskin.png'},
+    {project:'minimap-2.0.0.hnmod',slug:'minimap',title:'MiniMap',number:'2.0.0',file:'minimap-2.0.0.hnmod',source:'FRE LAUNCH',enabled:false,authors:['Map author'],icon_url:'https://horizon-rust.github.io/horizon-mods/icons/minimap.png'},
+    {project:'local.hmod',slug:'local',title:'Local content',number:'1',file:'local.hmod',source:'FRE LAUNCH',enabled:true,authors:[]},
+  ],calls=[]
+  const c=component('RustNativeMods.vue',async(command)=>{calls.push(command);if(command.endsWith('|rust_mods'))return JSON.stringify(mods);return {zoom:true,zoomFactor:4,zoomKey:'c',fpsCounter:false,coordinates:false}},[],{props:{profileId:'123'}})
+  await c.state.load()
+  const apple=c.state.rows.value.find(row=>row.id==='local:appleskin-0.1.2.hnmod')
+  assert.equal(apple.project.icon_url,mods[0].icon_url);assert.equal(apple.project.title,'AppleSkin');assert.equal(apple.owner.name,'soufi');assert.equal(apple.version.file_name,mods[0].file)
+  assert.equal(c.state.rows.value.find(row=>row.id==='local:minimap-2.0.0.hnmod').project.icon_url,mods[1].icon_url)
+  assert.equal(c.state.rows.value.find(row=>row.id==='local:local.hmod').project.icon_url,undefined)
+  assert.ok(!calls.some(command=>/catalog|install|import/.test(command)))
+})

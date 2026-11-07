@@ -438,6 +438,37 @@ pub fn forget_removed_file(profile:&Path,filename:&str)->Result<(),String> {
     }
     Ok(())
 }
+#[derive(Clone,Debug)]
+pub struct InstalledPresentation {
+    pub title:String,
+    pub authors:Vec<String>,
+    pub icon_url:Option<String>,
+}
+#[derive(Default)]
+pub struct CachedPresentations { projects:Vec<Project> }
+fn icon_url(value:Option<&str>)->Option<String> {
+    let url=Url::parse(value?).ok()?;
+    (https(&url) && matches!(url.host_str(),Some("horizon-rust.github.io"|"avatars.githubusercontent.com"|"raw.githubusercontent.com"))).then(||url.to_string())
+}
+impl CachedPresentations {
+    pub fn matching(&self,id:&str,version:&str,sha256:&str,kind:&str)->Option<InstalledPresentation> {
+        let project=self.projects.iter().find(|project|project.id==id && project.kind==kind
+            && project.versions.iter().any(|release|release.game=="26.3" && release.version==version && release.file.sha256==sha256))?;
+        Some(InstalledPresentation {title:project.name.clone(),authors:project.authors.clone(),icon_url:icon_url(project.icon.as_deref())})
+    }
+}
+/// Optional metadata: listing installed files never waits for the network.
+pub fn cached_presentations(root:&Path)->CachedPresentations {
+    let folder=root.join("mod-catalog");
+    if !folder.symlink_metadata().is_ok_and(|meta|meta.file_type().is_dir()) {return CachedPresentations::default();}
+    let index=read_bounded(&folder.join("catalog.json"),MAX_INDEX).and_then(|data|parse_index(&data));
+    CachedPresentations {projects:index.map(|index|index.projects).unwrap_or_default()}
+}
+pub fn local_facts_with_hash(path:&Path)->Result<(mod_audit::PackageFacts,String),String> {
+    let bytes=read_bounded(path,MAX_MOD)?;
+    let facts=mod_audit::inspect(&bytes,if path.extension().is_some_and(|ext|ext.eq_ignore_ascii_case("hnmod")){"native-mod"}else{"mod"},None)?;
+    Ok((facts,digest(&bytes)))
+}
 pub fn local_facts(path:&Path)->Result<mod_audit::PackageFacts,String> {
     mod_audit::inspect(&read_bounded(path,MAX_MOD)?,if path.extension().is_some_and(|ext|ext.eq_ignore_ascii_case("hnmod")){"native-mod"}else{"mod"},None)
 }
@@ -718,5 +749,39 @@ mod release_selection_tests {
     #[test] fn incompatible_releases_never_become_installable_from_registry_flags() {
         let mut index=registry();index.projects[0].versions.truncate(1);
         assert!(recommended_version(&index,&index.projects[0]).is_none());
+    }
+}
+
+#[cfg(test)]
+mod installed_presentation_tests {
+    use super::*;
+    fn write_index(root:&Path,icon:&str) {
+        fs::create_dir_all(root.join("mod-catalog")).unwrap();
+        fs::write(root.join("mod-catalog/catalog.json"),serde_json::to_vec(&serde_json::json!({"schema":1,"projects":[{
+            "id":"appleskin","kind":"native-mod","name":"AppleSkin","authors":["soufi"],"license":"MIT","source":"https://github.com/example/appleskin","icon":icon,
+            "versions":[
+                {"version":"0.1.3","api":"native-1/new/new","game":"26.3","hooks":139,"file":{"name":"new.hnmod","url":"https://github.com/example/appleskin/releases/download/new/new.hnmod","sha256":"a".repeat(64),"size":1}},
+                {"version":"0.1.2","api":"native-1/old/old","game":"26.3","hooks":1,"file":{"name":"old.hnmod","url":"https://github.com/example/appleskin/releases/download/old/old.hnmod","sha256":"b".repeat(64),"size":1}}
+            ]
+        }]})).unwrap()).unwrap();
+    }
+    #[test] fn existing_older_installed_releases_keep_their_catalog_icon_and_author() {
+        let temp=tempfile::tempdir().unwrap();let icon="https://horizon-rust.github.io/horizon-mods/icons/appleskin.png";
+        write_index(temp.path(),icon);let cache=cached_presentations(temp.path());
+        let entry=cache.matching("appleskin","0.1.2",&"b".repeat(64),"native-mod").unwrap();
+        assert_eq!(entry.title,"AppleSkin");assert_eq!(entry.authors,["soufi"]);assert_eq!(entry.icon_url.as_deref(),Some(icon));
+        for (id,version,hash,kind) in [("other","0.1.2","b","native-mod"),("appleskin","0.1.3","b","native-mod"),("appleskin","0.1.2","c","native-mod"),("appleskin","0.1.2","b","mod")] {
+            assert!(cache.matching(id,version,&hash.repeat(64),kind).is_none());
+        }
+    }
+    #[test] fn missing_or_corrupt_optional_catalog_does_not_prevent_listing_local_files() {
+        let temp=tempfile::tempdir().unwrap();
+        assert!(cached_presentations(temp.path()).matching("appleskin","0.1.2",&"b".repeat(64),"native-mod").is_none());
+        fs::create_dir(temp.path().join("mod-catalog")).unwrap();fs::write(temp.path().join("mod-catalog/catalog.json"),b"broken").unwrap();
+        assert!(cached_presentations(temp.path()).projects.is_empty());
+    }
+    #[test] fn catalog_icons_allow_only_the_existing_https_image_origins() {
+        for url in ["http://horizon-rust.github.io/a.png","https://127.0.0.1/a.png","https://horizon-rust.github.io.evil.test/a.png","https://user:secret@raw.githubusercontent.com/a.png","https://avatars.githubusercontent.com:444/a.png","javascript:alert(1)","file:///C:/private.png","data:image/svg+xml,<svg/>"] {assert!(icon_url(Some(url)).is_none(),"{url}");}
+        for url in ["https://horizon-rust.github.io/horizon-mods/icons/a.png","https://raw.githubusercontent.com/a/b/main/a.png","https://avatars.githubusercontent.com/u/1"] {assert!(icon_url(Some(url)).is_some());}
     }
 }

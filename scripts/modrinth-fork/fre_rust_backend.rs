@@ -828,23 +828,30 @@ struct LocalRustMod {
     source: &'static str,
     enabled: bool,
     authors: Vec<String>,
+    #[serde(skip_serializing_if="Option::is_none")]
+    icon_url: Option<String>,
 }
-fn list_local_mods(dir: &Path) -> Result<Vec<LocalRustMod>, String> {
+fn list_local_mods(root:&Path, dir: &Path) -> Result<Vec<LocalRustMod>, String> {
     let mut files = Vec::new();
+    let metadata=catalog::cached_presentations(root);
     let enabled=catalog::enabled_content(dir)?;
     for entry in fs::read_dir(owned_mods(dir)?).map_err(|e| e.to_string())? {
         let entry = entry.map_err(|e| e.to_string())?;
         if !entry.file_type().map_err(|e| e.to_string())?.is_file() { continue; }
         let file = entry.file_name().to_string_lossy().into_owned();
         if !mod_filename_safe(&file) { continue; }
-        let facts=catalog::local_facts(&entry.path()).ok();
+        let inspected=catalog::local_facts_with_hash(&entry.path()).ok();
+        let presentation=inspected.as_ref().and_then(|(facts,hash)|metadata.matching(&facts.id,&facts.version,hash,
+            if file.to_ascii_lowercase().ends_with(".hnmod") {"native-mod"} else {"mod"}));
+        let facts=inspected.map(|(facts,_)|facts);
         let slug=facts.as_ref().map(|facts|facts.id.clone()).unwrap_or_else(||file.rsplit_once('.').map_or(file.as_str(), |(name,_)|name).to_owned());
         let on=enabled.contains(&slug);
         files.push(LocalRustMod {
             project:file.clone(), slug:slug.clone(),
-            title:facts.as_ref().map(|facts|facts.name.clone()).unwrap_or(slug),
+            title:presentation.as_ref().map(|metadata|metadata.title.clone()).or_else(||facts.as_ref().map(|facts|facts.name.clone())).unwrap_or(slug),
             number:facts.as_ref().map(|facts|facts.version.clone()).unwrap_or_else(||"local".into()),
-            authors:facts.map(|facts|facts.authors).unwrap_or_default(),
+            authors:presentation.as_ref().map(|metadata|metadata.authors.clone()).unwrap_or_else(||facts.map(|facts|facts.authors).unwrap_or_default()),
+            icon_url:presentation.and_then(|metadata|metadata.icon_url),
             file, source:"FRE LAUNCH", enabled:on,
         });
         if files.len() > 500 { return Err("Too many mods; use Files to manage the profile.".into()); }
@@ -864,7 +871,7 @@ async fn rust_mods<R: tauri::Runtime>(
     let dir = profile_dir(&base(&app)?, &profile_id)?;
     read_profile(&dir, &profile_id).ok_or("Rust profile does not exist.")?;
     match action.as_str() {
-        "list" => serde_json::to_string(&list_local_mods(&dir)?).map_err(|e| e.to_string()),
+        "list" => serde_json::to_string(&list_local_mods(&base(&app)?,&dir)?).map_err(|e| e.to_string()),
         "enable" | "disable" => {
             if RUNNING_PROFILES.lock().await.contains(&profile_id) { return Err("Close the Rust game before changing mods.".into()); }
             let filename=project.as_deref().ok_or("Choose a Rust content mod.")?;
@@ -1350,15 +1357,24 @@ mod tests {
         archive.write_all(b"id='demo'\nname='Friendly mod'\nversion='2.1'\napi='0.2'\nauthors=['Builder']\ncapabilities=['registries']\n").unwrap();
         fs::write(mods.join("download.hmod"),archive.finish().unwrap().into_inner()).unwrap();
         catalog::set_content_enabled(profile.path(),"demo",true).unwrap();
-        let rows=list_local_mods(profile.path()).unwrap();
+        let rows=list_local_mods(profile.path(),profile.path()).unwrap();
         assert_eq!(rows.len(),1);
         assert_eq!(rows[0].title,"Friendly mod");
         assert_eq!(rows[0].slug,"demo");
         assert_eq!(rows[0].number,"2.1");
         assert_eq!(rows[0].authors,["Builder"]);
         assert!(rows[0].enabled);
+        assert!(rows[0].icon_url.is_none());
+        let bytes=fs::read(mods.join("download.hmod")).unwrap();
+        fs::create_dir(profile.path().join("mod-catalog")).unwrap();
+        let cached=serde_json::json!({"schema":1,"projects":[{"id":"demo","kind":"mod","name":"Catalogue title","authors":["Publisher"],"license":"MIT","source":"https://github.com/example/demo","icon":"https://horizon-rust.github.io/horizon-mods/icons/demo.png","versions":[{"version":"2.1","api":"0.2","game":"26.3","file":{"name":"download.hmod","url":"https://github.com/example/demo/releases/download/v2/download.hmod","sha256":format!("{:x}",Sha256::digest(&bytes)),"size":bytes.len()}}]}]});
+        fs::write(profile.path().join("mod-catalog/catalog.json"),serde_json::to_vec(&cached).unwrap()).unwrap();
+        let enriched=list_local_mods(profile.path(),profile.path()).unwrap();
+        assert_eq!(enriched[0].title,"Catalogue title");assert_eq!(enriched[0].authors,["Publisher"]);
+        assert_eq!(enriched[0].icon_url.as_deref(),Some("https://horizon-rust.github.io/horizon-mods/icons/demo.png"));
+        assert_eq!(fs::read(mods.join("download.hmod")).unwrap(),bytes);
         catalog::set_content_enabled(profile.path(),"demo",false).unwrap();
-        assert!(!list_local_mods(profile.path()).unwrap()[0].enabled);
+        assert!(!list_local_mods(profile.path(),profile.path()).unwrap()[0].enabled);
     }
     #[test]
     fn refuses_modified_or_unknown_rust_executable() {

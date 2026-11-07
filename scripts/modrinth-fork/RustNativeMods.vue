@@ -9,7 +9,7 @@ import RustModCatalog from '@/components/ui/RustModCatalog.vue'
 
 type ClientMods = { zoom: boolean; zoomFactor: number; zoomKey: 'c' | 'v' | 'z'; fpsCounter: boolean; coordinates: boolean }
 type ModKey = 'zoom' | 'fpsCounter' | 'coordinates'
-type ContentMod = { project: string; slug: string; title: string; number: string; file: string; source: string; enabled?: boolean; authors?: string[] }
+type ContentMod = { project: string; slug: string; title: string; number: string; file: string; source: string; enabled?: boolean; authors?: string[]; icon_url?: string }
 const defaults = (): ClientMods => ({ zoom: true, zoomFactor: 4, zoomKey: 'c', fpsCounter: false, coordinates: false })
 const props = defineProps<{ profileId: string; catalogOpen?: boolean; running?: boolean }>()
 const emit = defineEmits<{ browse: []; back: [] }>()
@@ -72,7 +72,7 @@ const rows = computed<ContentCardTableItem[]>(() => {
   }))
   const local = installed.value.map(mod => ({
     id: 'local:' + mod.file,
-    project: { id: mod.slug, slug: mod.slug, title: mod.title, icon_url: undefined },
+    project: { id: mod.slug, slug: mod.slug, title: mod.title, icon_url: mod.icon_url },
     version: { id: mod.file, version_number: mod.number, file_name: mod.file },
     owner: mod.authors?.length ? { id: mod.slug, name: mod.authors.join(', '), type: 'user' as const } : undefined,
     enabled: mod.enabled === true, hideSwitchVersion: true, disabled: blocked.value,
