@@ -144,7 +144,7 @@ def verify(root):
             "gameVersion", "modLoaderType", "file_length", "verify_hash", "add_project_from_path",
             "sync_content_files", "cf_search", "cf_install", "loader_type", "MINECRAFT_MODPACK_CLASS_ID", "category_id"]),
         ("CurseForge browser", cf_frontend, ["plugin:fre-curseforge|cf_search",
-            "plugin:fre-curseforge|cf_install", "instanceId", "apiKey", "contentType", "isModpack", "v-if=\"!isModpack\"",
+            "plugin:fre-curseforge|cf_install", "instanceId", "apiKey", "useApi", "contentType", "isModpack", "v-if=\"useApi && !isModpack\"",
             "async function doSearch()", "const sequence = ++searchSequence",
             "class=", "results.value = found"]),
         ("Browse source selector", cf_browse, ["CurseForgeBrowser", "freContentSource",
@@ -158,9 +158,10 @@ def verify(root):
         for snippet in snippets:
             assert snippet in source, f"{label}: missing {snippet}"
     assert "CurseForge" in cf_frontend
-    assert "openUrl(" not in cf_frontend, "The in-app catalog must not redirect search to a website"
-    assert "curseForgeWebsiteSearchUrl" not in cf_frontend, "Website fallback is no longer supported"
-    assert "browseWithoutKey" not in cf_frontend, "Searching inside the launcher must remain in-app"
+    assert "openUrl(curseForgeWebsiteSearchUrl())" in cf_frontend, "Keyless search must open the official website"
+    assert "const useApi = ref(false)" in cf_frontend, "Website mode must be the default"
+    assert "https://www.curseforge.com/minecraft/search?class=" in cf_frontend, "Use the official CurseForge search path"
+    assert "browseWithoutKey" in cf_frontend and "encodeURIComponent(query)" in cf_frontend, "Website search must safely encode the query"
     assert "api.curseforge.com" in cf_backend
     assert "https://api.curseforge.com" in cf_backend
     assert "npm install" not in cf_backend
