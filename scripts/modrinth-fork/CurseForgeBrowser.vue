@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { invoke } from '@tauri-apps/api/core'
+import { openUrl } from '@tauri-apps/plugin-opener'
 import { defineMessages, useVIntl } from '@modrinth/ui'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { list as listInstances } from '@/helpers/instance'
@@ -59,6 +60,8 @@ const instances = ref<GameChoice[]>([])
 const instanceId = ref(props.instanceId ?? '')
 const searchText = ref('')
 const apiKey = ref('')
+// Website mode is the default: it works without any CurseForge API key.
+const useApi = ref(false)
 const results = ref<CurseForgeMod[]>([])
 const searched = ref(false)
 const loading = ref(false)
@@ -76,7 +79,7 @@ const isModded = computed(() => ['fabric', 'forge', 'neoforge', 'quilt'].include
 watch(() => props.instanceId, (value) => {
   if (value) instanceId.value = value
 })
-watch([instanceId, searchText, apiKey], () => {
+watch([instanceId, searchText, apiKey, useApi], () => {
   searchSequence++
   loading.value = false
   results.value = []
@@ -105,7 +108,42 @@ function reason(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
+function curseForgeWebsiteSearchUrl(): string {
+  const category = isModpack.value ? 'modpacks' : 'mc-mods'
+  const query = searchText.value.trim()
+  const searchParam = query ? `&search=${encodeURIComponent(query)}` : ''
+  return `https://www.curseforge.com/minecraft/search?class=${category}&page=1&pageSize=20${searchParam}&sortBy=relevancy`
+}
+
+// Without an approved key, use CurseForge's own browser page rather than
+// scraping HTML, using an unrelated API key, or inventing search results.
+async function browseWithoutKey() {
+  error.value = ''
+  notice.value = ''
+  try {
+    await openUrl(curseForgeWebsiteSearchUrl())
+    notice.value = t(isModpack.value ? m.packOpened : m.siteOpened)
+  } catch (err) {
+    error.value = reason(err)
+  }
+}
+
+async function openProject(mod: CurseForgeMod) {
+  const slug = mod.slug
+  if (!/^[a-z0-9][a-z0-9-_]*$/i.test(slug)) return
+  const category = isModpack.value ? 'modpacks' : 'mc-mods'
+  try {
+    await openUrl(`https://www.curseforge.com/minecraft/${category}/${slug}`)
+  } catch (err) {
+    error.value = reason(err)
+  }
+}
+
 async function doSearch() {
+  if (!useApi.value) {
+    await browseWithoutKey()
+    return
+  }
   const sequence = ++searchSequence
   loading.value = true
   error.value = ''
@@ -160,12 +198,12 @@ async function install(mod: CurseForgeMod) {
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 class="m-0 text-xl font-semibold text-contrast">CurseForge</h2>
-          <p class="mt-2 mb-0 text-sm text-secondary">{{ t(isModpack ? m.packIntro : m.intro) }}</p>
+          <p class="mt-2 mb-0 text-sm text-secondary">{{ t(useApi ? (isModpack ? m.packIntro : m.intro) : m.directIntro) }}</p>
         </div>
-        <span class="rounded-lg border border-solid border-surface-5 px-3 py-1 text-xs text-secondary">CurseForge API</span>
+        <span class="rounded-lg border border-solid border-surface-5 px-3 py-1 text-xs text-secondary">{{ useApi ? "CurseForge API" : "CurseForge website" }}</span>
       </div>
 
-      <label v-if="!isModpack" class="mt-4 flex flex-col gap-2 text-sm text-secondary">
+      <label v-if="useApi && !isModpack" class="mt-4 flex flex-col gap-2 text-sm text-secondary">
         {{ t(m.instance) }}
         <select v-model="instanceId" :disabled="installing !== null" class="min-h-10 w-full rounded-lg bg-button-bg p-2 text-contrast">
           <option value="">{{ t(m.selectInstance) }}</option>
@@ -175,17 +213,19 @@ async function install(mod: CurseForgeMod) {
         </select>
       </label>
       <details class="mt-3 rounded-lg border border-solid border-surface-5 p-3">
-        <summary class="cursor-pointer text-sm text-secondary">Налаштування доступу CurseForge</summary>
-        <label class="mt-3 flex flex-col gap-2 text-sm text-secondary">
-          {{ t(m.apiKey) }}
-          <input v-model="apiKey" type="password" autocomplete="off" spellcheck="false"
-            class="min-h-10 w-full rounded-lg bg-button-bg px-3 text-contrast" placeholder="x-api-key" />
+        <summary class="cursor-pointer text-sm text-secondary">Розширені налаштування (необов'язково)</summary>
+        <label class="mt-3 flex items-center gap-2 text-sm text-secondary">
+          <input v-model="useApi" type="checkbox" />
+          {{ t(m.modeApi) }}
         </label>
-        <p class="mt-3 mb-1 text-xs text-secondary">
-          CurseForge вимагає схвалений API-ключ для сторонніх застосунків.
-          Якщо ключ задано через FRE_CURSEFORGE_API_KEY, поле можна залишити порожнім.
-          Без доступу використовуй каталог Modrinth поруч — він працює прямо в лаунчері.
-        </p>
+        <div v-if="useApi">
+          <label class="mt-3 flex flex-col gap-2 text-sm text-secondary">
+            {{ t(m.apiKey) }}
+            <input v-model="apiKey" type="password" autocomplete="off" spellcheck="false"
+              class="min-h-10 w-full rounded-lg bg-button-bg px-3 text-contrast" placeholder="x-api-key" />
+          </label>
+          <p class="mt-3 mb-1 text-xs text-secondary">{{ t(m.keyHelp) }}</p>
+        </div>
       </details>
 
       <form class="mt-4 flex flex-wrap gap-2" @submit.prevent="doSearch">
@@ -196,19 +236,20 @@ async function install(mod: CurseForgeMod) {
           maxlength="100"
         />
         <button type="submit" class="rounded-lg border-0 bg-brand px-5 py-2 font-semibold text-white cursor-pointer disabled:opacity-50" :disabled="loading">
-          {{ loading ? t(m.searching) : t(isModpack ? m.packSearch : m.searchButton) }}
+          {{ loading ? t(m.searching) : (useApi ? t(isModpack ? m.packSearch : m.searchButton) : t(m.siteSearch)) }}
         </button>
       </form>
-      <p v-if="isModpack" class="mt-3 mb-0 text-sm text-secondary">{{ t(m.packIntro) }}</p>
+      <p v-if="!useApi" class="mt-3 mb-0 text-sm text-secondary">Пошук відкриється на офіційному сайті CurseForge. Результати не завантажуються в FRE LAUNCH без API-ключа.</p>
+      <p v-else-if="isModpack" class="mt-3 mb-0 text-sm text-secondary">{{ t(m.packIntro) }}</p>
       <p v-else-if="isModded" class="mt-3 mb-0 text-sm text-secondary">{{ t(m.compatible) }}</p>
       <p v-else class="mt-3 mb-0 text-sm text-secondary">{{ t(m.noInstance) }}</p>
     </div>
 
     <p v-if="error" role="alert" class="rounded-lg border border-solid border-red-500/50 p-3 text-sm text-red-400">{{ error }}</p>
     <p v-if="notice" role="status" class="rounded-lg border border-solid border-surface-4 p-3 text-sm text-brand">{{ notice }}</p>
-    <p v-if="!isModpack" class="text-xs text-secondary">{{ t(m.warning) }}</p>
+    <p v-if="useApi && !isModpack" class="text-xs text-secondary">{{ t(m.warning) }}</p>
 
-    <div v-if="searched" class="space-y-3">
+    <div v-if="useApi && searched" class="space-y-3">
       <h3 class="m-0 font-semibold text-contrast">{{ t(m.results) }} · {{ results.length }}</h3>
       <p v-if="!results.length" class="text-secondary">{{ t(m.noResults) }}</p>
       <article
@@ -228,6 +269,7 @@ async function install(mod: CurseForgeMod) {
           <p v-if="mod.allowModDistribution === false" class="mt-1 mb-0 text-xs text-secondary">{{ t(m.distribution) }}</p>
         </div>
         <div class="flex flex-wrap gap-2">
+          <button type="button" class="rounded-lg border border-solid border-surface-5 px-3 py-2 text-sm text-secondary cursor-pointer" @click="openProject(mod)">{{ t(m.openWebsite) }}</button>
           <button
             v-if="!isModpack"
             class="rounded-lg border-0 bg-brand px-3 py-2 text-sm font-semibold text-white cursor-pointer disabled:opacity-40"

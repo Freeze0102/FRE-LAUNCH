@@ -74,7 +74,7 @@ function component(file, invoke, instances = [], options = {}) {
     : file === 'RustNativeMods.vue'
     ? 'installed,busy,error,notice,load,importFile,removeMod,openFolder,settings,saving,setMod,setZoomFactor,setZoomKey,saveSettings,blocked,rows,filtered,selected,removable,changeEnabled,bulkToggle,askRemove,confirmRemove,deleting,query,filter,catalogVisited,openBuiltin'
     : file === 'CurseForgeBrowser.vue'
-    ? 'instanceId,searchText,apiKey,results,searched,loading,notice,error,installing,doSearch,install'
+    ? 'instanceId,searchText,apiKey,useApi,results,searched,loading,notice,error,installing,doSearch,install,openProject,curseForgeWebsiteSearchUrl'
     : file === 'FreRustPanel.vue'
       ? 'source,name,selectedId,profiles,runtime,pending,error,notice,chooseSourceFolder,importResources,openProfileFiles,create,refresh,show,hide,visible'
       : file === 'FreRustLibrary.vue'
@@ -108,13 +108,44 @@ const deferred = () => {
   return { promise, resolve, reject }
 }
 
-test('CurseForge uses the in-app API and never redirects a keyless search to a website', async () => {
+test('CurseForge website search works without a key and uses the official category', async () => {
+  const calls = [], opened = []
+  const c = component('CurseForgeBrowser.vue', async (command, args) => {
+    calls.push({ command, args })
+    throw new Error('An API call must not be made without opting in')
+  }, instances, { openUrl: async url => opened.push(url) })
+  await c.mount()
+  assert.equal(c.state.useApi.value, false)
+  c.state.searchText.value = 'Sodium & shaders'
+  await c.state.doSearch()
+  assert.deepEqual(calls, [])
+  assert.deepEqual(opened, ['https://www.curseforge.com/minecraft/search?class=mc-mods&page=1&pageSize=20&search=Sodium%20%26%20shaders&sortBy=relevancy'])
+  assert.match(c.state.notice.value, /browser/)
+  assert.equal(c.state.searched.value, false)
+  const template = fs.readFileSync(path.join(__dirname, 'CurseForgeBrowser.vue'), 'utf8')
+  assert.match(template, /openUrl\(curseForgeWebsiteSearchUrl\(\)\)/)
+  assert.match(template, /v-if="useApi && searched"/)
+})
+
+test('CurseForge modpacks open website in the modpack category without a key', async () => {
+  const opened = []
+  const c = component('CurseForgeBrowser.vue', async () => {
+    throw new Error('API should not be called')
+  }, instances, { props: { contentType: 'modpack' }, openUrl: async url => opened.push(url) })
+  await c.mount()
+  c.state.searchText.value = 'Create Above and Beyond'
+  await c.state.doSearch()
+  assert.deepEqual(opened, ['https://www.curseforge.com/minecraft/search?class=modpacks&page=1&pageSize=20&search=Create%20Above%20and%20Beyond&sortBy=relevancy'])
+})
+
+test('CurseForge API search remains available only as a deliberate opt-in', async () => {
   const calls = []
   const c = component('CurseForgeBrowser.vue', async (command, args) => {
     calls.push({ command, args })
     throw new Error('CurseForge needs an approved API key')
   }, instances)
   await c.mount()
+  c.state.useApi.value = true
   c.state.searchText.value = 'Sodium & shaders'
   await c.state.doSearch()
   assert.deepEqual(calls, [{
@@ -129,14 +160,13 @@ test('CurseForge uses the in-app API and never redirects a keyless search to a w
   }])
   assert.match(c.state.error.value, /approved API key/)
   assert.equal(c.state.searched.value, false)
-  const template = fs.readFileSync(path.join(__dirname, 'CurseForgeBrowser.vue'), 'utf8')
-  assert.doesNotMatch(template, /curseForgeWebsiteSearchUrl|browseWithoutKey|importDownloadedMod|openUrl\(/)
 })
 
 test('CurseForge discards an old search after switching instance', async () => {
   const request = deferred()
   const c = component('CurseForgeBrowser.vue', () => request.promise, instances)
   await c.mount()
+  c.state.useApi.value = true
   const searching = c.state.doSearch()
   c.state.instanceId.value = 'b'
   request.resolve([{ id: 1, name: 'Wrong version' }])
@@ -150,6 +180,7 @@ test('CurseForge latest query wins even when responses arrive out of order', asy
   let calls = 0
   const c = component('CurseForgeBrowser.vue', () => (++calls === 1 ? old : recent).promise, instances)
   await c.mount()
+  c.state.useApi.value = true
   const first = c.state.doSearch()
   c.state.searchText.value = 'new'
   const second = c.state.doSearch()
@@ -185,6 +216,7 @@ test('CurseForge modpack search uses the approved modpack category, not Java mod
     throw new Error(command)
   }, instances, { props: { contentType: 'modpack' } })
   await c.mount()
+  c.state.useApi.value = true
   await c.state.doSearch()
   assert.equal(calls.at(-1).args.contentType, 'modpack')
   assert.equal(calls.at(-1).args.gameVersion, null)
@@ -192,7 +224,7 @@ test('CurseForge modpack search uses the approved modpack category, not Java mod
   await c.state.install({ id: 47, allowModDistribution: true })
   assert.equal(calls.length, 1, 'Modpack search must never invoke the Java jar installer')
   const template = fs.readFileSync(path.join(__dirname, 'CurseForgeBrowser.vue'), 'utf8')
-  assert.match(template, /v-if="!isModpack"/)
+  assert.match(template, /v-if="useApi && !isModpack"/)
 })
 
 test('Rust library stays accessible when no profile exists yet', async () => {
